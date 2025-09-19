@@ -58,7 +58,7 @@ EXTERNAL SOURCES:
 
 SPEC CHECKSUMS:
   Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
-  flutter_mapbox_navigation: 9c7db44c0ea2042d86dc6e157b8a99a68936287a
+  flutter_mapbox_navigation: 871865c156b3b5866da705b6d9a0efe48b25f3cd
   MapboxCommon: cc47fafe3fe5408ca49240aa80fa64f27f275711
   MapboxCoreMaps: 35685edba03e44468aed57c3dfd7f8795edafda8
   MapboxCoreNavigation: ccc186496b0272d9fe93d4bee49dbf64e798dcd5

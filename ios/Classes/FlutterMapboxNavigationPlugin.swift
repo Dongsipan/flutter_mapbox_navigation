@@ -55,6 +55,18 @@ public class FlutterMapboxNavigationPlugin: NavigationFactory, FlutterPlugin {
         {
             downloadOfflineRoute(arguments: arguments, flutterResult: result)
         }
+        else if(call.method == "getNavigationHistoryList")
+        {
+            getNavigationHistoryList(result: result)
+        }
+        else if(call.method == "deleteNavigationHistory")
+        {
+            deleteNavigationHistory(arguments: arguments, result: result)
+        }
+        else if(call.method == "clearAllNavigationHistory")
+        {
+            clearAllNavigationHistory(result: result)
+        }
         else
         {
             result("Method is Not Implemented");

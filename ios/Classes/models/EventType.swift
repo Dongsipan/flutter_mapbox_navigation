@@ -19,4 +19,7 @@ enum MapBoxEventType: String, Codable
     case failed_to_reroute
     case reroute_along
     case on_map_tap
+    case history_recording_started
+    case history_recording_stopped
+    case history_recording_error
 }

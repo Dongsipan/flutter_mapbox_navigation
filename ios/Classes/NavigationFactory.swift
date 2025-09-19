@@ -4,6 +4,8 @@ import MapboxMaps
 import MapboxDirections
 import MapboxCoreNavigation
 import MapboxNavigation
+import MapboxNavigationCore
+import Foundation
 
 public class NavigationFactory : NSObject, FlutterStreamHandler
 {
@@ -40,7 +42,12 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
     var _showReportFeedbackButton = true
     var _showEndOfRouteFeedback = true
     var _enableOnMapTapCallback = false
+    var _enableHistoryRecording = false
+    var _isHistoryRecording = false
+    var _currentHistoryId: String?
+    var _historyStartTime: Date?
     var navigationDirections: Directions?
+    private var historyManager: HistoryManager?
     
     func addWayPoints(arguments: NSDictionary?, result: @escaping FlutterResult)
     {
@@ -218,6 +225,7 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
         _showReportFeedbackButton = arguments?["showReportFeedbackButton"] as? Bool ?? _showReportFeedbackButton
         _showEndOfRouteFeedback = arguments?["showEndOfRouteFeedback"] as? Bool ?? _showEndOfRouteFeedback
         _enableOnMapTapCallback = arguments?["enableOnMapTapCallback"] as? Bool ?? _enableOnMapTapCallback
+        _enableHistoryRecording = arguments?["enableHistoryRecording"] as? Bool ?? _enableHistoryRecording
         _mapStyleUrlDay = arguments?["mapStyleUrlDay"] as? String
         _mapStyleUrlNight = arguments?["mapStyleUrlNight"] as? String
         _zoom = arguments?["zoom"] as? Double ?? _zoom
@@ -386,6 +394,159 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
         _eventSink = nil
         return nil
     }
+    
+    // MARK: - Navigation History Methods
+    
+    func getNavigationHistoryList(result: @escaping FlutterResult) {
+        if historyManager == nil {
+            historyManager = HistoryManager()
+        }
+        
+        do {
+            let historyList = historyManager!.getHistoryList()
+            let historyMaps = historyList.map { history in
+                [
+                    "id": history.id,
+                    "historyFilePath": history.historyFilePath,
+                    "startTime": history.startTime.timeIntervalSince1970 * 1000, // 转换为毫秒
+                    "duration": history.duration,
+                    "startPointName": history.startPointName ?? "",
+                    "endPointName": history.endPointName ?? "",
+                    "navigationMode": history.navigationMode ?? ""
+                ]
+            }
+            result(historyMaps)
+        } catch {
+            result(FlutterError(code: "HISTORY_ERROR", message: "Failed to get history list: \(error.localizedDescription)", details: nil))
+        }
+    }
+    
+    func deleteNavigationHistory(arguments: NSDictionary?, result: @escaping FlutterResult) {
+        guard let historyId = arguments?["historyId"] as? String else {
+            result(FlutterError(code: "INVALID_ARGUMENT", message: "historyId is required", details: nil))
+            return
+        }
+        
+        if historyManager == nil {
+            historyManager = HistoryManager()
+        }
+        
+        do {
+            let success = historyManager!.deleteHistoryRecord(historyId: historyId)
+            result(success)
+        } catch {
+            result(FlutterError(code: "HISTORY_ERROR", message: "Failed to delete history: \(error.localizedDescription)", details: nil))
+        }
+    }
+    
+    func clearAllNavigationHistory(result: @escaping FlutterResult) {
+        if historyManager == nil {
+            historyManager = HistoryManager()
+        }
+        
+        do {
+            let success = historyManager!.clearAllHistory()
+            result(success)
+        } catch {
+            result(FlutterError(code: "HISTORY_ERROR", message: "Failed to clear history: \(error.localizedDescription)", details: nil))
+        }
+    }
+    
+    // MARK: - History Recording Methods
+    
+    /**
+     * 启动导航历史记录
+     */
+    private func startHistoryRecording() {
+        if _enableHistoryRecording && !_isHistoryRecording {
+            // 使用 Mapbox Navigation SDK 的历史记录功能
+            // 根据官方示例，使用 HistoryRecording 类
+            do {
+                // 启动历史记录
+                try HistoryRecording.startRecordingHistory()
+                _isHistoryRecording = true
+                _currentHistoryId = UUID().uuidString
+                _historyStartTime = Date()
+                print("History recording started successfully")
+                sendEvent(eventType: MapBoxEventType.history_recording_started)
+            } catch {
+                print("Failed to start history recording: \(error.localizedDescription)")
+                sendEvent(eventType: MapBoxEventType.history_recording_error, data: "Failed to start history recording: \(error.localizedDescription)")
+            }
+        }
+    }
+    
+    /**
+     * 停止导航历史记录
+     */
+    private func stopHistoryRecording() {
+        if _isHistoryRecording {
+            do {
+                // 创建历史文件 URL
+                let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+                let historyFileName = "navigation_history_\(_currentHistoryId ?? UUID().uuidString).json"
+                let historyFileURL = documentsPath.appendingPathComponent(historyFileName)
+                
+                // 停止记录并写入文件
+                try HistoryRecording.stopRecordingHistory(writingFileWith: historyFileURL)
+                
+                print("History recording stopped successfully, file saved to: \(historyFileURL.path)")
+                // 保存历史记录信息
+                saveHistoryRecord(filePath: historyFileURL.path)
+                sendEvent(eventType: MapBoxEventType.history_recording_stopped, data: historyFileURL.path)
+                
+                _isHistoryRecording = false
+                _currentHistoryId = nil
+                _historyStartTime = nil
+            } catch {
+                print("Failed to stop history recording: \(error.localizedDescription)")
+                sendEvent(eventType: MapBoxEventType.history_recording_error, data: "Failed to stop history recording: \(error.localizedDescription)")
+                _isHistoryRecording = false
+                _currentHistoryId = nil
+                _historyStartTime = nil
+            }
+        }
+    }
+    
+    /**
+     * 保存历史记录信息
+     */
+    private func saveHistoryRecord(filePath: String) {
+        do {
+            let fileManager = FileManager.default
+            if fileManager.fileExists(atPath: filePath) {
+                let fileAttributes = try fileManager.attributesOfItem(atPath: filePath)
+                let fileSize = fileAttributes[.size] as? Int64 ?? 0
+                
+                let duration = _historyStartTime != nil ? Date().timeIntervalSince(_historyStartTime!) : 0
+                
+                let historyData: [String: Any] = [
+                    "id": _currentHistoryId ?? UUID().uuidString,
+                    "filePath": filePath,
+                    "startTime": _historyStartTime?.timeIntervalSince1970 ?? 0,
+                    "duration": Int(duration),
+                    "fileSize": fileSize,
+                    "startPointName": _wayPoints.first?.name ?? "未知起点",
+                    "endPointName": _wayPoints.last?.name ?? "未知终点",
+                    "navigationMode": _navigationMode ?? "driving"
+                ]
+                
+                // 使用历史记录管理器保存
+                if historyManager == nil {
+                    historyManager = HistoryManager()
+                }
+                
+                let success = historyManager!.saveHistoryRecord(historyData: historyData)
+                if !success {
+                    sendEvent(eventType: MapBoxEventType.history_recording_error, data: "Failed to save history record to database")
+                } else {
+                    print("History record saved successfully: \(historyData)")
+                }
+            }
+        } catch {
+            sendEvent(eventType: MapBoxEventType.history_recording_error, data: "Failed to save history record: \(error.localizedDescription)")
+        }
+    }
 }
 
 
@@ -395,6 +556,12 @@ extension NavigationFactory : NavigationViewControllerDelegate {
         _lastKnownLocation = location
         _distanceRemaining = progress.distanceRemaining
         _durationRemaining = progress.durationRemaining
+        
+        // 启动历史记录（仅在第一次更新时）
+        if !_isHistoryRecording {
+            startHistoryRecording()
+        }
+        
         sendEvent(eventType: MapBoxEventType.navigation_running)
         //_currentLegDescription =  progress.currentLeg.description
         if(_eventSink != nil)
@@ -416,6 +583,12 @@ extension NavigationFactory : NavigationViewControllerDelegate {
     
     public func navigationViewController(_ navigationViewController: NavigationViewController, didArriveAt waypoint: Waypoint) -> Bool {
         sendEvent(eventType: MapBoxEventType.on_arrival, data: "true")
+        
+        // 如果是最后一个航点，停止历史记录
+        if _wayPoints.isEmpty || waypoint == _wayPoints.last {
+            stopHistoryRecording()
+        }
+        
         if(!_wayPoints.isEmpty && IsMultipleUniqueRoutes)
         {
             continueNavigationWithWayPoints(wayPoints: [getLastKnownLocation(), _wayPoints.remove(at: 0)])
@@ -430,6 +603,7 @@ extension NavigationFactory : NavigationViewControllerDelegate {
     public func navigationViewControllerDidDismiss(_ navigationViewController: NavigationViewController, byCanceling canceled: Bool) {
         if(canceled)
         {
+            stopHistoryRecording()
             sendEvent(eventType: MapBoxEventType.navigation_cancelled)
         }
         endNavigation(result: nil)
@@ -455,4 +629,136 @@ extension NavigationFactory : NavigationViewControllerDelegate {
             
         }
     }
+}
+
+// MARK: - HistoryManager 内嵌类
+/**
+ * 导航历史记录管理器
+ */
+class HistoryManager {
+    
+    private let userDefaults = UserDefaults.standard
+    private let historyKey = "navigation_history_list"
+    
+    init() {}
+    
+    /**
+     * 保存历史记录
+     */
+    func saveHistoryRecord(historyData: [String: Any]) -> Bool {
+        do {
+            var historyList = getHistoryList()
+            let historyRecord = HistoryRecord(
+                id: historyData["id"] as? String ?? UUID().uuidString,
+                historyFilePath: historyData["filePath"] as? String ?? "",
+                startTime: Date(timeIntervalSince1970: historyData["startTime"] as? TimeInterval ?? 0),
+                duration: historyData["duration"] as? Int ?? 0,
+                startPointName: historyData["startPointName"] as? String,
+                endPointName: historyData["endPointName"] as? String,
+                navigationMode: historyData["navigationMode"] as? String
+            )
+            
+            historyList.append(historyRecord)
+            return saveHistoryList(historyList)
+        } catch {
+            return false
+        }
+    }
+    
+    /**
+     * 获取历史记录列表
+     */
+    func getHistoryList() -> [HistoryRecord] {
+        guard let data = userDefaults.data(forKey: historyKey),
+              let historyList = try? JSONDecoder().decode([HistoryRecord].self, from: data) else {
+            return []
+        }
+        return historyList
+    }
+    
+    /**
+     * 删除指定的历史记录
+     */
+    func deleteHistoryRecord(historyId: String) -> Bool {
+        var historyList = getHistoryList()
+        if let index = historyList.firstIndex(where: { $0.id == historyId }) {
+            let record = historyList[index]
+            
+            // 删除文件
+            let fileManager = FileManager.default
+            if fileManager.fileExists(atPath: record.historyFilePath) {
+                try? fileManager.removeItem(atPath: record.historyFilePath)
+            }
+            
+            // 从列表中移除
+            historyList.remove(at: index)
+            return saveHistoryList(historyList)
+        }
+        return false
+    }
+    
+    /**
+     * 清除所有历史记录
+     */
+    func clearAllHistory() -> Bool {
+        let historyList = getHistoryList()
+        
+        // 删除所有文件
+        let fileManager = FileManager.default
+        for record in historyList {
+            if fileManager.fileExists(atPath: record.historyFilePath) {
+                try? fileManager.removeItem(atPath: record.historyFilePath)
+            }
+        }
+        
+        // 清空列表
+        return saveHistoryList([])
+    }
+    
+    /**
+     * 获取历史记录存储目录
+     */
+    func getHistoryDirectory() -> URL {
+        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+        let historyDir = documentsPath.appendingPathComponent("navigation_history")
+        
+        // 创建目录（如果不存在）
+        if !FileManager.default.fileExists(atPath: historyDir.path) {
+            try? FileManager.default.createDirectory(at: historyDir, withIntermediateDirectories: true, attributes: nil)
+        }
+        
+        return historyDir
+    }
+    
+    /**
+     * 生成历史记录文件路径
+     */
+    func generateHistoryFilePath(historyId: String) -> String {
+        let historyDir = getHistoryDirectory()
+        let fileName = "navigation_history_\(historyId).json"
+        return historyDir.appendingPathComponent(fileName).path
+    }
+    
+    private func saveHistoryList(_ historyList: [HistoryRecord]) -> Bool {
+        do {
+            let data = try JSONEncoder().encode(historyList)
+            userDefaults.set(data, forKey: historyKey)
+            return true
+        } catch {
+            return false
+        }
+    }
+}
+
+/**
+ * 历史记录数据类
+ */
+struct HistoryRecord: Codable {
+    let id: String
+    let historyFilePath: String
+    let startTime: Date
+    let duration: Int
+    let startPointName: String?
+    let endPointName: String?
+    let navigationMode: String?
 }

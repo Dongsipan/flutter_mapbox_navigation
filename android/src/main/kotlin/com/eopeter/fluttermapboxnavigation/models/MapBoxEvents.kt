@@ -19,5 +19,8 @@ enum class MapBoxEvents(val value: String) {
     ON_ARRIVAL("on_arrival"),
     FAILED_TO_REROUTE("failed_to_reroute"),
     REROUTE_ALONG("reroute_along"),
-    ON_MAP_TAP("on_map_tap")
+    ON_MAP_TAP("on_map_tap"),
+    HISTORY_RECORDING_STARTED("history_recording_started"),
+    HISTORY_RECORDING_STOPPED("history_recording_stopped"),
+    HISTORY_RECORDING_ERROR("history_recording_error")
 }

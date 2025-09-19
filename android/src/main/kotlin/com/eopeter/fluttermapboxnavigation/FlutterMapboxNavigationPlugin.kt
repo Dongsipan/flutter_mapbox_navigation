@@ -8,6 +8,7 @@ import android.os.Build
 import com.eopeter.fluttermapboxnavigation.activity.NavigationLauncher
 import com.eopeter.fluttermapboxnavigation.factory.EmbeddedNavigationViewFactory
 import com.eopeter.fluttermapboxnavigation.models.Waypoint
+import com.eopeter.fluttermapboxnavigation.utilities.HistoryManager
 import com.mapbox.api.directions.v5.DirectionsCriteria
 import com.mapbox.api.directions.v5.models.DirectionsRoute
 import io.flutter.embedding.engine.plugins.FlutterPlugin
@@ -29,6 +30,7 @@ class FlutterMapboxNavigationPlugin : FlutterPlugin, MethodCallHandler,
     private lateinit var progressEventChannel: EventChannel
     private var currentActivity: Activity? = null
     private lateinit var currentContext: Context
+    private lateinit var historyManager: HistoryManager
 
     override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         val messenger = binding.binaryMessenger
@@ -40,8 +42,8 @@ class FlutterMapboxNavigationPlugin : FlutterPlugin, MethodCallHandler,
 
         platformViewRegistry = binding.platformViewRegistry
         binaryMessenger = messenger
-
-
+        currentContext = binding.applicationContext
+        historyManager = HistoryManager(currentContext)
     }
 
     companion object {
@@ -74,6 +76,7 @@ class FlutterMapboxNavigationPlugin : FlutterPlugin, MethodCallHandler,
         var durationRemaining: Double? = null
         var platformViewRegistry: PlatformViewRegistry? = null
         var binaryMessenger: BinaryMessenger? = null
+        var enableHistoryRecording = false
 
         var viewId = "FlutterMapboxNavigationView"
     }
@@ -106,6 +109,15 @@ class FlutterMapboxNavigationPlugin : FlutterPlugin, MethodCallHandler,
             "enableOfflineRouting" -> {
                 downloadRegionForOfflineRouting(call, result)
             }
+            "getNavigationHistoryList" -> {
+                getNavigationHistoryList(result)
+            }
+            "deleteNavigationHistory" -> {
+                deleteNavigationHistory(call, result)
+            }
+            "clearAllNavigationHistory" -> {
+                clearAllNavigationHistory(result)
+            }
             else -> result.notImplemented()
         }
     }
@@ -115,6 +127,50 @@ class FlutterMapboxNavigationPlugin : FlutterPlugin, MethodCallHandler,
         result: Result
     ) {
         result.error("TODO", "Not Implemented in Android", "will implement soon")
+    }
+
+    private fun getNavigationHistoryList(result: Result) {
+        try {
+            val historyList = historyManager.getHistoryList()
+            val historyMaps = historyList.map { history ->
+                mapOf(
+                    "id" to history.id,
+                    "historyFilePath" to history.historyFilePath,
+                    "startTime" to history.startTime.time,
+                    "duration" to history.duration,
+                    "startPointName" to history.startPointName,
+                    "endPointName" to history.endPointName,
+                    "navigationMode" to history.navigationMode
+                )
+            }
+            result.success(historyMaps)
+        } catch (e: Exception) {
+            result.error("HISTORY_ERROR", "Failed to get history list: ${e.message}", null)
+        }
+    }
+
+    private fun deleteNavigationHistory(call: MethodCall, result: Result) {
+        val arguments = call.arguments as? Map<String, Any>
+        val historyId = arguments?.get("historyId") as? String
+        if (historyId != null) {
+            try {
+                val success = historyManager.deleteHistoryRecord(historyId)
+                result.success(success)
+            } catch (e: Exception) {
+                result.error("HISTORY_ERROR", "Failed to delete history: ${e.message}", null)
+            }
+        } else {
+            result.error("INVALID_ARGUMENT", "historyId is required", null)
+        }
+    }
+
+    private fun clearAllNavigationHistory(result: Result) {
+        try {
+            val success = historyManager.clearAllHistory()
+            result.success(success)
+        } catch (e: Exception) {
+            result.error("HISTORY_ERROR", "Failed to clear history: ${e.message}", null)
+        }
     }
 
     private fun checkPermissionAndBeginNavigation(
@@ -149,6 +205,11 @@ class FlutterMapboxNavigationPlugin : FlutterPlugin, MethodCallHandler,
         val onMapTap = arguments?.get("enableOnMapTapCallback") as? Boolean
         if (onMapTap != null) {
             enableOnMapTapCallback = onMapTap
+        }
+
+        val historyRecording = arguments?.get("enableHistoryRecording") as? Boolean
+        if (historyRecording != null) {
+            enableHistoryRecording = historyRecording
         }
 
         val language = arguments?.get("language") as? String

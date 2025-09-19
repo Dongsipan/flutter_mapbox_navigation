@@ -35,6 +35,7 @@ class MapBoxOptions {
     this.showReportFeedbackButton = true,
     this.showEndOfRouteFeedback = true,
     this.enableOnMapTapCallback = false,
+    this.enableHistoryRecording = false,
   });
 
   MapBoxOptions.from(MapBoxOptions option) {
@@ -60,6 +61,7 @@ class MapBoxOptions {
     animateBuildRoute = option.animateBuildRoute;
     showReportFeedbackButton = option.showReportFeedbackButton;
     showEndOfRouteFeedback = option.showEndOfRouteFeedback;
+    enableHistoryRecording = option.enableHistoryRecording;
   }
 
   /// The initial Latitude of the Map View
@@ -168,6 +170,10 @@ class MapBoxOptions {
   /// to where you tap on the map.
   bool? enableOnMapTapCallback;
 
+  /// 是否启用导航历史记录功能
+  /// 当设置为 true 时，导航过程中会自动记录历史数据
+  bool? enableHistoryRecording;
+
   Map<String, dynamic> toMap() {
     final optionsMap = <String, dynamic>{};
     void addIfNonNull(String fieldName, dynamic value) {
@@ -225,6 +231,7 @@ class MapBoxOptions {
     addIfNonNull('showReportFeedbackButton', showReportFeedbackButton);
     addIfNonNull('showEndOfRouteFeedback', showEndOfRouteFeedback);
     addIfNonNull('enableOnMapTapCallback', enableOnMapTapCallback);
+    addIfNonNull('enableHistoryRecording', enableHistoryRecording);
 
     return optionsMap;
   }

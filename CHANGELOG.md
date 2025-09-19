@@ -1,3 +1,11 @@
+## 0.2.3
+* 添加导航历史记录功能
+* 新增 `enableHistoryRecording` 参数到 MapBoxOptions
+* 新增 `NavigationHistory` 数据模型
+* 新增历史记录管理 API (getNavigationHistoryList, deleteNavigationHistory, clearAllNavigationHistory)
+* 支持 Android 和 iOS 平台的导航历史记录
+* 添加完整的使用示例和文档
+
 ## 0.2.2
 * Fix issue with voice units in Android
 * Fix BannerText, VoiceInstruction and Off Route Events

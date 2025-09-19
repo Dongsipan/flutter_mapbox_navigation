@@ -102,4 +102,25 @@ abstract class FlutterMapboxNavigationPlatform extends PlatformInterface {
       'registerEventListener() has not been implemented.',
     );
   }
+
+  /// 获取所有导航历史记录列表
+  Future<List<NavigationHistory>> getNavigationHistoryList() async {
+    throw UnimplementedError(
+      'getNavigationHistoryList() has not been implemented.',
+    );
+  }
+
+  /// 删除指定的导航历史记录
+  Future<bool> deleteNavigationHistory(String historyId) async {
+    throw UnimplementedError(
+      'deleteNavigationHistory() has not been implemented.',
+    );
+  }
+
+  /// 清除所有导航历史记录
+  Future<bool> clearAllNavigationHistory() async {
+    throw UnimplementedError(
+      'clearAllNavigationHistory() has not been implemented.',
+    );
+  }
 }

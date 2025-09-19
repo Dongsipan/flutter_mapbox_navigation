@@ -23,8 +23,8 @@ class MapBoxNavigation {
     voiceInstructionsEnabled: true,
     bannerInstructionsEnabled: true,
     allowsUTurnAtWayPoints: true,
-    mode: MapBoxNavigationMode.drivingWithTraffic,
-    units: VoiceUnits.imperial,
+    mode: MapBoxNavigationMode.cycling,
+    units: VoiceUnits.metric,
     simulateRoute: false,
     animateBuildRoute: true,
     longPressDestinationEnabled: true,
@@ -110,5 +110,20 @@ class MapBoxNavigation {
   ) async {
     return FlutterMapboxNavigationPlatform.instance
         .registerRouteEventListener(listener);
+  }
+
+  /// 获取所有导航历史记录列表
+  Future<List<NavigationHistory>> getNavigationHistoryList() async {
+    return FlutterMapboxNavigationPlatform.instance.getNavigationHistoryList();
+  }
+
+  /// 删除指定的导航历史记录
+  Future<bool> deleteNavigationHistory(String historyId) async {
+    return FlutterMapboxNavigationPlatform.instance.deleteNavigationHistory(historyId);
+  }
+
+  /// 清除所有导航历史记录
+  Future<bool> clearAllNavigationHistory() async {
+    return FlutterMapboxNavigationPlatform.instance.clearAllNavigationHistory();
   }
 }

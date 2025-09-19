@@ -49,6 +49,13 @@ import com.mapbox.navigation.core.trip.session.VoiceInstructionsObserver
 import com.mapbox.navigation.dropin.map.MapViewObserver
 import com.mapbox.navigation.dropin.navigationview.NavigationViewListener
 import com.mapbox.navigation.utils.internal.ifNonNull
+import com.mapbox.navigation.core.history.HistoryRecorder
+import com.eopeter.fluttermapboxnavigation.utilities.HistoryManager
+import java.io.File
+import java.util.UUID
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class NavigationActivity : AppCompatActivity() {
     private var finishBroadcastReceiver: BroadcastReceiver? = null
@@ -59,6 +66,10 @@ class NavigationActivity : AppCompatActivity() {
     private var accessToken: String? = null
     private var lastLocation: Location? = null
     private var isNavigationInProgress = false
+    private var isHistoryRecording = false
+    private var currentHistoryId: String? = null
+    private var historyStartTime: Long = 0
+    private lateinit var historyManager: HistoryManager
 
     private val navigationStateListener = object : NavigationViewListener() {
         override fun onFreeDrive() {
@@ -75,6 +86,7 @@ class NavigationActivity : AppCompatActivity() {
 
         override fun onActiveNavigation() {
             isNavigationInProgress = true
+            startHistoryRecording()
         }
 
         override fun onArrival() {
@@ -91,6 +103,8 @@ class NavigationActivity : AppCompatActivity() {
         binding.navigationView.registerMapObserver(onMapClick)
         accessToken =
             PluginUtilities.getResourceFromContext(this.applicationContext, "mapbox_access_token")
+        
+        historyManager = HistoryManager(this.applicationContext)
 
         val navigationOptions = NavigationOptions.Builder(this.applicationContext)
             .accessToken(accessToken)
@@ -206,7 +220,80 @@ class NavigationActivity : AppCompatActivity() {
     fun tryCancelNavigation() {
         if (isNavigationInProgress) {
             isNavigationInProgress = false
+            stopHistoryRecording()
             sendEvent(MapBoxEvents.NAVIGATION_CANCELLED)
+        }
+    }
+
+    /**
+     * 启动导航历史记录
+     */
+    private fun startHistoryRecording() {
+        if (FlutterMapboxNavigationPlugin.enableHistoryRecording && !isHistoryRecording) {
+            try {
+                val navigation = MapboxNavigationApp.current()
+                navigation?.historyRecorder?.startRecording()
+                isHistoryRecording = true
+                currentHistoryId = UUID.randomUUID().toString()
+                historyStartTime = System.currentTimeMillis()
+                sendEvent(MapBoxEvents.HISTORY_RECORDING_STARTED)
+            } catch (e: Exception) {
+                sendEvent(MapBoxEvents.HISTORY_RECORDING_ERROR, "Failed to start history recording: ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * 停止导航历史记录
+     */
+    private fun stopHistoryRecording() {
+        if (isHistoryRecording) {
+            try {
+                val navigation = MapboxNavigationApp.current()
+                navigation?.historyRecorder?.stopRecording { filePath ->
+                    if (filePath != null) {
+                        // 保存历史记录信息到数据库或文件
+                        saveHistoryRecord(filePath)
+                        sendEvent(MapBoxEvents.HISTORY_RECORDING_STOPPED, filePath)
+                    } else {
+                        sendEvent(MapBoxEvents.HISTORY_RECORDING_ERROR, "Failed to save history file")
+                    }
+                }
+                isHistoryRecording = false
+                currentHistoryId = null
+                historyStartTime = 0
+            } catch (e: Exception) {
+                sendEvent(MapBoxEvents.HISTORY_RECORDING_ERROR, "Failed to stop history recording: ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * 保存历史记录信息
+     */
+    private fun saveHistoryRecord(filePath: String) {
+        try {
+            val historyFile = File(filePath)
+            if (historyFile.exists()) {
+                val duration = System.currentTimeMillis() - historyStartTime
+                val historyData = mapOf(
+                    "id" to currentHistoryId,
+                    "filePath" to filePath,
+                    "startTime" to historyStartTime,
+                    "duration" to duration,
+                    "startPointName" to (points.firstOrNull()?.name ?: "未知起点"),
+                    "endPointName" to (points.lastOrNull()?.name ?: "未知终点"),
+                    "navigationMode" to FlutterMapboxNavigationPlugin.navigationMode
+                )
+                
+                // 使用历史记录管理器保存
+                val success = historyManager.saveHistoryRecord(historyData)
+                if (!success) {
+                    sendEvent(MapBoxEvents.HISTORY_RECORDING_ERROR, "Failed to save history record to database")
+                }
+            }
+        } catch (e: Exception) {
+            sendEvent(MapBoxEvents.HISTORY_RECORDING_ERROR, "Failed to save history record: ${e.message}")
         }
     }
 
@@ -365,6 +452,7 @@ class NavigationActivity : AppCompatActivity() {
     private val arrivalObserver: ArrivalObserver = object : ArrivalObserver {
         override fun onFinalDestinationArrival(routeProgress: RouteProgress) {
             isNavigationInProgress = false
+            stopHistoryRecording()
             sendEvent(MapBoxEvents.ON_ARRIVAL)
         }
 

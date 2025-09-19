@@ -5,9 +5,9 @@ import 'package:flutter_mapbox_navigation/flutter_mapbox_navigation.dart';
 /// 导航功能扩展类
 /// 提供额外的导航功能和工具方法
 class NavigationExtensions {
-  static final NavigationExtensions _instance = NavigationExtensions._internal();
   factory NavigationExtensions() => _instance;
   NavigationExtensions._internal();
+  static final NavigationExtensions _instance = NavigationExtensions._internal();
 
   // 路线历史记录
   final List<List<WayPoint>> _routeHistory = [];
@@ -26,14 +26,14 @@ class NavigationExtensions {
   static double calculateDistance(double lat1, double lon1, double lat2, double lon2) {
     const double earthRadius = 6371000; // 地球半径（米）
     
-    final double dLat = _degreesToRadians(lat2 - lat1);
-    final double dLon = _degreesToRadians(lon2 - lon1);
+    final dLat = _degreesToRadians(lat2 - lat1);
+    final dLon = _degreesToRadians(lon2 - lon1);
     
-    final double a = sin(dLat / 2) * sin(dLat / 2) +
+    final a = sin(dLat / 2) * sin(dLat / 2) +
         cos(_degreesToRadians(lat1)) * cos(_degreesToRadians(lat2)) *
         sin(dLon / 2) * sin(dLon / 2);
     
-    final double c = 2 * atan2(sqrt(a), sqrt(1 - a));
+    final c = 2 * atan2(sqrt(a), sqrt(1 - a));
     
     return earthRadius * c;
   }
@@ -47,22 +47,22 @@ class NavigationExtensions {
   List<WayPoint> optimizeRoute(List<WayPoint> wayPoints) {
     if (wayPoints.length <= 2) return wayPoints;
 
-    final List<WayPoint> optimized = [wayPoints.first]; // 起点
-    final List<WayPoint> remaining = wayPoints.sublist(1, wayPoints.length - 1);
-    final WayPoint destination = wayPoints.last; // 终点
+    final optimized = <WayPoint>[wayPoints.first]; // 起点
+    final remaining = wayPoints.sublist(1, wayPoints.length - 1);
+    final destination = wayPoints.last; // 终点
 
-    WayPoint current = wayPoints.first;
+    var current = wayPoints.first;
     
     while (remaining.isNotEmpty) {
       // 找到距离当前点最近的下一个点
-      WayPoint nearest = remaining.first;
-      double minDistance = calculateDistance(
+      var nearest = remaining.first;
+      var minDistance = calculateDistance(
         current.latitude!, current.longitude!,
         nearest.latitude!, nearest.longitude!,
       );
 
       for (final wayPoint in remaining) {
-        final double distance = calculateDistance(
+        final distance = calculateDistance(
           current.latitude!, current.longitude!,
           wayPoint.latitude!, wayPoint.longitude!,
         );
@@ -88,7 +88,7 @@ class NavigationExtensions {
       _eventController.add(NavigationExtensionEvent(
         type: NavigationExtensionEventType.routeSaved,
         data: wayPoints,
-      ));
+      ),);
     }
   }
 
@@ -104,7 +104,7 @@ class NavigationExtensions {
       _eventController.add(NavigationExtensionEvent(
         type: NavigationExtensionEventType.historyCleared,
         data: null,
-      ));
+      ),);
     }
   }
 
@@ -115,22 +115,22 @@ class NavigationExtensions {
     required double radiusKm,
     required int count,
   }) {
-    final List<WayPoint> wayPoints = [];
-    final Random random = Random();
+    final wayPoints = <WayPoint>[];
+    final random = Random();
 
-    for (int i = 0; i < count; i++) {
+    for (var i = 0; i < count; i++) {
       // 在圆形区域内生成随机点
-      final double angle = random.nextDouble() * 2 * pi;
-      final double distance = random.nextDouble() * radiusKm * 1000; // 转换为米
+      final angle = random.nextDouble() * 2 * pi;
+      final distance = random.nextDouble() * radiusKm * 1000; // 转换为米
       
-      final double deltaLat = distance * cos(angle) / 111320; // 纬度度数
-      final double deltaLon = distance * sin(angle) / (111320 * cos(_degreesToRadians(centerLat)));
+      final deltaLat = distance * cos(angle) / 111320; // 纬度度数
+      final deltaLon = distance * sin(angle) / (111320 * cos(_degreesToRadians(centerLat)));
       
       wayPoints.add(WayPoint(
-        name: "随机点 ${i + 1}",
+        name: '随机点 ${i + 1}',
         latitude: centerLat + deltaLat,
         longitude: centerLon + deltaLon,
-      ));
+      ),);
     }
 
     return wayPoints;
@@ -142,8 +142,8 @@ class NavigationExtensions {
       if (!_eventController.isClosed) {
         _eventController.add(NavigationExtensionEvent(
           type: NavigationExtensionEventType.validationError,
-          data: "至少需要2个路径点",
-        ));
+          data: '至少需要2个路径点',
+        ),);
       }
       return false;
     }
@@ -153,8 +153,8 @@ class NavigationExtensions {
         if (!_eventController.isClosed) {
           _eventController.add(NavigationExtensionEvent(
             type: NavigationExtensionEventType.validationError,
-            data: "无效的坐标: ${wayPoint.name}",
-          ));
+            data: '无效的坐标: ${wayPoint.name}',
+          ),);
         }
         return false;
       }
@@ -172,7 +172,7 @@ class NavigationExtensions {
     if (wayPoints.length < 2) return 0;
 
     double totalDistance = 0;
-    for (int i = 0; i < wayPoints.length - 1; i++) {
+    for (var i = 0; i < wayPoints.length - 1; i++) {
       totalDistance += calculateDistance(
         wayPoints[i].latitude!,
         wayPoints[i].longitude!,
@@ -187,21 +187,21 @@ class NavigationExtensions {
   /// 格式化距离显示
   String formatDistance(double meters) {
     if (meters < 1000) {
-      return "${meters.toStringAsFixed(0)} 米";
+      return '${meters.toStringAsFixed(0)} 米';
     } else {
-      return "${(meters / 1000).toStringAsFixed(1)} 公里";
+      return '${(meters / 1000).toStringAsFixed(1)} 公里';
     }
   }
 
   /// 格式化时间显示
   String formatDuration(double seconds) {
-    final int hours = (seconds / 3600).floor();
-    final int minutes = ((seconds % 3600) / 60).floor();
+    final hours = (seconds / 3600).floor();
+    final minutes = ((seconds % 3600) / 60).floor();
     
     if (hours > 0) {
-      return "${hours}小时${minutes}分钟";
+      return '$hours小时$minutes分钟';
     } else {
-      return "${minutes}分钟";
+      return '$minutes分钟';
     }
   }
 
@@ -213,10 +213,6 @@ class NavigationExtensions {
 
 /// 路线信息类
 class RouteInfo {
-  final List<WayPoint> wayPoints;
-  final double totalDistance;
-  final DateTime createdAt;
-  final String? name;
 
   RouteInfo({
     required this.wayPoints,
@@ -224,17 +220,21 @@ class RouteInfo {
     required this.createdAt,
     this.name,
   });
+  final List<WayPoint> wayPoints;
+  final double totalDistance;
+  final DateTime createdAt;
+  final String? name;
 }
 
 /// 扩展事件类
 class NavigationExtensionEvent {
-  final NavigationExtensionEventType type;
-  final dynamic data;
 
   NavigationExtensionEvent({
     required this.type,
     required this.data,
   });
+  final NavigationExtensionEventType type;
+  final dynamic data;
 }
 
 /// 扩展事件类型

@@ -307,14 +307,14 @@ class _AdvancedFeaturesExampleState extends State<AdvancedFeaturesExample> {
           width: double.maxFinite,
           height: 300,
           child: history.isEmpty
-            ? Column(
+            ? const Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.history, size: 64, color: Colors.grey),
-                  const SizedBox(height: 16),
-                  const Text('暂无历史记录'),
-                  const SizedBox(height: 8),
-                  const Text(
+                  Icon(Icons.history, size: 64, color: Colors.grey),
+                  SizedBox(height: 16),
+                  Text('暂无历史记录'),
+                  SizedBox(height: 8),
+                  Text(
                     '先添加一些路径点，然后点击"保存路线"',
                     style: TextStyle(fontSize: 12, color: Colors.grey),
                     textAlign: TextAlign.center,

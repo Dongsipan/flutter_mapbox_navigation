@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_mapbox_navigation/flutter_mapbox_navigation.dart';
-import '../lib/src/extensions/navigation_extensions.dart';
+import 'package:flutter_mapbox_navigation/src/extensions/navigation_extensions.dart';
 
 void main() {
   group('NavigationExtensions Tests', () {
@@ -42,34 +42,34 @@ void main() {
     group('Route Optimization', () {
       test('should return same route for 2 waypoints', () {
         final wayPoints = [
-          WayPoint(name: "Start", latitude: 39.9042, longitude: 116.4074),
-          WayPoint(name: "End", latitude: 39.9163, longitude: 116.3972),
+          WayPoint(name: 'Start', latitude: 39.9042, longitude: 116.4074),
+          WayPoint(name: 'End', latitude: 39.9163, longitude: 116.3972),
         ];
 
         final optimized = extensions.optimizeRoute(wayPoints);
         
         expect(optimized.length, equals(2));
-        expect(optimized[0].name, equals("Start"));
-        expect(optimized[1].name, equals("End"));
+        expect(optimized[0].name, equals('Start'));
+        expect(optimized[1].name, equals('End'));
       });
 
       test('should optimize route with multiple waypoints', () {
         final wayPoints = [
-          WayPoint(name: "Start", latitude: 39.9042, longitude: 116.4074), // 天安门
-          WayPoint(name: "Far", latitude: 39.9500, longitude: 116.4500),   // 远点
-          WayPoint(name: "Near", latitude: 39.9100, longitude: 116.4100),  // 近点
-          WayPoint(name: "End", latitude: 39.9163, longitude: 116.3972),   // 故宫
+          WayPoint(name: 'Start', latitude: 39.9042, longitude: 116.4074), // 天安门
+          WayPoint(name: 'Far', latitude: 39.9500, longitude: 116.4500),   // 远点
+          WayPoint(name: 'Near', latitude: 39.9100, longitude: 116.4100),  // 近点
+          WayPoint(name: 'End', latitude: 39.9163, longitude: 116.3972),   // 故宫
         ];
 
         final optimized = extensions.optimizeRoute(wayPoints);
         
         expect(optimized.length, equals(4));
-        expect(optimized[0].name, equals("Start")); // 起点不变
-        expect(optimized[3].name, equals("End"));   // 终点不变
+        expect(optimized[0].name, equals('Start')); // 起点不变
+        expect(optimized[3].name, equals('End'));   // 终点不变
         
         // 验证中间点被重新排序（近点应该在远点之前）
-        final nearIndex = optimized.indexWhere((wp) => wp.name == "Near");
-        final farIndex = optimized.indexWhere((wp) => wp.name == "Far");
+        final nearIndex = optimized.indexWhere((wp) => wp.name == 'Near');
+        final farIndex = optimized.indexWhere((wp) => wp.name == 'Far');
         expect(nearIndex, lessThan(farIndex));
       });
     });
@@ -77,8 +77,8 @@ void main() {
     group('Route Validation', () {
       test('should validate correct waypoints', () {
         final wayPoints = [
-          WayPoint(name: "Start", latitude: 39.9042, longitude: 116.4074),
-          WayPoint(name: "End", latitude: 39.9163, longitude: 116.3972),
+          WayPoint(name: 'Start', latitude: 39.9042, longitude: 116.4074),
+          WayPoint(name: 'End', latitude: 39.9163, longitude: 116.3972),
         ];
 
         final isValid = extensions.validateWayPoints(wayPoints);
@@ -88,7 +88,7 @@ void main() {
 
       test('should reject single waypoint', () {
         final wayPoints = [
-          WayPoint(name: "Only", latitude: 39.9042, longitude: 116.4074),
+          WayPoint(name: 'Only', latitude: 39.9042, longitude: 116.4074),
         ];
 
         final isValid = extensions.validateWayPoints(wayPoints);
@@ -98,8 +98,8 @@ void main() {
 
       test('should reject invalid coordinates', () {
         final wayPoints = [
-          WayPoint(name: "Start", latitude: 39.9042, longitude: 116.4074),
-          WayPoint(name: "Invalid", latitude: 91.0, longitude: 181.0), // 超出范围
+          WayPoint(name: 'Start', latitude: 39.9042, longitude: 116.4074),
+          WayPoint(name: 'Invalid', latitude: 91, longitude: 181), // 超出范围
         ];
 
         final isValid = extensions.validateWayPoints(wayPoints);
@@ -113,7 +113,7 @@ void main() {
         final wayPoints = extensions.generateRandomWayPoints(
           centerLat: 39.9042,
           centerLon: 116.4074,
-          radiusKm: 5.0,
+          radiusKm: 5,
           count: 5,
         );
 
@@ -147,9 +147,9 @@ void main() {
     group('Total Distance Calculation', () {
       test('should calculate total distance for route', () {
         final wayPoints = [
-          WayPoint(name: "A", latitude: 39.9042, longitude: 116.4074),
-          WayPoint(name: "B", latitude: 39.9100, longitude: 116.4100),
-          WayPoint(name: "C", latitude: 39.9163, longitude: 116.3972),
+          WayPoint(name: 'A', latitude: 39.9042, longitude: 116.4074),
+          WayPoint(name: 'B', latitude: 39.9100, longitude: 116.4100),
+          WayPoint(name: 'C', latitude: 39.9163, longitude: 116.3972),
         ];
 
         final totalDistance = extensions.calculateTotalDistance(wayPoints);
@@ -171,7 +171,7 @@ void main() {
 
       test('should return 0 for single waypoint', () {
         final wayPoints = [
-          WayPoint(name: "Only", latitude: 39.9042, longitude: 116.4074),
+          WayPoint(name: 'Only', latitude: 39.9042, longitude: 116.4074),
         ];
 
         final totalDistance = extensions.calculateTotalDistance(wayPoints);
@@ -183,8 +183,8 @@ void main() {
     group('Route History', () {
       test('should save and retrieve route history', () {
         final wayPoints = [
-          WayPoint(name: "Start", latitude: 39.9042, longitude: 116.4074),
-          WayPoint(name: "End", latitude: 39.9163, longitude: 116.3972),
+          WayPoint(name: 'Start', latitude: 39.9042, longitude: 116.4074),
+          WayPoint(name: 'End', latitude: 39.9163, longitude: 116.3972),
         ];
 
         extensions.saveRouteToHistory(wayPoints);
@@ -193,8 +193,8 @@ void main() {
         
         expect(history.length, equals(1));
         expect(history[0].length, equals(2));
-        expect(history[0][0].name, equals("Start"));
-        expect(history[0][1].name, equals("End"));
+        expect(history[0][0].name, equals('Start'));
+        expect(history[0][1].name, equals('End'));
       });
 
       test('should clear route history', () {
@@ -202,8 +202,8 @@ void main() {
         extensions.clearRouteHistory();
 
         final wayPoints = [
-          WayPoint(name: "Start", latitude: 39.9042, longitude: 116.4074),
-          WayPoint(name: "End", latitude: 39.9163, longitude: 116.3972),
+          WayPoint(name: 'Start', latitude: 39.9042, longitude: 116.4074),
+          WayPoint(name: 'End', latitude: 39.9163, longitude: 116.3972),
         ];
 
         extensions.saveRouteToHistory(wayPoints);
@@ -216,27 +216,27 @@ void main() {
 
     group('Formatting', () {
       test('should format distance correctly', () {
-        expect(extensions.formatDistance(500), equals("500 米"));
-        expect(extensions.formatDistance(1000), equals("1.0 公里"));
-        expect(extensions.formatDistance(1500), equals("1.5 公里"));
-        expect(extensions.formatDistance(12345), equals("12.3 公里"));
+        expect(extensions.formatDistance(500), equals('500 米'));
+        expect(extensions.formatDistance(1000), equals('1.0 公里'));
+        expect(extensions.formatDistance(1500), equals('1.5 公里'));
+        expect(extensions.formatDistance(12345), equals('12.3 公里'));
       });
 
       test('should format duration correctly', () {
-        expect(extensions.formatDuration(30), equals("0分钟"));
-        expect(extensions.formatDuration(60), equals("1分钟"));
-        expect(extensions.formatDuration(90), equals("1分钟"));
-        expect(extensions.formatDuration(3600), equals("1小时0分钟"));
-        expect(extensions.formatDuration(3660), equals("1小时1分钟"));
-        expect(extensions.formatDuration(7320), equals("2小时2分钟"));
+        expect(extensions.formatDuration(30), equals('0分钟'));
+        expect(extensions.formatDuration(60), equals('1分钟'));
+        expect(extensions.formatDuration(90), equals('1分钟'));
+        expect(extensions.formatDuration(3600), equals('1小时0分钟'));
+        expect(extensions.formatDuration(3660), equals('1小时1分钟'));
+        expect(extensions.formatDuration(7320), equals('2小时2分钟'));
       });
     });
 
     group('Event Stream', () {
       test('should emit events when saving route', () async {
         final wayPoints = [
-          WayPoint(name: "Start", latitude: 39.9042, longitude: 116.4074),
-          WayPoint(name: "End", latitude: 39.9163, longitude: 116.3972),
+          WayPoint(name: 'Start', latitude: 39.9042, longitude: 116.4074),
+          WayPoint(name: 'End', latitude: 39.9163, longitude: 116.3972),
         ];
 
         // 监听事件

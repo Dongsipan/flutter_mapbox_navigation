@@ -61,9 +61,9 @@ class _AdvancedFeaturesExampleState extends State<AdvancedFeaturesExample> {
   // 生成随机路径点
   void _generateRandomWayPoints() {
     final random = Random();
-    final centerLat = 39.9042; // 天安门为中心
-    final centerLon = 116.4074;
-    final radiusKm = 5.0; // 5公里半径
+    const centerLat = 39.9042; // 天安门为中心
+    const centerLon = 116.4074;
+    const radiusKm = 5.0; // 5公里半径
     
     final randomPoints = <WayPoint>[];
     for (int i = 0; i < 3; i++) {

@@ -119,11 +119,47 @@ class MapBoxNavigation {
 
   /// 删除指定的导航历史记录
   Future<bool> deleteNavigationHistory(String historyId) async {
-    return FlutterMapboxNavigationPlatform.instance.deleteNavigationHistory(historyId);
+    return FlutterMapboxNavigationPlatform.instance
+        .deleteNavigationHistory(historyId);
   }
 
   /// 清除所有导航历史记录
   Future<bool> clearAllNavigationHistory() async {
     return FlutterMapboxNavigationPlatform.instance.clearAllNavigationHistory();
+  }
+
+  /// 开始历史记录回放
+  /// [historyFilePath] 历史记录文件路径
+  /// [enableReplayUI] 是否启用回放UI界面，默认为true
+  Future<bool> startHistoryReplay({
+    required String historyFilePath,
+    bool enableReplayUI = true,
+  }) async {
+    return FlutterMapboxNavigationPlatform.instance.startHistoryReplay(
+      historyFilePath: historyFilePath,
+      enableReplayUI: enableReplayUI,
+    );
+  }
+
+  /// 停止历史记录回放
+  Future<bool> stopHistoryReplay() async {
+    return FlutterMapboxNavigationPlatform.instance.stopHistoryReplay();
+  }
+
+  /// 暂停历史记录回放
+  Future<bool> pauseHistoryReplay() async {
+    return FlutterMapboxNavigationPlatform.instance.pauseHistoryReplay();
+  }
+
+  /// 恢复历史记录回放
+  Future<bool> resumeHistoryReplay() async {
+    return FlutterMapboxNavigationPlatform.instance.resumeHistoryReplay();
+  }
+
+  /// 设置历史记录回放速度
+  /// [speed] 回放速度倍数，1.0为正常速度，2.0为2倍速，0.5为0.5倍速
+  Future<bool> setHistoryReplaySpeed(double speed) async {
+    return FlutterMapboxNavigationPlatform.instance
+        .setHistoryReplaySpeed(speed);
   }
 }

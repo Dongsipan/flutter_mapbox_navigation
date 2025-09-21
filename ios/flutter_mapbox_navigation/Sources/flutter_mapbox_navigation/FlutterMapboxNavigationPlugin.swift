@@ -67,6 +67,26 @@ public class FlutterMapboxNavigationPlugin: NavigationFactory, FlutterPlugin {
         {
             clearAllNavigationHistory(result: result)
         }
+        else if(call.method == "startHistoryReplay")
+        {
+            startHistoryReplay(arguments: arguments, result: result)
+        }
+        else if(call.method == "stopHistoryReplay")
+        {
+            stopHistoryReplay(result: result)
+        }
+        else if(call.method == "pauseHistoryReplay")
+        {
+            pauseHistoryReplay(result: result)
+        }
+        else if(call.method == "resumeHistoryReplay")
+        {
+            resumeHistoryReplay(result: result)
+        }
+        else if(call.method == "setHistoryReplaySpeed")
+        {
+            setHistoryReplaySpeed(arguments: arguments, result: result)
+        }
         else
         {
             result("Method is Not Implemented");

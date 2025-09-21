@@ -118,6 +118,21 @@ class FlutterMapboxNavigationPlugin : FlutterPlugin, MethodCallHandler,
             "clearAllNavigationHistory" -> {
                 clearAllNavigationHistory(result)
             }
+            "startHistoryReplay" -> {
+                startHistoryReplay(call, result)
+            }
+            "stopHistoryReplay" -> {
+                stopHistoryReplay(result)
+            }
+            "pauseHistoryReplay" -> {
+                pauseHistoryReplay(result)
+            }
+            "resumeHistoryReplay" -> {
+                resumeHistoryReplay(result)
+            }
+            "setHistoryReplaySpeed" -> {
+                setHistoryReplaySpeed(call, result)
+            }
             else -> result.notImplemented()
         }
     }
@@ -170,6 +185,70 @@ class FlutterMapboxNavigationPlugin : FlutterPlugin, MethodCallHandler,
             result.success(success)
         } catch (e: Exception) {
             result.error("HISTORY_ERROR", "Failed to clear history: ${e.message}", null)
+        }
+    }
+
+    private fun startHistoryReplay(call: MethodCall, result: Result) {
+        try {
+            val historyFilePath = call.argument<String>("historyFilePath")
+            val enableReplayUI = call.argument<Boolean>("enableReplayUI") ?: true
+
+            if (historyFilePath == null) {
+                result.error("INVALID_ARGUMENTS", "Missing historyFilePath", null)
+                return
+            }
+
+            // Android端的历史记录回放实现
+            // 注意：这里需要根据Mapbox Android SDK的具体API来实现
+            // 目前Android SDK可能不支持历史记录回放功能，或者API不同
+
+            // 临时返回false，表示Android端暂不支持
+            result.success(false)
+        } catch (e: Exception) {
+            result.error("REPLAY_ERROR", "Failed to start history replay: ${e.message}", null)
+        }
+    }
+
+    private fun stopHistoryReplay(result: Result) {
+        try {
+            // Android端的停止历史记录回放实现
+            result.success(false)
+        } catch (e: Exception) {
+            result.error("REPLAY_ERROR", "Failed to stop history replay: ${e.message}", null)
+        }
+    }
+
+    private fun pauseHistoryReplay(result: Result) {
+        try {
+            // Android端的暂停历史记录回放实现
+            result.success(false)
+        } catch (e: Exception) {
+            result.error("REPLAY_ERROR", "Failed to pause history replay: ${e.message}", null)
+        }
+    }
+
+    private fun resumeHistoryReplay(result: Result) {
+        try {
+            // Android端的恢复历史记录回放实现
+            result.success(false)
+        } catch (e: Exception) {
+            result.error("REPLAY_ERROR", "Failed to resume history replay: ${e.message}", null)
+        }
+    }
+
+    private fun setHistoryReplaySpeed(call: MethodCall, result: Result) {
+        try {
+            val speed = call.argument<Double>("speed")
+
+            if (speed == null) {
+                result.error("INVALID_ARGUMENTS", "Missing speed parameter", null)
+                return
+            }
+
+            // Android端的设置回放速度实现
+            result.success(false)
+        } catch (e: Exception) {
+            result.error("REPLAY_ERROR", "Failed to set history replay speed: ${e.message}", null)
         }
     }
 

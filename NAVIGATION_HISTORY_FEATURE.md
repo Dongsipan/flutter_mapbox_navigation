@@ -57,6 +57,171 @@ final success = await MapBoxNavigation.instance.deleteNavigationHistory(historyI
 final success = await MapBoxNavigation.instance.clearAllNavigationHistory();
 ```
 
+### 4. 历史记录回放
+
+```dart
+// 开始历史记录回放（带UI）
+final success = await MapBoxNavigation.instance.startHistoryReplay(
+  historyFilePath: '/path/to/history/file.pbf.gz',
+  enableReplayUI: true,
+);
+
+// 开始历史记录回放（无UI，仅数据回放）
+final success = await MapBoxNavigation.instance.startHistoryReplay(
+  historyFilePath: '/path/to/history/file.pbf.gz',
+  enableReplayUI: false,
+);
+
+// 停止历史记录回放
+final success = await MapBoxNavigation.instance.stopHistoryReplay();
+
+// 暂停历史记录回放
+final success = await MapBoxNavigation.instance.pauseHistoryReplay();
+
+// 恢复历史记录回放
+final success = await MapBoxNavigation.instance.resumeHistoryReplay();
+
+// 设置回放速度（1.0为正常速度，2.0为2倍速，0.5为0.5倍速）
+final success = await MapBoxNavigation.instance.setHistoryReplaySpeed(2.0);
+```
+
+## 完整的历史记录回放示例
+
+```dart
+import 'package:flutter/material.dart';
+import 'package:flutter_mapbox_navigation/flutter_mapbox_navigation.dart';
+
+class HistoryReplayExample extends StatefulWidget {
+  @override
+  _HistoryReplayExampleState createState() => _HistoryReplayExampleState();
+}
+
+class _HistoryReplayExampleState extends State<HistoryReplayExample> {
+  List<NavigationHistory> _historyList = [];
+  bool _isReplaying = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadHistoryList();
+  }
+
+  Future<void> _loadHistoryList() async {
+    try {
+      final historyList = await MapBoxNavigation.instance.getNavigationHistoryList();
+      setState(() {
+        _historyList = historyList;
+      });
+    } catch (e) {
+      print('加载历史记录失败: $e');
+    }
+  }
+
+  Future<void> _startReplay(NavigationHistory history) async {
+    try {
+      final success = await MapBoxNavigation.instance.startHistoryReplay(
+        historyFilePath: history.historyFilePath,
+        enableReplayUI: true,
+      );
+
+      if (success) {
+        setState(() {
+          _isReplaying = true;
+        });
+        print('历史记录回放已开始');
+      }
+    } catch (e) {
+      print('启动历史记录回放失败: $e');
+    }
+  }
+
+  Future<void> _stopReplay() async {
+    try {
+      final success = await MapBoxNavigation.instance.stopHistoryReplay();
+      if (success) {
+        setState(() {
+          _isReplaying = false;
+        });
+        print('历史记录回放已停止');
+      }
+    } catch (e) {
+      print('停止历史记录回放失败: $e');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('历史记录回放'),
+        actions: [
+          if (_isReplaying)
+            IconButton(
+              icon: Icon(Icons.stop),
+              onPressed: _stopReplay,
+            ),
+        ],
+      ),
+      body: ListView.builder(
+        itemCount: _historyList.length,
+        itemBuilder: (context, index) {
+          final history = _historyList[index];
+          return ListTile(
+            title: Text('${history.startPointName} → ${history.endPointName}'),
+            subtitle: Text('开始时间: ${history.startTime}'),
+            trailing: ElevatedButton(
+              onPressed: _isReplaying ? null : () => _startReplay(history),
+              child: Text('回放'),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+```
+
+## 平台支持
+
+### iOS
+- ✅ 完全支持历史记录回放功能
+- ✅ 支持带UI和无UI的回放模式
+- ✅ 支持回放控制（开始、停止、暂停、恢复）
+- ✅ 支持回放速度调节
+- ✅ 基于Mapbox Navigation SDK v3的HistoryReplayController
+
+### Android
+- ⚠️ 当前版本暂不支持历史记录回放功能
+- 📝 Android端的Mapbox Navigation SDK可能不提供相同的历史记录回放API
+- 🔄 未来版本将根据Android SDK的支持情况进行实现
+
+## 注意事项
+
+1. **文件路径**: 历史记录文件路径必须是设备上的有效文件路径
+2. **文件格式**: 历史记录文件通常是`.pbf.gz`格式的压缩文件
+3. **权限**: 确保应用有读取历史记录文件的权限
+4. **内存使用**: 回放大型历史记录文件可能消耗较多内存
+5. **UI模式**: 启用UI模式时会显示完整的导航界面，禁用时仅进行数据回放
+
+## 故障排除
+
+### 常见问题
+
+1. **文件不存在错误**
+   ```
+   解决方案：检查历史记录文件路径是否正确，文件是否存在
+   ```
+
+2. **回放启动失败**
+   ```
+   解决方案：确保历史记录文件格式正确，没有损坏
+   ```
+
+3. **Android端不支持**
+   ```
+   解决方案：当前版本仅iOS支持，Android端将在未来版本中实现
+   ```
+
 ## 数据模型
 
 ### NavigationHistory

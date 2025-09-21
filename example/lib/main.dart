@@ -4,6 +4,7 @@ import 'app.dart';
 import 'custom_navigation_example.dart';
 import 'advanced_features_example.dart';
 import 'history_test_page.dart';
+import 'history_replay_example.dart';
 
 void main() => runApp(const NavigationDemoApp());
 
@@ -43,7 +44,6 @@ class NavigationHomePage extends StatelessWidget {
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 24),
-
             _buildDemoCard(
               context,
               title: '原始示例',
@@ -52,12 +52,11 @@ class NavigationHomePage extends StatelessWidget {
               color: Colors.blue,
               onTap: () => Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const SampleNavigationApp()),
+                MaterialPageRoute(
+                    builder: (context) => const SampleNavigationApp()),
               ),
             ),
-
             const SizedBox(height: 16),
-
             _buildDemoCard(
               context,
               title: '自定义导航',
@@ -66,12 +65,11 @@ class NavigationHomePage extends StatelessWidget {
               color: Colors.green,
               onTap: () => Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const CustomNavigationExample()),
+                MaterialPageRoute(
+                    builder: (context) => const CustomNavigationExample()),
               ),
             ),
-
             const SizedBox(height: 16),
-
             _buildDemoCard(
               context,
               title: '高级功能',
@@ -80,12 +78,11 @@ class NavigationHomePage extends StatelessWidget {
               color: Colors.purple,
               onTap: () => Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const AdvancedFeaturesExample()),
+                MaterialPageRoute(
+                    builder: (context) => const AdvancedFeaturesExample()),
               ),
             ),
-
             const SizedBox(height: 16),
-
             _buildDemoCard(
               context,
               title: '历史记录测试',
@@ -94,7 +91,21 @@ class NavigationHomePage extends StatelessWidget {
               color: Colors.orange,
               onTap: () => Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const HistoryTestPage()),
+                MaterialPageRoute(
+                    builder: (context) => const HistoryTestPage()),
+              ),
+            ),
+            const SizedBox(height: 16),
+            _buildDemoCard(
+              context,
+              title: '历史记录回放',
+              description: '回放已保存的导航历史记录',
+              icon: Icons.play_circle_filled,
+              color: Colors.green,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (context) => const HistoryReplayExample()),
               ),
             ),
           ],

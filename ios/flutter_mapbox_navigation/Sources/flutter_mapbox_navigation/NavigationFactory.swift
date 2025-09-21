@@ -53,6 +53,12 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
     var mapboxNavigationProvider: MapboxNavigationProvider?
     var mapboxNavigation: MapboxNavigation?
     private var historyManager: HistoryManager?
+
+    // History Replay components
+    private var historyReplayController: HistoryReplayController?
+    private var replayNavigationProvider: MapboxNavigationProvider?
+    private var replayMapboxNavigation: MapboxNavigation?
+    private var isHistoryReplaying: Bool = false
     
     func addWayPoints(arguments: NSDictionary?, result: @escaping FlutterResult)
     {
@@ -145,22 +151,10 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
         if mapboxNavigationProvider == nil {
             let locationSource: LocationSource = _simulateRoute ? .simulation(initialLocation: nil) : .live
             
-            // 配置历史记录目录（根据官方示例）
-            let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-            let historyDirectoryURL = documentsPath.appendingPathComponent("NavigationHistory")
-            
-            // 确保目录存在
-            if !FileManager.default.fileExists(atPath: historyDirectoryURL.path) {
-                try? FileManager.default.createDirectory(
-                    at: historyDirectoryURL,
-                    withIntermediateDirectories: true,
-                    attributes: nil
-                )
-            }
-            
+            // 历史记录将直接使用SDK生成的文件路径，无需额外配置目录
+
             let coreConfig = CoreConfig(
-                locationSource: locationSource,
-                historyRecordingConfig: HistoryRecordingConfig(historyDirectoryURL: historyDirectoryURL)
+                locationSource: locationSource
             )
             mapboxNavigationProvider = MapboxNavigationProvider(coreConfig: coreConfig)
         }
@@ -616,14 +610,223 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
                     print("Failed to stop history recording: No file URL returned")
                     return
                 }
-                
+
                 print("History recording stopped successfully, file saved to: \(historyFileUrl.path)")
-                // 保存历史记录信息
+
+                // 直接保存历史记录信息，使用原始文件路径
                 self.saveHistoryRecord(filePath: historyFileUrl.path)
             }
         }
     }
-    
+
+    // MARK: - History Replay Methods
+
+    /**
+     * 开始历史记录回放
+     */
+    func startHistoryReplay(arguments: NSDictionary?, result: @escaping FlutterResult) {
+        guard let arguments = arguments,
+              let historyFilePath = arguments["historyFilePath"] as? String else {
+            result(FlutterError(code: "INVALID_ARGUMENTS", message: "Missing historyFilePath", details: nil))
+            return
+        }
+
+        let enableReplayUI = arguments["enableReplayUI"] as? Bool ?? true
+
+        print("Starting history replay with file: \(historyFilePath)")
+        print("Enable replay UI: \(enableReplayUI)")
+
+        // 检查文件是否存在
+        let fileManager = FileManager.default
+        print("Checking if history file exists at path: \(historyFilePath)")
+
+        // 列出目录内容以便调试
+        let parentDir = URL(fileURLWithPath: historyFilePath).deletingLastPathComponent()
+        do {
+            let contents = try fileManager.contentsOfDirectory(atPath: parentDir.path)
+            print("Contents of parent directory \(parentDir.path): \(contents)")
+        } catch {
+            print("Error listing directory contents: \(error)")
+        }
+
+        guard fileManager.fileExists(atPath: historyFilePath) else {
+            print("History file not found at path: \(historyFilePath)")
+            result(FlutterError(code: "FILE_NOT_FOUND", message: "History file not found at path: \(historyFilePath)", details: nil))
+            return
+        }
+
+        print("History file found, proceeding with replay")
+
+        do {
+            // 创建历史记录回放控制器
+            let fileUrl = URL(fileURLWithPath: historyFilePath)
+            guard let historyReader = HistoryReader(fileUrl: fileUrl) else {
+                result(FlutterError(code: "HISTORY_READER_ERROR", message: "Failed to create HistoryReader", details: nil))
+                return
+            }
+
+            historyReplayController = HistoryReplayController(historyReader: historyReader)
+            historyReplayController?.delegate = self
+
+            print("HistoryReplayController created successfully")
+            print("Delegate set to: \(String(describing: historyReplayController?.delegate))")
+
+            // 创建用于回放的导航提供者
+            let coreConfig = CoreConfig(
+                routingConfig: RoutingConfig(
+                    rerouteConfig: RerouteConfig(
+                        detectsReroute: false // 禁用重新路由检测，因为我们要手动设置新路由
+                    )
+                ),
+                locationSource: .custom(
+                    .historyReplayingValue(with: historyReplayController!)
+                )
+            )
+
+            replayNavigationProvider = MapboxNavigationProvider(coreConfig: coreConfig)
+
+            Task { @MainActor in
+                replayMapboxNavigation = replayNavigationProvider?.mapboxNavigation
+                isHistoryReplaying = true
+
+                print("ReplayMapboxNavigation initialized: \(replayMapboxNavigation != nil)")
+
+                if enableReplayUI {
+                    // 启动带UI的回放
+                    print("Starting replay with UI")
+                    startReplayWithUI()
+                } else {
+                    // 启动无UI的回放（仅数据回放）
+                    print("Starting replay without UI")
+                    startReplayWithoutUI()
+                }
+
+                result(true)
+            }
+        } catch {
+            print("Error starting history replay: \(error)")
+            result(FlutterError(code: "REPLAY_START_ERROR", message: "Failed to start history replay: \(error.localizedDescription)", details: nil))
+        }
+    }
+
+    /**
+     * 停止历史记录回放
+     */
+    func stopHistoryReplay(result: @escaping FlutterResult) {
+        print("Stopping history replay")
+
+        guard isHistoryReplaying else {
+            result(FlutterError(code: "NOT_REPLAYING", message: "History replay is not active", details: nil))
+            return
+        }
+
+        // 停止回放
+        Task { @MainActor in
+            replayMapboxNavigation?.tripSession().setToIdle()
+
+            // 如果有导航控制器，关闭它
+            if let navigationViewController = _navigationViewController {
+                navigationViewController.dismiss(animated: true)
+                _navigationViewController = nil
+            }
+        }
+
+        // 清理资源
+        historyReplayController = nil
+        replayNavigationProvider = nil
+        replayMapboxNavigation = nil
+        isHistoryReplaying = false
+
+        result(true)
+    }
+
+    /**
+     * 暂停历史记录回放
+     */
+    func pauseHistoryReplay(result: @escaping FlutterResult) {
+        print("Pausing history replay")
+
+        guard isHistoryReplaying, let historyReplayController = historyReplayController else {
+            result(FlutterError(code: "NOT_REPLAYING", message: "History replay is not active", details: nil))
+            return
+        }
+
+        // 暂停回放（如果支持的话）
+        // 注意：Mapbox SDK可能不直接支持暂停，这里可能需要停止然后记录位置
+        result(true)
+    }
+
+    /**
+     * 恢复历史记录回放
+     */
+    func resumeHistoryReplay(result: @escaping FlutterResult) {
+        print("Resuming history replay")
+
+        guard isHistoryReplaying else {
+            result(FlutterError(code: "NOT_REPLAYING", message: "History replay is not active", details: nil))
+            return
+        }
+
+        // 恢复回放
+        result(true)
+    }
+
+    /**
+     * 设置历史记录回放速度
+     */
+    func setHistoryReplaySpeed(arguments: NSDictionary?, result: @escaping FlutterResult) {
+        guard let arguments = arguments,
+              let speed = arguments["speed"] as? Double else {
+            result(FlutterError(code: "INVALID_ARGUMENTS", message: "Missing speed parameter", details: nil))
+            return
+        }
+
+        print("Setting history replay speed to: \(speed)")
+
+        guard isHistoryReplaying else {
+            result(FlutterError(code: "NOT_REPLAYING", message: "History replay is not active", details: nil))
+            return
+        }
+
+        // 设置回放速度（如果SDK支持的话）
+        // 注意：可能需要根据具体的SDK版本来实现
+        result(true)
+    }
+
+    /**
+     * 启动带UI的历史记录回放
+     */
+    @MainActor
+    private func startReplayWithUI() {
+        print("Starting history replay with UI")
+
+        guard let replayMapboxNavigation = replayMapboxNavigation else {
+            print("Error: replayMapboxNavigation is nil")
+            return
+        }
+
+        print("About to start free drive mode for replay")
+        // 启动自由驾驶模式，等待历史记录中的路由
+        replayMapboxNavigation.tripSession().startFreeDrive()
+        print("Free drive mode started, waiting for route callbacks...")
+    }
+
+    /**
+     * 启动无UI的历史记录回放
+     */
+    @MainActor
+    private func startReplayWithoutUI() {
+        print("Starting history replay without UI")
+
+        guard let replayMapboxNavigation = replayMapboxNavigation else {
+            print("Error: replayMapboxNavigation is nil")
+            return
+        }
+
+        // 启动自由驾驶模式进行数据回放
+        replayMapboxNavigation.tripSession().startFreeDrive()
+    }
+
     /**
      * 保存历史记录信息
      */
@@ -758,6 +961,116 @@ extension NavigationFactory : NavigationViewControllerDelegate {
         }
     }
     */
+}
+
+// MARK: - HistoryReplayDelegate
+
+extension NavigationFactory: HistoryReplayDelegate {
+    public func historyReplayController(
+        _ historyReplayController: HistoryReplayController,
+        didReplayEvent event: any HistoryEvent
+    ) {
+        // 监控所有传入的事件
+        print("History replay event received: \(type(of: event)) - \(event)")
+
+        // 发送事件给Flutter端
+        sendEvent(eventType: MapBoxEventType.navigation_running)
+    }
+
+    public func historyReplayController(
+        _ historyReplayController: HistoryReplayController,
+        wantsToSetRoutes routes: NavigationRoutes
+    ) {
+        print("🚀 History replay wants to set routes!")
+        print("Main route available: \(routes.mainRoute)")
+        print("Navigation controller exists: \(_navigationViewController != nil)")
+
+        // 当历史文件中有更新的路由时，我们需要相应地设置路由
+        Task { @MainActor in
+            if let replayMapboxNavigation = replayMapboxNavigation {
+                if _navigationViewController == nil {
+                    // 如果没有导航控制器，创建一个
+                    print("Creating new navigation controller for replay")
+                    presentReplayNavigationController(with: routes)
+                } else {
+                    // 如果已经有导航控制器，更新路由
+                    print("Updating existing navigation controller with new routes")
+                    replayMapboxNavigation.tripSession().startActiveGuidance(
+                        with: routes,
+                        startLegIndex: 0
+                    )
+                }
+            } else {
+                print("❌ Error: replayMapboxNavigation is nil in wantsToSetRoutes")
+            }
+        }
+    }
+
+    public func historyReplayControllerDidFinishReplay(_ historyReplayController: HistoryReplayController) {
+        print("History replay finished")
+
+        // 回放完成，清理资源
+        Task { @MainActor in
+            _navigationViewController?.dismiss(animated: true) {
+                self.replayMapboxNavigation?.tripSession().setToIdle()
+                self.isHistoryReplaying = false
+            }
+        }
+
+        // 发送回放完成事件给Flutter端
+        sendEvent(eventType: MapBoxEventType.navigation_finished)
+    }
+
+    /**
+     * 展示回放导航控制器
+     */
+    private func presentReplayNavigationController(with navigationRoutes: NavigationRoutes) {
+        print("📱 Presenting replay navigation controller")
+
+        guard let replayMapboxNavigation = replayMapboxNavigation,
+              let replayNavigationProvider = replayNavigationProvider else {
+            print("❌ Error: replay navigation components are nil")
+            print("replayMapboxNavigation: \(replayMapboxNavigation != nil)")
+            print("replayNavigationProvider: \(replayNavigationProvider != nil)")
+            return
+        }
+
+        Task { @MainActor in
+            print("Creating NavigationOptions...")
+            let navigationOptions = NavigationOptions(
+                mapboxNavigation: replayMapboxNavigation,
+                voiceController: replayNavigationProvider.routeVoiceController,
+                eventsManager: replayMapboxNavigation.eventsManager()
+            )
+
+            print("Creating NavigationViewController...")
+            let navigationViewController = NavigationViewController(
+                navigationRoutes: navigationRoutes,
+                navigationOptions: navigationOptions
+            )
+
+            navigationViewController.delegate = self
+            navigationViewController.modalPresentationStyle = .fullScreen
+            navigationViewController.routeLineTracksTraversal = true
+
+            print("Looking for root view controller...")
+            // 获取当前的视图控制器来展示导航
+            if let rootViewController = UIApplication.shared.windows.first?.rootViewController {
+                var presentingViewController = rootViewController
+                while let presented = presentingViewController.presentedViewController {
+                    presentingViewController = presented
+                }
+
+                print("Presenting navigation controller...")
+                presentingViewController.present(navigationViewController, animated: true) {
+                    print("✅ Navigation controller presented successfully!")
+                    self._navigationViewController = navigationViewController
+                }
+            } else {
+                print("❌ Error: Could not find root view controller")
+            }
+        }
+    }
 }
 
 // MARK: - HistoryManager 内嵌类

@@ -3,8 +3,11 @@ import 'package:flutter_mapbox_navigation/flutter_mapbox_navigation.dart';
 
 /// 导航历史记录功能使用示例
 class NavigationHistoryExample extends StatefulWidget {
+  const NavigationHistoryExample({super.key});
+
   @override
-  _NavigationHistoryExampleState createState() => _NavigationHistoryExampleState();
+  _NavigationHistoryExampleState createState() =>
+      _NavigationHistoryExampleState();
 }
 
 class _NavigationHistoryExampleState extends State<NavigationHistoryExample> {
@@ -24,7 +27,8 @@ class _NavigationHistoryExampleState extends State<NavigationHistoryExample> {
     });
 
     try {
-      final historyList = await MapBoxNavigation.instance.getNavigationHistoryList();
+      final historyList =
+          await MapBoxNavigation.instance.getNavigationHistoryList();
       setState(() {
         _historyList = historyList;
         _isLoading = false;
@@ -71,7 +75,8 @@ class _NavigationHistoryExampleState extends State<NavigationHistoryExample> {
   /// 删除历史记录
   Future<void> _deleteHistory(String historyId) async {
     try {
-      final success = await MapBoxNavigation.instance.deleteNavigationHistory(historyId);
+      final success =
+          await MapBoxNavigation.instance.deleteNavigationHistory(historyId);
       if (success) {
         _loadHistoryList(); // 重新加载列表
         _showSuccessDialog('删除成功');
@@ -86,7 +91,8 @@ class _NavigationHistoryExampleState extends State<NavigationHistoryExample> {
   /// 清除所有历史记录
   Future<void> _clearAllHistory() async {
     try {
-      final success = await MapBoxNavigation.instance.clearAllNavigationHistory();
+      final success =
+          await MapBoxNavigation.instance.clearAllNavigationHistory();
       if (success) {
         _loadHistoryList(); // 重新加载列表
         _showSuccessDialog('清除成功');
@@ -103,12 +109,12 @@ class _NavigationHistoryExampleState extends State<NavigationHistoryExample> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('错误'),
+        title: const Text('错误'),
         content: Text(message),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: Text('确定'),
+            child: const Text('确定'),
           ),
         ],
       ),
@@ -120,12 +126,12 @@ class _NavigationHistoryExampleState extends State<NavigationHistoryExample> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('成功'),
+        title: const Text('成功'),
         content: Text(message),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: Text('确定'),
+            child: const Text('确定'),
           ),
         ],
       ),
@@ -136,10 +142,10 @@ class _NavigationHistoryExampleState extends State<NavigationHistoryExample> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('导航历史记录示例'),
+        title: const Text('导航历史记录示例'),
         actions: [
           IconButton(
-            icon: Icon(Icons.refresh),
+            icon: const Icon(Icons.refresh),
             onPressed: _loadHistoryList,
           ),
           PopupMenuButton<String>(
@@ -149,7 +155,7 @@ class _NavigationHistoryExampleState extends State<NavigationHistoryExample> {
               }
             },
             itemBuilder: (context) => [
-              PopupMenuItem(
+              const PopupMenuItem(
                 value: 'clear_all',
                 child: Text('清除所有历史记录'),
               ),
@@ -161,22 +167,22 @@ class _NavigationHistoryExampleState extends State<NavigationHistoryExample> {
         children: [
           // 开始导航按钮
           Padding(
-            padding: EdgeInsets.all(16.0),
+            padding: const EdgeInsets.all(16.0),
             child: SizedBox(
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: _startNavigationWithHistory,
-                child: Text('开始导航（启用历史记录）'),
+                child: const Text('开始导航（启用历史记录）'),
               ),
             ),
           ),
-          
+
           // 历史记录列表
           Expanded(
             child: _isLoading
-                ? Center(child: CircularProgressIndicator())
+                ? const Center(child: CircularProgressIndicator())
                 : _historyList.isEmpty
-                    ? Center(
+                    ? const Center(
                         child: Text(
                           '暂无历史记录',
                           style: TextStyle(fontSize: 16, color: Colors.grey),
@@ -187,9 +193,10 @@ class _NavigationHistoryExampleState extends State<NavigationHistoryExample> {
                         itemBuilder: (context, index) {
                           final history = _historyList[index];
                           return Card(
-                            margin: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                            margin: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 4),
                             child: ListTile(
-                              leading: CircleAvatar(
+                              leading: const CircleAvatar(
                                 child: Icon(Icons.history),
                               ),
                               title: Text(history.startPointName ?? '未知起点'),
@@ -197,11 +204,14 @@ class _NavigationHistoryExampleState extends State<NavigationHistoryExample> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text('终点: ${history.endPointName ?? '未知终点'}'),
-                                  Text('开始时间: ${_formatDateTime(history.startTime)}'),
+                                  Text(
+                                      '开始时间: ${_formatDateTime(history.startTime)}'),
                                   if (history.distance != null)
-                                    Text('距离: ${(history.distance! / 1000).toStringAsFixed(2)} km'),
+                                    Text(
+                                        '距离: ${(history.distance! / 1000).toStringAsFixed(2)} km'),
                                   if (history.duration != null)
-                                    Text('时长: ${_formatDuration(history.duration!)}'),
+                                    Text(
+                                        '时长: ${_formatDuration(history.duration!)}'),
                                 ],
                               ),
                               trailing: PopupMenuButton<String>(
@@ -211,7 +221,7 @@ class _NavigationHistoryExampleState extends State<NavigationHistoryExample> {
                                   }
                                 },
                                 itemBuilder: (context) => [
-                                  PopupMenuItem(
+                                  const PopupMenuItem(
                                     value: 'delete',
                                     child: Text('删除'),
                                   ),
@@ -230,7 +240,7 @@ class _NavigationHistoryExampleState extends State<NavigationHistoryExample> {
   /// 格式化日期时间
   String _formatDateTime(DateTime dateTime) {
     return '${dateTime.year}-${dateTime.month.toString().padLeft(2, '0')}-${dateTime.day.toString().padLeft(2, '0')} '
-           '${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
+        '${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
   }
 
   /// 格式化时长
@@ -238,13 +248,13 @@ class _NavigationHistoryExampleState extends State<NavigationHistoryExample> {
     final hours = seconds ~/ 3600;
     final minutes = (seconds % 3600) ~/ 60;
     final remainingSeconds = seconds % 60;
-    
+
     if (hours > 0) {
-      return '${hours}小时${minutes}分钟';
+      return '$hours小时$minutes分钟';
     } else if (minutes > 0) {
-      return '${minutes}分钟${remainingSeconds}秒';
+      return '$minutes分钟$remainingSeconds秒';
     } else {
-      return '${remainingSeconds}秒';
+      return '$remainingSeconds秒';
     }
   }
 }

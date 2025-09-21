@@ -1,5 +1,36 @@
 /// 导航历史记录数据模型
 class NavigationHistory {
+  NavigationHistory({
+    required this.id,
+    required this.historyFilePath,
+    this.cover,
+    required this.startTime,
+    this.endTime,
+    this.distance,
+    this.duration,
+    this.startPointName,
+    this.endPointName,
+    this.navigationMode,
+  });
+
+  /// 从 Map 创建 NavigationHistory 对象
+  factory NavigationHistory.fromMap(Map<String, dynamic> map) {
+    return NavigationHistory(
+      id: map['id'] as String,
+      historyFilePath: map['historyFilePath'] as String,
+      cover: map['cover'] as String?,
+      startTime: DateTime.fromMillisecondsSinceEpoch(map['startTime'] as int),
+      endTime: map['endTime'] != null
+          ? DateTime.fromMillisecondsSinceEpoch(map['endTime'] as int)
+          : null,
+      distance: map['distance'] as double?,
+      duration: map['duration'] as int?,
+      startPointName: map['startPointName'] as String?,
+      endPointName: map['endPointName'] as String?,
+      navigationMode: map['navigationMode'] as String?,
+    );
+  }
+
   /// 历史记录唯一标识符
   final String id;
 
@@ -29,37 +60,6 @@ class NavigationHistory {
 
   /// 导航模式
   final String? navigationMode;
-
-  NavigationHistory({
-    required this.id,
-    required this.historyFilePath,
-    this.cover,
-    required this.startTime,
-    this.endTime,
-    this.distance,
-    this.duration,
-    this.startPointName,
-    this.endPointName,
-    this.navigationMode,
-  });
-
-  /// 从 Map 创建 NavigationHistory 对象
-  factory NavigationHistory.fromMap(Map<String, dynamic> map) {
-    return NavigationHistory(
-      id: map['id'] as String,
-      historyFilePath: map['historyFilePath'] as String,
-      cover: map['cover'] as String?,
-      startTime: DateTime.fromMillisecondsSinceEpoch(map['startTime'] as int),
-      endTime: map['endTime'] != null 
-          ? DateTime.fromMillisecondsSinceEpoch(map['endTime'] as int)
-          : null,
-      distance: map['distance'] as double?,
-      duration: map['duration'] as int?,
-      startPointName: map['startPointName'] as String?,
-      endPointName: map['endPointName'] as String?,
-      navigationMode: map['navigationMode'] as String?,
-    );
-  }
 
   /// 转换为 Map
   Map<String, dynamic> toMap() {

@@ -1,9 +1,7 @@
 import MapboxMaps
-import MapboxDirections
-import MapboxCoreNavigation
-import MapboxNavigation
+import MapboxNavigationUIKit
 
-class CustomNightStyle: NightStyle {
+class CustomDayStyle: DayStyle {
 
     required init() {
         super.init()
@@ -15,7 +13,7 @@ class CustomNightStyle: NightStyle {
         initStyle()
         if(url != nil)
         {
-            mapStyleURL = URL(string: url!) ?? URL(string: StyleURI.navigationNight.rawValue)!
+            mapStyleURL = URL(string: url!) ?? URL(string: StyleURI.standard.rawValue)!
             previewMapStyleURL = mapStyleURL
         }
     }
@@ -23,11 +21,11 @@ class CustomNightStyle: NightStyle {
     func initStyle()
     {
         // Use a custom map style.
-        mapStyleURL = URL(string: StyleURI.navigationNight.rawValue)!
+        mapStyleURL = URL(string: StyleURI.standard.rawValue)!
         previewMapStyleURL = mapStyleURL
 
         // Specify that the style should be used during the day.
-        styleType = .night
+        styleType = .day
     }
 
     override func apply() {

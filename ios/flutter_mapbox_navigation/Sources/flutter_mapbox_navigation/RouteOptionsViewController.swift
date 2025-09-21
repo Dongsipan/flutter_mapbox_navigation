@@ -2,8 +2,9 @@ import Flutter
 import UIKit
 import MapboxMaps
 import MapboxDirections
-import MapboxCoreNavigation
-import MapboxNavigation
+import MapboxNavigationCore
+import MapboxNavigationUIKit
+import Combine
 
 public class RouteOptionsViewController : UIViewController, NavigationMapViewDelegate
 {
@@ -11,6 +12,8 @@ public class RouteOptionsViewController : UIViewController, NavigationMapViewDel
     var routeOptions: NavigationRouteOptions?
     var route: Route?
     var routes: [Route]!
+    private let locationProvider = AppleLocationProvider()
+    private var cancellables = Set<AnyCancellable>()
 
     init(routes: [Route], options: NavigationRouteOptions)
     {
@@ -29,7 +32,7 @@ public class RouteOptionsViewController : UIViewController, NavigationMapViewDel
     public override func viewDidLoad() {
         super.viewDidLoad()
 
-        mapView = NavigationMapView(frame: view.bounds)
+        setupNavigationMapView()
         view.addSubview(mapView)
         mapView.delegate = self
         ///mapView.showsUserLocation = true
@@ -48,6 +51,37 @@ public class RouteOptionsViewController : UIViewController, NavigationMapViewDel
          mapView.selectAnnotation(annotation, animated: true, completionHandler: nil)
          }
          */
+    }
+
+    private func setupNavigationMapView() {
+        // Create publishers for location and route progress
+        let locationPublisher: AnyPublisher<CLLocation, Never> = locationProvider.onLocationUpdate
+            .compactMap { locations -> CLLocation? in
+                // locations is an array of Location objects, convert to CLLocation
+                guard let location = locations.first else { return nil }
+                return CLLocation(
+                    coordinate: location.coordinate,
+                    altitude: location.altitude ?? 0.0,
+                    horizontalAccuracy: location.horizontalAccuracy ?? 0.0,
+                    verticalAccuracy: location.verticalAccuracy ?? 0.0,
+                    course: location.bearing ?? -1.0,
+                    speed: location.speed ?? 0.0,
+                    timestamp: location.timestamp
+                )
+            }
+            .eraseToAnyPublisher()
+
+        let routeProgressPublisher = Just<RouteProgress?>(nil)
+            .eraseToAnyPublisher()
+
+        // Initialize NavigationMapView with required publishers
+        mapView = NavigationMapView(
+            location: locationPublisher,
+            routeProgress: routeProgressPublisher
+        )
+
+        mapView.frame = view.bounds
+        mapView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
     }
 
     // long press to select a destination
@@ -92,14 +126,16 @@ public class RouteOptionsViewController : UIViewController, NavigationMapViewDel
         let routeOptions = NavigationRouteOptions(waypoints: [origin, destination], profileIdentifier: .automobileAvoidingTraffic)
 
         // Generate the route object and draw it on the map
-        _ = Directions.shared.calculate(routeOptions) { [weak self] (session, result) in
+        _ = Directions.shared.calculate(routeOptions) { [weak self] result in
             guard case let .success(response) = result, let route = response.routes?.first, let strongSelf = self else {
                 return
             }
-            strongSelf.route = route
-            strongSelf.routeOptions = routeOptions
-            // Draw the route on the map after creating it
-            strongSelf.drawRoute(route: route)
+            Task { @MainActor in
+                strongSelf.route = route
+                strongSelf.routeOptions = routeOptions
+                // Draw the route on the map after creating it
+                strongSelf.drawRoute(route: route)
+            }
         }
     }
 

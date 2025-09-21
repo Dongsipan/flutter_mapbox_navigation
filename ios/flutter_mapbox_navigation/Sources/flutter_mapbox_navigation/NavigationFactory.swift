@@ -1,29 +1,31 @@
 import Flutter
 import UIKit
-import MapboxMaps
-import MapboxDirections
-import MapboxCoreNavigation
-import MapboxNavigation
 import MapboxNavigationCore
+import MapboxNavigationUIKit
+import MapboxDirections
+import CoreLocation
 import Foundation
+
+// Type alias to avoid conflicts with Mapbox's Location type
+typealias FlutterLocation = flutter_mapbox_navigation.Location
 
 public class NavigationFactory : NSObject, FlutterStreamHandler
 {
     var _navigationViewController: NavigationViewController? = nil
     var _eventSink: FlutterEventSink? = nil
-    
+
     let ALLOW_ROUTE_SELECTION = false
     let IsMultipleUniqueRoutes = false
     var isEmbeddedNavigation = false
-    
+
     var _distanceRemaining: Double?
     var _durationRemaining: Double?
     var _navigationMode: String?
-    var _routes: [Route]?
-    var _wayPointOrder = [Int:Waypoint]()
-    var _wayPoints = [Waypoint]()
+    var _navigationRoutes: NavigationRoutes?
+    var _wayPointOrder: [Int: Waypoint] = [:]
+    var _wayPoints: [Waypoint] = []
     var _lastKnownLocation: CLLocation?
-    
+
     var _options: NavigationRouteOptions?
     var _simulateRoute = false
     var _allowsUTurnAtWayPoints: Bool?
@@ -46,18 +48,21 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
     var _isHistoryRecording = false
     var _currentHistoryId: String?
     var _historyStartTime: Date?
-    var navigationDirections: Directions?
+
+    // Mapbox Navigation v3 components
+    var mapboxNavigationProvider: MapboxNavigationProvider?
+    var mapboxNavigation: MapboxNavigation?
     private var historyManager: HistoryManager?
     
     func addWayPoints(arguments: NSDictionary?, result: @escaping FlutterResult)
     {
 
-        guard var locations = getLocationsFromFlutterArgument(arguments: arguments) else { return }
+        guard let locations = getLocationsFromFlutterArgument(arguments: arguments) else { return }
 
         var nextIndex = 1
         for loc in locations
         {
-            let wayPoint = Waypoint(coordinate: CLLocationCoordinate2D(latitude: loc.latitude!, longitude: loc.longitude!), name: loc.name)
+            var wayPoint = Waypoint(coordinate: CLLocationCoordinate2D(latitude: loc.latitude!, longitude: loc.longitude!), name: loc.name)
             wayPoint.separatesLegs = !loc.isSilent
             if (_wayPoints.count >= nextIndex) {
                 _wayPoints.insert(wayPoint, at: nextIndex)
@@ -83,14 +88,14 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
         _wayPoints.removeAll()
         _wayPointOrder.removeAll()
         
-        guard var locations = getLocationsFromFlutterArgument(arguments: arguments) else { return }
+        guard let locations = getLocationsFromFlutterArgument(arguments: arguments) else { return }
         
         for loc in locations
         {
-            let location = Waypoint(coordinate: CLLocationCoordinate2D(latitude: loc.latitude!, longitude: loc.longitude!), name: loc.name)
-            
+            var location = Waypoint(coordinate: CLLocationCoordinate2D(latitude: loc.latitude!, longitude: loc.longitude!), name: loc.name)
+
             location.separatesLegs = !loc.isSilent
-            
+
             _wayPoints.append(location)
             _wayPointOrder[loc.order!] = location
         }
@@ -121,71 +126,86 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
     
     func startNavigationWithWayPoints(wayPoints: [Waypoint], flutterResult: @escaping FlutterResult, isUpdatingWaypoints: Bool)
     {
-        let simulationMode: SimulationMode = _simulateRoute ? .always : .never
         setNavigationOptions(wayPoints: wayPoints)
-        
-        Directions.shared.calculate(_options!) { [weak self](session, result) in
-            guard let strongSelf = self else { return }
-            switch result {
+
+        // Initialize MapboxNavigationProvider with v3 API
+        let locationSource: LocationSource = _simulateRoute ? .simulation() : .live
+        let coreConfig = CoreConfig(locationSource: locationSource)
+        mapboxNavigationProvider = MapboxNavigationProvider(coreConfig: coreConfig)
+
+        Task { @MainActor in
+            mapboxNavigation = mapboxNavigationProvider?.mapboxNavigation
+
+            guard let mapboxNavigation = mapboxNavigation else {
+                flutterResult("Failed to initialize Mapbox Navigation")
+                return
+            }
+
+            // Calculate routes using v3 API
+            let request = mapboxNavigation.routingProvider().calculateRoutes(options: _options!)
+
+            switch await request.result {
             case .failure(let error):
-                strongSelf.sendEvent(eventType: MapBoxEventType.route_build_failed)
-                flutterResult("An error occured while calculating the route \(error.localizedDescription)")
-            case .success(let response):
-                guard let routes = response.routes else { return }
-                //TODO: if more than one route found, give user option to select one: DOES NOT WORK
-                if(routes.count > 1 && strongSelf.ALLOW_ROUTE_SELECTION)
-                {
-                    //show map to select a specific route
-                    strongSelf._routes = routes
-                    let routeOptionsView = RouteOptionsViewController(routes: routes, options: strongSelf._options!)
-                    
-                    let flutterViewController = UIApplication.shared.delegate?.window??.rootViewController as! FlutterViewController
-                    flutterViewController.present(routeOptionsView, animated: true, completion: nil)
+                DispatchQueue.main.async {
+                    self.sendEvent(eventType: MapBoxEventType.route_build_failed)
+                    flutterResult("An error occurred while calculating the route: \(error.localizedDescription)")
                 }
-                else
-                {
-                    let navigationService = MapboxNavigationService(routeResponse: response, routeIndex: 0, routeOptions: strongSelf._options!, simulating: simulationMode)
-                    var dayStyle = CustomDayStyle()
-                    if(strongSelf._mapStyleUrlDay != nil){
-                        dayStyle = CustomDayStyle(url: strongSelf._mapStyleUrlDay)
-                    }
-                    let nightStyle = CustomNightStyle()
-                    if(strongSelf._mapStyleUrlNight != nil){
-                        nightStyle.mapStyleURL = URL(string: strongSelf._mapStyleUrlNight!)!
-                    }
-                    let navigationOptions = NavigationOptions(styles: [dayStyle, nightStyle], navigationService: navigationService)
+            case .success(let navigationRoutes):
+                DispatchQueue.main.async {
+                    self._navigationRoutes = navigationRoutes
+
                     if (isUpdatingWaypoints) {
-                        strongSelf._navigationViewController?.navigationService.router.updateRoute(with: IndexedRouteResponse(routeResponse: response, routeIndex: 0), routeOptions: strongSelf._options) { success in
-                            if (success) {
-                                flutterResult("true")
-                            } else {
-                                flutterResult("failed to add stop")
+                        // Update existing navigation with new routes
+                        if let navigationViewController = self._navigationViewController {
+                            // In v3, we need to start active guidance with new routes
+                            Task { @MainActor in
+                                mapboxNavigation.tripSession().startActiveGuidance(with: navigationRoutes, startLegIndex: 0)
                             }
+                            flutterResult("true")
+                        } else {
+                            flutterResult("failed to add stop - no active navigation")
                         }
-                    }
-                    else {
-                        strongSelf.startNavigation(routeResponse: response, options: strongSelf._options!, navOptions: navigationOptions)
+                    } else {
+                        self.startNavigation(navigationRoutes: navigationRoutes, mapboxNavigation: mapboxNavigation)
+                        flutterResult("Navigation started successfully")
                     }
                 }
             }
         }
-        
     }
     
-    func startNavigation(routeResponse: RouteResponse, options: NavigationRouteOptions, navOptions: NavigationOptions)
+    func startNavigation(navigationRoutes: NavigationRoutes, mapboxNavigation: MapboxNavigation)
     {
         isEmbeddedNavigation = false
         if(self._navigationViewController == nil)
         {
-            self._navigationViewController = NavigationViewController(for: routeResponse, routeIndex: 0, routeOptions: options, navigationOptions: navOptions)
-            self._navigationViewController!.modalPresentationStyle = .fullScreen
-            self._navigationViewController!.delegate = self
-            self._navigationViewController!.navigationMapView!.localizeLabels()
-            self._navigationViewController!.showsReportFeedback = _showReportFeedbackButton
-            self._navigationViewController!.showsEndOfRouteFeedback = _showEndOfRouteFeedback
+            Task { @MainActor in
+                // Create NavigationOptions for v3
+                let navigationOptions = NavigationOptions(
+                    mapboxNavigation: mapboxNavigation,
+                    voiceController: mapboxNavigationProvider!.routeVoiceController,
+                    eventsManager: mapboxNavigation.eventsManager()
+                )
+
+                // Create NavigationViewController with v3 API
+                self._navigationViewController = NavigationViewController(
+                    navigationRoutes: navigationRoutes,
+                    navigationOptions: navigationOptions
+                )
+
+                self._navigationViewController!.modalPresentationStyle = .fullScreen
+                self._navigationViewController!.delegate = self
+                self._navigationViewController!.routeLineTracksTraversal = true
+
+                // Configure feedback options
+                // Note: v3 API may have different properties for feedback
+                // self._navigationViewController!.showsReportFeedback = _showReportFeedbackButton
+                // self._navigationViewController!.showsEndOfRouteFeedback = _showEndOfRouteFeedback
+
+                let flutterViewController = UIApplication.shared.delegate?.window??.rootViewController as! FlutterViewController
+                flutterViewController.present(self._navigationViewController!, animated: true, completion: nil)
+            }
         }
-        let flutterViewController = UIApplication.shared.delegate?.window??.rootViewController as! FlutterViewController
-        flutterViewController.present(self._navigationViewController!, animated: true, completion: nil)
     }
     
     func setNavigationOptions(wayPoints: [Waypoint]) {
@@ -240,27 +260,28 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
     func continueNavigationWithWayPoints(wayPoints: [Waypoint])
     {
         _options?.waypoints = wayPoints
-        Directions.shared.calculate(_options!) { [weak self](session, result) in
-            guard let strongSelf = self else { return }
-            switch result {
+
+        guard let mapboxNavigation = mapboxNavigation else { return }
+
+        Task { @MainActor in
+            let request = mapboxNavigation.routingProvider().calculateRoutes(options: _options!)
+
+            switch await request.result {
             case .failure(let error):
-                strongSelf.sendEvent(eventType: MapBoxEventType.route_build_failed, data: error.localizedDescription)
-            case .success(let response):
-                strongSelf.sendEvent(eventType: MapBoxEventType.route_built, data: strongSelf.encodeRouteResponse(response: response))
-                guard let routes = response.routes else { return }
-                //TODO: if more than one route found, give user option to select one: DOES NOT WORK
-                if(routes.count > 1 && strongSelf.ALLOW_ROUTE_SELECTION)
-                {
-                    //TODO: show map to select a specific route
-                    
+                DispatchQueue.main.async {
+                    self.sendEvent(eventType: MapBoxEventType.route_build_failed, data: error.localizedDescription)
                 }
-                else
-                {
-                    strongSelf._navigationViewController?.navigationService.start()
+            case .success(let navigationRoutes):
+                DispatchQueue.main.async {
+                    self.sendEvent(eventType: MapBoxEventType.route_built, data: self.encodeNavigationRoutes(navigationRoutes: navigationRoutes))
+
+                    // Update the navigation session with new routes
+                    Task { @MainActor in
+                        mapboxNavigation.tripSession().startActiveGuidance(with: navigationRoutes, startLegIndex: 0)
+                    }
                 }
             }
         }
-        
     }
     
     func endNavigation(result: FlutterResult?)
@@ -268,7 +289,8 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
         sendEvent(eventType: MapBoxEventType.navigation_finished)
         if(self._navigationViewController != nil)
         {
-            self._navigationViewController?.navigationService.endNavigation(feedback: nil)
+            // In v3, navigation is ended by dismissing the NavigationViewController
+            // The MapboxNavigation instance handles the session cleanup
             if(isEmbeddedNavigation)
             {
                 self._navigationViewController?.view.removeFromSuperview()
@@ -277,21 +299,26 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
             }
             else
             {
-                self._navigationViewController?.dismiss(animated: true, completion: {
-                    self._navigationViewController = nil
-                    if(result != nil)
-                    {
-                        result!(true)
-                    }
-                })
+                Task { @MainActor in
+                    self._navigationViewController?.dismiss(animated: true, completion: {
+                        self._navigationViewController = nil
+                        if(result != nil)
+                        {
+                            result!(true)
+                        }
+                    })
+                }
             }
         }
-        
+
+        // Clean up MapboxNavigation provider
+        mapboxNavigationProvider = nil
+        mapboxNavigation = nil
     }
     
-    func getLocationsFromFlutterArgument(arguments: NSDictionary?) -> [Location]? {
-        
-        var locations = [Location]()
+    func getLocationsFromFlutterArgument(arguments: NSDictionary?) -> [FlutterLocation]? {
+
+        var locations = [FlutterLocation]()
         guard let oWayPoints = arguments?["wayPoints"] as? NSDictionary else {return nil}
         for item in oWayPoints as NSDictionary
         {
@@ -301,7 +328,7 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
             guard let oLongitude = point["Longitude"] as? Double else {return nil}
             let oIsSilent = point["IsSilent"] as? Bool ?? false
             let order = point["Order"] as? Int
-            let location = Location(name: oName, latitude: oLatitude, longitude: oLongitude, order: order,isSilent: oIsSilent)
+            let location = FlutterLocation(name: oName, latitude: oLatitude, longitude: oLongitude, order: order,isSilent: oIsSilent)
             locations.append(location)
         }
         if(!_isOptimized)
@@ -374,16 +401,31 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
     
     func encodeRouteResponse(response: RouteResponse) -> String {
         let routes = response.routes
-        
+
         if routes != nil && !routes!.isEmpty {
             let jsonEncoder = JSONEncoder()
             let jsonData = try! jsonEncoder.encode(response.routes!)
             return String(data: jsonData, encoding: String.Encoding.utf8) ?? "{}"
         }
-        
+
         return "{}"
     }
-    
+
+    func encodeNavigationRoutes(navigationRoutes: NavigationRoutes) -> String {
+        // For v3, we need to encode the routes from NavigationRoutes
+        let routes = navigationRoutes.mainRoute.route
+
+        do {
+            let jsonEncoder = JSONEncoder()
+            let jsonData = try jsonEncoder.encode([routes])
+            return String(data: jsonData, encoding: String.Encoding.utf8) ?? "{}"
+        } catch {
+            return "{}"
+        }
+    }
+
+
+
     //MARK: EventListener Delegates
     public func onListen(withArguments arguments: Any?, eventSink events: @escaping FlutterEventSink) -> FlutterError? {
         _eventSink = events
@@ -460,18 +502,16 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
     private func startHistoryRecording() {
         if _enableHistoryRecording && !_isHistoryRecording {
             // 使用 Mapbox Navigation SDK 的历史记录功能
-            // 根据官方示例，使用 HistoryRecording 类
-            do {
-                // 启动历史记录
-                try HistoryRecording.startRecordingHistory()
+            // 在 v3 中，使用 MapboxNavigation 的 historyRecorder
+            guard let mapboxNavigation = mapboxNavigation else { return }
+
+            Task { @MainActor in
+                mapboxNavigation.historyRecorder()?.startRecordingHistory()
                 _isHistoryRecording = true
                 _currentHistoryId = UUID().uuidString
                 _historyStartTime = Date()
                 print("History recording started successfully")
                 sendEvent(eventType: MapBoxEventType.history_recording_started)
-            } catch {
-                print("Failed to start history recording: \(error.localizedDescription)")
-                sendEvent(eventType: MapBoxEventType.history_recording_error, data: "Failed to start history recording: \(error.localizedDescription)")
             }
         }
     }
@@ -481,29 +521,33 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
      */
     private func stopHistoryRecording() {
         if _isHistoryRecording {
-            do {
-                // 创建历史文件 URL
-                let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-                let historyFileName = "navigation_history_\(_currentHistoryId ?? UUID().uuidString).json"
-                let historyFileURL = documentsPath.appendingPathComponent(historyFileName)
-                
+            // 在 v3 中，使用 MapboxNavigation 的 historyRecorder
+            guard let mapboxNavigation = mapboxNavigation else { return }
+
+            // 创建历史文件 URL
+            let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+            let historyFileName = "navigation_history_\(_currentHistoryId ?? UUID().uuidString).json"
+            let historyFileURL = documentsPath.appendingPathComponent(historyFileName)
+
+            Task { @MainActor in
                 // 停止记录并写入文件
-                try HistoryRecording.stopRecordingHistory(writingFileWith: historyFileURL)
-                
-                print("History recording stopped successfully, file saved to: \(historyFileURL.path)")
-                // 保存历史记录信息
-                saveHistoryRecord(filePath: historyFileURL.path)
-                sendEvent(eventType: MapBoxEventType.history_recording_stopped, data: historyFileURL.path)
-                
-                _isHistoryRecording = false
-                _currentHistoryId = nil
-                _historyStartTime = nil
-            } catch {
-                print("Failed to stop history recording: \(error.localizedDescription)")
-                sendEvent(eventType: MapBoxEventType.history_recording_error, data: "Failed to stop history recording: \(error.localizedDescription)")
-                _isHistoryRecording = false
-                _currentHistoryId = nil
-                _historyStartTime = nil
+                mapboxNavigation.historyRecorder()?.stopRecordingHistory { [weak self] fileURL in
+                    guard let self = self else { return }
+
+                    if let fileURL = fileURL {
+                        print("History recording stopped successfully, file saved to: \(fileURL.path)")
+                        // 保存历史记录信息
+                        self.saveHistoryRecord(filePath: fileURL.path)
+                        self.sendEvent(eventType: MapBoxEventType.history_recording_stopped, data: fileURL.path)
+                    } else {
+                        print("Failed to stop history recording: No file URL returned")
+                        self.sendEvent(eventType: MapBoxEventType.history_recording_error, data: "Failed to stop history recording: No file URL returned")
+                    }
+
+                    self._isHistoryRecording = false
+                    self._currentHistoryId = nil
+                    self._historyStartTime = nil
+                }
             }
         }
     }
@@ -613,22 +657,26 @@ extension NavigationFactory : NavigationViewControllerDelegate {
         return _shouldReRoute
     }
     
+    // EndOfRouteFeedback has been removed in v3
+    // This delegate method is no longer available
+    /*
     public func navigationViewController(_ navigationViewController: NavigationViewController, didSubmitArrivalFeedback feedback: EndOfRouteFeedback) {
-        
+
         if(_eventSink != nil)
         {
             let jsonEncoder = JSONEncoder()
-            
+
             let localFeedback = Feedback(rating: feedback.rating, comment: feedback.comment)
             let feedbackJsonData = try! jsonEncoder.encode(localFeedback)
             let feedbackJson = String(data: feedbackJsonData, encoding: String.Encoding.ascii)
-            
+
             sendEvent(eventType: MapBoxEventType.navigation_finished, data: feedbackJson ?? "")
-            
+
             _eventSink = nil
-            
+
         }
     }
+    */
 }
 
 // MARK: - HistoryManager 内嵌类

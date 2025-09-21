@@ -59,6 +59,7 @@ class _SampleNavigationAppState extends State<SampleNavigationApp> {
   bool _isNavigating = false;
   bool _inFreeDrive = false;
   late MapBoxOptions _navigationOption;
+  bool _enableHistoryRecording = false; // 历史记录开关
 
   @override
   void initState() {
@@ -128,6 +129,30 @@ class _SampleNavigationAppState extends State<SampleNavigationApp> {
                         )),
                       ),
                     ),
+                    // 历史记录开关
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 10),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            '启用导航历史记录',
+                            style: TextStyle(fontSize: 16),
+                          ),
+                          Switch(
+                            value: _enableHistoryRecording,
+                            onChanged: (value) {
+                              setState(() {
+                                _enableHistoryRecording = value;
+                                _navigationOption.enableHistoryRecording =
+                                    value;
+                              });
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -143,8 +168,10 @@ class _SampleNavigationAppState extends State<SampleNavigationApp> {
                             opt.bannerInstructionsEnabled = true;
                             opt.units = VoiceUnits.metric;
                             opt.language = "de-DE";
-                            await MapBoxNavigation.instance
-                                .startNavigation(wayPoints: wayPoints, options: opt);
+                            opt.enableHistoryRecording =
+                                _enableHistoryRecording; // 使用历史记录设置
+                            await MapBoxNavigation.instance.startNavigation(
+                                wayPoints: wayPoints, options: opt);
                           },
                         ),
                         const SizedBox(
@@ -168,7 +195,9 @@ class _SampleNavigationAppState extends State<SampleNavigationApp> {
                                     simulateRoute: true,
                                     language: "en",
                                     allowsUTurnAtWayPoints: true,
-                                    units: VoiceUnits.metric));
+                                    units: VoiceUnits.metric,
+                                    enableHistoryRecording:
+                                        _enableHistoryRecording)); // 使用历史记录设置
                             //after 10 seconds add a new stop
                             await Future.delayed(const Duration(seconds: 10));
                             var stop = WayPoint(

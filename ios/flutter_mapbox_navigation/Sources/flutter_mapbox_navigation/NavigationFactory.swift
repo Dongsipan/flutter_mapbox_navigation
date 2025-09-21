@@ -13,11 +13,11 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
 {
     var _navigationViewController: NavigationViewController? = nil
     var _eventSink: FlutterEventSink? = nil
-
+    
     let ALLOW_ROUTE_SELECTION = false
     let IsMultipleUniqueRoutes = false
     var isEmbeddedNavigation = false
-
+    
     var _distanceRemaining: Double?
     var _durationRemaining: Double?
     var _navigationMode: String?
@@ -25,7 +25,7 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
     var _wayPointOrder: [Int: Waypoint] = [:]
     var _wayPoints: [Waypoint] = []
     var _lastKnownLocation: CLLocation?
-
+    
     var _options: NavigationRouteOptions?
     var _simulateRoute = false
     var _allowsUTurnAtWayPoints: Bool?
@@ -48,7 +48,7 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
     var _isHistoryRecording = false
     var _currentHistoryId: String?
     var _historyStartTime: Date?
-
+    
     // Mapbox Navigation v3 components
     var mapboxNavigationProvider: MapboxNavigationProvider?
     var mapboxNavigation: MapboxNavigation?
@@ -56,9 +56,9 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
     
     func addWayPoints(arguments: NSDictionary?, result: @escaping FlutterResult)
     {
-
+        
         guard let locations = getLocationsFromFlutterArgument(arguments: arguments) else { return }
-
+        
         var nextIndex = 1
         for loc in locations
         {
@@ -93,9 +93,9 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
         for loc in locations
         {
             var location = Waypoint(coordinate: CLLocationCoordinate2D(latitude: loc.latitude!, longitude: loc.longitude!), name: loc.name)
-
+            
             location.separatesLegs = !loc.isSilent
-
+            
             _wayPoints.append(location)
             _wayPointOrder[loc.order!] = location
         }
@@ -126,24 +126,56 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
     
     func startNavigationWithWayPoints(wayPoints: [Waypoint], flutterResult: @escaping FlutterResult, isUpdatingWaypoints: Bool)
     {
+        // End any existing navigation first
+        if _navigationViewController != nil {
+            endNavigation(result: nil)
+        }
+        
+        // 重置历史记录状态
+        print("Resetting history recording state before starting new navigation")
+        print("Before reset - isHistoryRecording: \(_isHistoryRecording), currentHistoryId: \(_currentHistoryId ?? "nil")")
+        _isHistoryRecording = false
+        _currentHistoryId = nil
+        _historyStartTime = nil
+        print("After reset - isHistoryRecording: \(_isHistoryRecording), currentHistoryId: \(_currentHistoryId ?? "nil")")
+        
         setNavigationOptions(wayPoints: wayPoints)
-
-        // Initialize MapboxNavigationProvider with v3 API
-        let locationSource: LocationSource = _simulateRoute ? .simulation() : .live
-        let coreConfig = CoreConfig(locationSource: locationSource)
-        mapboxNavigationProvider = MapboxNavigationProvider(coreConfig: coreConfig)
-
+        
+        // Initialize MapboxNavigationProvider with v3 API only if not already initialized
+        if mapboxNavigationProvider == nil {
+            let locationSource: LocationSource = _simulateRoute ? .simulation(initialLocation: nil) : .live
+            
+            // 配置历史记录目录（根据官方示例）
+            let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+            let historyDirectoryURL = documentsPath.appendingPathComponent("NavigationHistory")
+            
+            // 确保目录存在
+            if !FileManager.default.fileExists(atPath: historyDirectoryURL.path) {
+                try? FileManager.default.createDirectory(
+                    at: historyDirectoryURL,
+                    withIntermediateDirectories: true,
+                    attributes: nil
+                )
+            }
+            
+            let coreConfig = CoreConfig(
+                locationSource: locationSource,
+                historyRecordingConfig: HistoryRecordingConfig(historyDirectoryURL: historyDirectoryURL)
+            )
+            mapboxNavigationProvider = MapboxNavigationProvider(coreConfig: coreConfig)
+        }
+        
         Task { @MainActor in
             mapboxNavigation = mapboxNavigationProvider?.mapboxNavigation
-
+            
             guard let mapboxNavigation = mapboxNavigation else {
                 flutterResult("Failed to initialize Mapbox Navigation")
                 return
             }
-
+            
             // Calculate routes using v3 API
             let request = mapboxNavigation.routingProvider().calculateRoutes(options: _options!)
-
+            
             switch await request.result {
             case .failure(let error):
                 DispatchQueue.main.async {
@@ -153,7 +185,7 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
             case .success(let navigationRoutes):
                 DispatchQueue.main.async {
                     self._navigationRoutes = navigationRoutes
-
+                    
                     if (isUpdatingWaypoints) {
                         // Update existing navigation with new routes
                         if let navigationViewController = self._navigationViewController {
@@ -186,24 +218,27 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
                     voiceController: mapboxNavigationProvider!.routeVoiceController,
                     eventsManager: mapboxNavigation.eventsManager()
                 )
-
+                
                 // Create NavigationViewController with v3 API
                 self._navigationViewController = NavigationViewController(
                     navigationRoutes: navigationRoutes,
                     navigationOptions: navigationOptions
                 )
-
+                
                 self._navigationViewController!.modalPresentationStyle = .fullScreen
                 self._navigationViewController!.delegate = self
                 self._navigationViewController!.routeLineTracksTraversal = true
-
+                
                 // Configure feedback options
                 // Note: v3 API may have different properties for feedback
                 // self._navigationViewController!.showsReportFeedback = _showReportFeedbackButton
                 // self._navigationViewController!.showsEndOfRouteFeedback = _showEndOfRouteFeedback
-
+                
                 let flutterViewController = UIApplication.shared.delegate?.window??.rootViewController as! FlutterViewController
-                flutterViewController.present(self._navigationViewController!, animated: true, completion: nil)
+                flutterViewController.present(self._navigationViewController!, animated: true, completion: {
+                    // 导航界面显示后启动历史记录
+                    self.startHistoryRecording()
+                })
             }
         }
     }
@@ -260,12 +295,12 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
     func continueNavigationWithWayPoints(wayPoints: [Waypoint])
     {
         _options?.waypoints = wayPoints
-
+        
         guard let mapboxNavigation = mapboxNavigation else { return }
-
+        
         Task { @MainActor in
             let request = mapboxNavigation.routingProvider().calculateRoutes(options: _options!)
-
+            
             switch await request.result {
             case .failure(let error):
                 DispatchQueue.main.async {
@@ -274,7 +309,7 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
             case .success(let navigationRoutes):
                 DispatchQueue.main.async {
                     self.sendEvent(eventType: MapBoxEventType.route_built, data: self.encodeNavigationRoutes(navigationRoutes: navigationRoutes))
-
+                    
                     // Update the navigation session with new routes
                     Task { @MainActor in
                         mapboxNavigation.tripSession().startActiveGuidance(with: navigationRoutes, startLegIndex: 0)
@@ -286,6 +321,9 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
     
     func endNavigation(result: FlutterResult?)
     {
+        // 先停止历史记录
+        stopHistoryRecording()
+        
         sendEvent(eventType: MapBoxEventType.navigation_finished)
         if(self._navigationViewController != nil)
         {
@@ -310,14 +348,14 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
                 }
             }
         }
-
+        
         // Clean up MapboxNavigation provider
         mapboxNavigationProvider = nil
         mapboxNavigation = nil
     }
     
     func getLocationsFromFlutterArgument(arguments: NSDictionary?) -> [FlutterLocation]? {
-
+        
         var locations = [FlutterLocation]()
         guard let oWayPoints = arguments?["wayPoints"] as? NSDictionary else {return nil}
         for item in oWayPoints as NSDictionary
@@ -401,20 +439,20 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
     
     func encodeRouteResponse(response: RouteResponse) -> String {
         let routes = response.routes
-
+        
         if routes != nil && !routes!.isEmpty {
             let jsonEncoder = JSONEncoder()
             let jsonData = try! jsonEncoder.encode(response.routes!)
             return String(data: jsonData, encoding: String.Encoding.utf8) ?? "{}"
         }
-
+        
         return "{}"
     }
-
+    
     func encodeNavigationRoutes(navigationRoutes: NavigationRoutes) -> String {
         // For v3, we need to encode the routes from NavigationRoutes
         let routes = navigationRoutes.mainRoute.route
-
+        
         do {
             let jsonEncoder = JSONEncoder()
             let jsonData = try jsonEncoder.encode([routes])
@@ -423,9 +461,9 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
             return "{}"
         }
     }
-
-
-
+    
+    
+    
     //MARK: EventListener Delegates
     public func onListen(withArguments arguments: Any?, eventSink events: @escaping FlutterEventSink) -> FlutterError? {
         _eventSink = events
@@ -440,25 +478,36 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
     // MARK: - Navigation History Methods
     
     func getNavigationHistoryList(result: @escaping FlutterResult) {
+        print("getNavigationHistoryList called")
+
         if historyManager == nil {
+            print("Creating new HistoryManager instance")
             historyManager = HistoryManager()
         }
-        
+
         do {
             let historyList = historyManager!.getHistoryList()
+            print("Retrieved \(historyList.count) history records")
+
             let historyMaps = historyList.map { history in
-                [
+                let startTimeMillis = Int64(history.startTime.timeIntervalSince1970 * 1000)
+                let historyMap: [String: Any] = [
                     "id": history.id,
                     "historyFilePath": history.historyFilePath,
-                    "startTime": history.startTime.timeIntervalSince1970 * 1000, // 转换为毫秒
+                    "startTime": startTimeMillis, // 确保是整数类型
                     "duration": history.duration,
                     "startPointName": history.startPointName ?? "",
                     "endPointName": history.endPointName ?? "",
                     "navigationMode": history.navigationMode ?? ""
                 ]
+                print("History map: \(historyMap)")
+                return historyMap
             }
+
+            print("Returning \(historyMaps.count) history maps to Flutter")
             result(historyMaps)
         } catch {
+            print("Error in getNavigationHistoryList: \(error)")
             result(FlutterError(code: "HISTORY_ERROR", message: "Failed to get history list: \(error.localizedDescription)", details: nil))
         }
     }
@@ -500,19 +549,30 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
      * 启动导航历史记录
      */
     private func startHistoryRecording() {
+        print("startHistoryRecording called - enableHistoryRecording: \(_enableHistoryRecording), isHistoryRecording: \(_isHistoryRecording)")
+        
         if _enableHistoryRecording && !_isHistoryRecording {
             // 使用 Mapbox Navigation SDK 的历史记录功能
             // 在 v3 中，使用 MapboxNavigation 的 historyRecorder
-            guard let mapboxNavigation = mapboxNavigation else { return }
-
+            guard let mapboxNavigation = mapboxNavigation else {
+                print("mapboxNavigation is nil, cannot start history recording")
+                return
+            }
+            
             Task { @MainActor in
-                mapboxNavigation.historyRecorder()?.startRecordingHistory()
+                let historyRecorder = mapboxNavigation.historyRecorder()
+                print("historyRecorder: \(String(describing: historyRecorder))")
+                
+                // 根据官方示例，直接调用 startRecordingHistory()，不需要 try-catch
+                historyRecorder?.startRecordingHistory()
                 _isHistoryRecording = true
                 _currentHistoryId = UUID().uuidString
                 _historyStartTime = Date()
-                print("History recording started successfully")
-                sendEvent(eventType: MapBoxEventType.history_recording_started)
+                print("History recording started successfully with ID: \(_currentHistoryId ?? "unknown")")
+                sendEvent(eventType: MapBoxEventType.history_recording_started, data: _currentHistoryId ?? "")
             }
+        } else {
+            print("History recording not started - enableHistoryRecording: \(_enableHistoryRecording), isHistoryRecording: \(_isHistoryRecording)")
         }
     }
     
@@ -520,34 +580,46 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
      * 停止导航历史记录
      */
     private func stopHistoryRecording() {
-        if _isHistoryRecording {
-            // 在 v3 中，使用 MapboxNavigation 的 historyRecorder
-            guard let mapboxNavigation = mapboxNavigation else { return }
-
-            // 创建历史文件 URL
-            let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-            let historyFileName = "navigation_history_\(_currentHistoryId ?? UUID().uuidString).json"
-            let historyFileURL = documentsPath.appendingPathComponent(historyFileName)
-
-            Task { @MainActor in
-                // 停止记录并写入文件
-                mapboxNavigation.historyRecorder()?.stopRecordingHistory { [weak self] fileURL in
-                    guard let self = self else { return }
-
-                    if let fileURL = fileURL {
-                        print("History recording stopped successfully, file saved to: \(fileURL.path)")
-                        // 保存历史记录信息
-                        self.saveHistoryRecord(filePath: fileURL.path)
-                        self.sendEvent(eventType: MapBoxEventType.history_recording_stopped, data: fileURL.path)
-                    } else {
-                        print("Failed to stop history recording: No file URL returned")
-                        self.sendEvent(eventType: MapBoxEventType.history_recording_error, data: "Failed to stop history recording: No file URL returned")
-                    }
-
-                    self._isHistoryRecording = false
-                    self._currentHistoryId = nil
-                    self._historyStartTime = nil
+        print("stopHistoryRecording called - isHistoryRecording: \(_isHistoryRecording)")
+        print("Current historyId: \(_currentHistoryId ?? "nil"), startTime: \(_historyStartTime?.description ?? "nil")")
+        
+        // 防止重复调用
+        guard _isHistoryRecording else {
+            print("History recording already stopped or not started")
+            return
+        }
+        
+        // 立即设置为false，防止重复调用
+        _isHistoryRecording = false
+        
+        // 在 v3 中，使用 MapboxNavigation 的 historyRecorder
+        guard let mapboxNavigation = mapboxNavigation else {
+            print("mapboxNavigation is nil, cannot stop history recording")
+            return
+        }
+        
+        // 创建历史文件 URL
+        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+        let historyFileName = "navigation_history_\(_currentHistoryId ?? UUID().uuidString).json"
+        let historyFileURL = documentsPath.appendingPathComponent(historyFileName)
+        
+        Task { @MainActor in
+            // 根据官方示例使用回调版本的 stopRecordingHistory
+            let historyRecorder = mapboxNavigation.historyRecorder()
+            print("Attempting to stop history recording...")
+            print("historyRecorder: \(String(describing: historyRecorder))")
+            
+            // 使用官方示例的回调版本
+            historyRecorder?.stopRecordingHistory { [weak self] historyFileUrl in
+                guard let self = self else { return }
+                guard let historyFileUrl = historyFileUrl else {
+                    print("Failed to stop history recording: No file URL returned")
+                    return
                 }
+                
+                print("History recording stopped successfully, file saved to: \(historyFileUrl.path)")
+                // 保存历史记录信息
+                self.saveHistoryRecord(filePath: historyFileUrl.path)
             }
         }
     }
@@ -556,9 +628,12 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
      * 保存历史记录信息
      */
     private func saveHistoryRecord(filePath: String) {
+        print("saveHistoryRecord called with filePath: \(filePath)")
         do {
             let fileManager = FileManager.default
+            print("Checking if file exists at path: \(filePath)")
             if fileManager.fileExists(atPath: filePath) {
+                print("History file exists, proceeding with save")
                 let fileAttributes = try fileManager.attributesOfItem(atPath: filePath)
                 let fileSize = fileAttributes[.size] as? Int64 ?? 0
                 
@@ -580,19 +655,25 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
                     historyManager = HistoryManager()
                 }
                 
+                print("Attempting to save history record: \(historyData)")
                 let success = historyManager!.saveHistoryRecord(historyData: historyData)
                 if !success {
+                    print("Failed to save history record to database")
                     sendEvent(eventType: MapBoxEventType.history_recording_error, data: "Failed to save history record to database")
                 } else {
                     print("History record saved successfully: \(historyData)")
+                    sendEvent(eventType: MapBoxEventType.history_recording_stopped, data: filePath)
                 }
+            } else {
+                print("History file does not exist at path: \(filePath)")
+                sendEvent(eventType: MapBoxEventType.history_recording_error, data: "History file does not exist")
             }
         } catch {
+            print("Error saving history record: \(error.localizedDescription)")
             sendEvent(eventType: MapBoxEventType.history_recording_error, data: "Failed to save history record: \(error.localizedDescription)")
         }
     }
 }
-
 
 extension NavigationFactory : NavigationViewControllerDelegate {
     //MARK: NavigationViewController Delegates
@@ -695,7 +776,10 @@ class HistoryManager {
      */
     func saveHistoryRecord(historyData: [String: Any]) -> Bool {
         do {
+            print("HistoryManager.saveHistoryRecord called with data: \(historyData)")
             var historyList = getHistoryList()
+            print("Current history list count before adding: \(historyList.count)")
+
             let historyRecord = HistoryRecord(
                 id: historyData["id"] as? String ?? UUID().uuidString,
                 historyFilePath: historyData["filePath"] as? String ?? "",
@@ -705,10 +789,16 @@ class HistoryManager {
                 endPointName: historyData["endPointName"] as? String,
                 navigationMode: historyData["navigationMode"] as? String
             )
-            
+
+            print("Created history record: \(historyRecord)")
             historyList.append(historyRecord)
-            return saveHistoryList(historyList)
+            print("History list count after adding: \(historyList.count)")
+
+            let success = saveHistoryList(historyList)
+            print("saveHistoryList result: \(success)")
+            return success
         } catch {
+            print("Error in saveHistoryRecord: \(error)")
             return false
         }
     }
@@ -717,10 +807,22 @@ class HistoryManager {
      * 获取历史记录列表
      */
     func getHistoryList() -> [HistoryRecord] {
-        guard let data = userDefaults.data(forKey: historyKey),
-              let historyList = try? JSONDecoder().decode([HistoryRecord].self, from: data) else {
+        print("HistoryManager.getHistoryList called")
+        print("Looking for key: \(historyKey)")
+
+        guard let data = userDefaults.data(forKey: historyKey) else {
+            print("No data found for key: \(historyKey)")
             return []
         }
+
+        print("Found data, size: \(data.count) bytes")
+
+        guard let historyList = try? JSONDecoder().decode([HistoryRecord].self, from: data) else {
+            print("Failed to decode history list from data")
+            return []
+        }
+
+        print("Successfully decoded \(historyList.count) history records")
         return historyList
     }
     
@@ -789,10 +891,22 @@ class HistoryManager {
     
     private func saveHistoryList(_ historyList: [HistoryRecord]) -> Bool {
         do {
+            print("HistoryManager.saveHistoryList called with \(historyList.count) records")
             let data = try JSONEncoder().encode(historyList)
+            print("Encoded data size: \(data.count) bytes")
             userDefaults.set(data, forKey: historyKey)
+            print("Data saved to UserDefaults with key: \(historyKey)")
+
+            // 验证保存是否成功
+            if let savedData = userDefaults.data(forKey: historyKey) {
+                print("Verification: Data successfully saved, size: \(savedData.count) bytes")
+            } else {
+                print("Verification: Failed to save data to UserDefaults")
+            }
+
             return true
         } catch {
+            print("Error in saveHistoryList: \(error)")
             return false
         }
     }

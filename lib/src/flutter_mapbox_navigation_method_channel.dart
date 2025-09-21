@@ -21,7 +21,7 @@ class MethodChannelFlutterMapboxNavigation
   final eventChannel = const EventChannel('flutter_mapbox_navigation/events');
 
   late StreamSubscription<RouteEvent> _routeEventSubscription;
-  late ValueSetter<RouteEvent>? _onRouteEvent;
+  ValueSetter<RouteEvent>? _onRouteEvent;
 
   @override
   Future<String?> getPlatformVersion() async {
@@ -111,6 +111,72 @@ class MethodChannelFlutterMapboxNavigation
     ValueSetter<RouteEvent> listener,
   ) async {
     _onRouteEvent = listener;
+  }
+
+  @override
+  Future<List<NavigationHistory>> getNavigationHistoryList() async {
+    try {
+      log('Calling getNavigationHistoryList method');
+      final result = await methodChannel
+          .invokeMethod<List<dynamic>>('getNavigationHistoryList');
+      log('Received result from native: $result');
+
+      if (result != null) {
+        log('Result is not null, processing ${result.length} items');
+        final historyList = result.map(
+          (item) {
+            log('Processing item: $item');
+            try {
+              // 安全地转换 Map<Object?, Object?> 到 Map<String, dynamic>
+              final Map<String, dynamic> itemMap =
+                  Map<String, dynamic>.from(item as Map);
+              log('Converted item map: $itemMap');
+              final history = NavigationHistory.fromMap(itemMap);
+              log('Successfully created NavigationHistory: ${history.toString()}');
+              return history;
+            } catch (e, stackTrace) {
+              log('Error creating NavigationHistory from item: $item');
+              log('Error: $e');
+              log('StackTrace: $stackTrace');
+              rethrow;
+            }
+          },
+        ).toList();
+        log('Successfully created ${historyList.length} NavigationHistory objects');
+        return historyList;
+      }
+      log('Result is null, returning empty list');
+      return [];
+    } catch (e) {
+      log('Error getting navigation history list: $e');
+      return [];
+    }
+  }
+
+  @override
+  Future<bool> deleteNavigationHistory(String historyId) async {
+    try {
+      final result =
+          await methodChannel.invokeMethod<bool>('deleteNavigationHistory', {
+        'historyId': historyId,
+      });
+      return result ?? false;
+    } catch (e) {
+      log('Error deleting navigation history: $e');
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> clearAllNavigationHistory() async {
+    try {
+      final result =
+          await methodChannel.invokeMethod<bool>('clearAllNavigationHistory');
+      return result ?? false;
+    } catch (e) {
+      log('Error clearing all navigation history: $e');
+      return false;
+    }
   }
 
   /// Events Handling

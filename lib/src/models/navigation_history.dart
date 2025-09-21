@@ -15,13 +15,35 @@ class NavigationHistory {
 
   /// 从 Map 创建 NavigationHistory 对象
   factory NavigationHistory.fromMap(Map<String, dynamic> map) {
+    // 安全地转换 startTime，支持 int 和 double 类型
+    int startTimeMillis;
+    final startTimeValue = map['startTime'];
+    if (startTimeValue is int) {
+      startTimeMillis = startTimeValue;
+    } else if (startTimeValue is double) {
+      startTimeMillis = startTimeValue.toInt();
+    } else {
+      startTimeMillis = 0;
+    }
+
+    // 安全地转换 endTime
+    int? endTimeMillis;
+    final endTimeValue = map['endTime'];
+    if (endTimeValue != null) {
+      if (endTimeValue is int) {
+        endTimeMillis = endTimeValue;
+      } else if (endTimeValue is double) {
+        endTimeMillis = endTimeValue.toInt();
+      }
+    }
+
     return NavigationHistory(
       id: map['id'] as String,
       historyFilePath: map['historyFilePath'] as String,
       cover: map['cover'] as String?,
-      startTime: DateTime.fromMillisecondsSinceEpoch(map['startTime'] as int),
-      endTime: map['endTime'] != null
-          ? DateTime.fromMillisecondsSinceEpoch(map['endTime'] as int)
+      startTime: DateTime.fromMillisecondsSinceEpoch(startTimeMillis),
+      endTime: endTimeMillis != null
+          ? DateTime.fromMillisecondsSinceEpoch(endTimeMillis)
           : null,
       distance: map['distance'] as double?,
       duration: map['duration'] as int?,

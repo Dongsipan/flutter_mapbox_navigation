@@ -9,131 +9,382 @@ class HistoryTestPage extends StatefulWidget {
 }
 
 class _HistoryTestPageState extends State<HistoryTestPage> {
-  final List<WayPoint> _currentWayPoints = [];
-  final List<List<WayPoint>> _routeHistory = [];
+  List<NavigationHistory> _navigationHistoryList = [];
   String? _statusMessage;
+  bool _isLoading = false;
+  bool _enableHistoryRecording = true; // 默认启用历史记录
 
-  // 添加测试路径点
-  void _addTestWayPoints() {
-    setState(() {
-      _currentWayPoints.clear();
-      _currentWayPoints.addAll([
-        WayPoint(name: "起点", latitude: 39.9021, longitude: 116.4272),
-        WayPoint(name: "中点", latitude: 39.9042, longitude: 116.4074),
-        WayPoint(name: "终点", latitude: 39.9163, longitude: 116.3972),
-      ]);
-      _statusMessage = "已添加3个测试路径点";
-    });
+  @override
+  void initState() {
+    super.initState();
+    _loadNavigationHistoryList();
+    _setupNavigationListener();
   }
 
-  // 保存当前路线
-  void _saveCurrentRoute() {
-    if (_currentWayPoints.isEmpty) {
+  /// 设置导航事件监听器
+  void _setupNavigationListener() {
+    MapBoxNavigation.instance.registerRouteEventListener((event) {
+      print('Navigation Event: ${event.eventType}');
       setState(() {
-        _statusMessage = "没有路线可保存";
+        _statusMessage = '导航事件: ${event.eventType}';
       });
-      return;
-    }
 
-    _routeHistory.add(List<WayPoint>.from(_currentWayPoints));
-    setState(() {
-      _statusMessage = "路线已保存！历史记录数量: ${_routeHistory.length}";
+      // 监听历史记录相关事件
+      switch (event.eventType) {
+        case MapBoxEvent.history_recording_started:
+          setState(() {
+            _statusMessage = '历史记录开始记录: ${event.data}';
+          });
+          break;
+        case MapBoxEvent.history_recording_stopped:
+          setState(() {
+            _statusMessage = '历史记录停止记录: ${event.data}';
+          });
+          // 延迟重新加载历史记录
+          Future.delayed(const Duration(seconds: 2), () {
+            _loadNavigationHistoryList();
+          });
+          break;
+        case MapBoxEvent.history_recording_error:
+          setState(() {
+            _statusMessage = '历史记录错误: ${event.data}';
+          });
+          break;
+        case MapBoxEvent.navigation_finished:
+        case MapBoxEvent.navigation_cancelled:
+        case MapBoxEvent.on_arrival:
+          // 导航结束后延迟重新加载历史记录
+          Future.delayed(const Duration(seconds: 3), () {
+            print('Reloading navigation history after navigation ended');
+            _loadNavigationHistoryList();
+          });
+          break;
+        default:
+          break;
+      }
     });
-    
-    // 显示成功提示
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('路线已保存！当前共有${_routeHistory.length}条历史记录'),
-        backgroundColor: Colors.green,
-        duration: const Duration(seconds: 2),
-        action: SnackBarAction(
-          label: '查看',
-          textColor: Colors.white,
-          onPressed: _showRouteHistory,
-        ),
-      ),
-    );
   }
 
-  // 显示路线历史
-  void _showRouteHistory() {
+  /// 加载导航历史记录列表
+  Future<void> _loadNavigationHistoryList() async {
+    setState(() {
+      _isLoading = true;
+      _statusMessage = '正在加载历史记录...';
+    });
+
+    try {
+      final historyList =
+          await MapBoxNavigation.instance.getNavigationHistoryList();
+      setState(() {
+        _navigationHistoryList = historyList;
+        _statusMessage = '已加载 ${historyList.length} 条历史记录';
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _statusMessage = '加载历史记录失败: $e';
+        _isLoading = false;
+      });
+    }
+  }
+
+  /// 测试启用历史记录的导航
+  Future<void> _testNavigationWithHistory() async {
+    setState(() {
+      _statusMessage = '正在启动导航（启用历史记录）...';
+    });
+
+    final wayPoints = [
+      WayPoint(
+        name: "起点",
+        latitude: 37.7749, // 旧金山
+        longitude: -122.4194,
+      ),
+      WayPoint(
+        name: "终点",
+        latitude: 37.7849, // 旧金山附近
+        longitude: -122.4094,
+      ),
+    ];
+
+    final options = MapBoxOptions(
+      enableHistoryRecording: true, // 启用历史记录
+      voiceInstructionsEnabled: true,
+      bannerInstructionsEnabled: true,
+      simulateRoute: true, // 使用模拟路线进行测试
+    );
+
+    try {
+      final success = await MapBoxNavigation.instance.startNavigation(
+        wayPoints: wayPoints,
+        options: options,
+      );
+
+      if (success == true) {
+        setState(() {
+          _statusMessage = '导航已启动，历史记录功能已启用';
+        });
+      } else {
+        setState(() {
+          _statusMessage = '导航启动失败';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _statusMessage = '导航启动失败: $e';
+      });
+    }
+  }
+
+  /// 测试禁用历史记录的导航
+  Future<void> _testNavigationWithoutHistory() async {
+    setState(() {
+      _statusMessage = '正在启动导航（禁用历史记录）...';
+    });
+
+    final wayPoints = [
+      WayPoint(
+        name: "起点",
+        latitude: 37.7749, // 旧金山
+        longitude: -122.4194,
+      ),
+      WayPoint(
+        name: "终点",
+        latitude: 37.7849, // 旧金山附近
+        longitude: -122.4094,
+      ),
+    ];
+
+    final options = MapBoxOptions(
+      enableHistoryRecording: false, // 禁用历史记录
+      voiceInstructionsEnabled: true,
+      bannerInstructionsEnabled: true,
+      simulateRoute: true, // 使用模拟路线进行测试
+    );
+
+    try {
+      final success = await MapBoxNavigation.instance.startNavigation(
+        wayPoints: wayPoints,
+        options: options,
+      );
+
+      if (success == true) {
+        setState(() {
+          _statusMessage = '导航已启动，历史记录功能已禁用';
+        });
+      } else {
+        setState(() {
+          _statusMessage = '导航启动失败';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _statusMessage = '导航启动失败: $e';
+      });
+    }
+  }
+
+  /// 结束当前导航
+  Future<void> _finishNavigation() async {
+    setState(() {
+      _statusMessage = '正在结束导航...';
+    });
+
+    try {
+      final success = await MapBoxNavigation.instance.finishNavigation();
+      if (success == true) {
+        setState(() {
+          _statusMessage = '导航已结束';
+        });
+        // 延迟重新加载历史记录
+        Future.delayed(const Duration(seconds: 2), () {
+          _loadNavigationHistoryList();
+        });
+      } else {
+        setState(() {
+          _statusMessage = '结束导航失败';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _statusMessage = '结束导航失败: $e';
+      });
+    }
+  }
+
+  /// 创建测试历史记录（用于测试API）
+  Future<void> _createTestHistoryRecord() async {
+    setState(() {
+      _statusMessage = '正在创建测试历史记录...';
+    });
+
+    try {
+      // 这里我们需要直接调用平台方法来创建一个测试历史记录
+      // 由于没有直接的API，我们先检查现有的历史记录数量
+      final currentCount = _navigationHistoryList.length;
+
+      // 模拟一个短暂的导航来触发历史记录
+      final wayPoints = [
+        WayPoint(
+          name: "测试起点",
+          latitude: 37.7749,
+          longitude: -122.4194,
+        ),
+        WayPoint(
+          name: "测试终点",
+          latitude: 37.7849,
+          longitude: -122.4094,
+        ),
+      ];
+
+      final options = MapBoxOptions(
+        enableHistoryRecording: true,
+        voiceInstructionsEnabled: false,
+        bannerInstructionsEnabled: false,
+        simulateRoute: true,
+      );
+
+      // 启动导航
+      await MapBoxNavigation.instance.startNavigation(
+        wayPoints: wayPoints,
+        options: options,
+      );
+
+      setState(() {
+        _statusMessage = '测试导航已启动，请等待几秒后手动结束导航';
+      });
+
+      // 5秒后自动结束导航
+      Future.delayed(const Duration(seconds: 5), () async {
+        await _finishNavigation();
+      });
+    } catch (e) {
+      setState(() {
+        _statusMessage = '创建测试历史记录失败: $e';
+      });
+    }
+  }
+
+  /// 删除指定的导航历史记录
+  Future<void> _deleteNavigationHistory(String historyId) async {
+    setState(() {
+      _statusMessage = '正在删除历史记录...';
+    });
+
+    try {
+      final success =
+          await MapBoxNavigation.instance.deleteNavigationHistory(historyId);
+      if (success) {
+        await _loadNavigationHistoryList(); // 重新加载列表
+        setState(() {
+          _statusMessage = '删除成功';
+        });
+      } else {
+        setState(() {
+          _statusMessage = '删除失败';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _statusMessage = '删除失败: $e';
+      });
+    }
+  }
+
+  /// 清除所有导航历史记录
+  Future<void> _clearAllNavigationHistory() async {
+    setState(() {
+      _statusMessage = '正在清除所有历史记录...';
+    });
+
+    try {
+      final success =
+          await MapBoxNavigation.instance.clearAllNavigationHistory();
+      if (success) {
+        await _loadNavigationHistoryList(); // 重新加载列表
+        setState(() {
+          _statusMessage = '已清除所有历史记录';
+        });
+      } else {
+        setState(() {
+          _statusMessage = '清除失败';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _statusMessage = '清除失败: $e';
+      });
+    }
+  }
+
+  // 显示导航历史记录
+  void _showNavigationHistory() {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('路线历史记录 (${_routeHistory.length}条)'),
+        title: Text('导航历史记录 (${_navigationHistoryList.length}条)'),
         content: SizedBox(
           width: double.maxFinite,
-          height: 300,
-          child: _routeHistory.isEmpty
-            ? const Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.history, size: 64, color: Colors.grey),
-                  SizedBox(height: 16),
-                  Text('暂无历史记录'),
-                  SizedBox(height: 8),
-                  Text(
-                    '先添加路径点，然后点击"保存路线"',
-                    style: TextStyle(fontSize: 12, color: Colors.grey),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              )
-            : ListView.builder(
-                itemCount: _routeHistory.length,
-                itemBuilder: (context, index) {
-                  final route = _routeHistory[index];
-                  
-                  return Card(
-                    child: ListTile(
-                      leading: CircleAvatar(
-                        backgroundColor: Colors.blue,
-                        child: Text('${index + 1}'),
-                      ),
-                      title: Text('路线 ${index + 1}'),
-                      subtitle: Text('${route.length}个路径点'),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.restore, color: Colors.green),
-                            tooltip: '恢复此路线',
-                            onPressed: () {
-                              setState(() {
-                                _currentWayPoints.clear();
-                                _currentWayPoints.addAll(route);
-                                _statusMessage = "已恢复路线 ${index + 1}";
-                              });
-                              Navigator.of(context).pop();
-                            },
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.delete, color: Colors.red),
-                            tooltip: '删除此路线',
-                            onPressed: () {
-                              setState(() {
-                                _routeHistory.removeAt(index);
-                                _statusMessage = "已删除路线 ${index + 1}";
-                              });
-                              Navigator.of(context).pop();
-                              _showRouteHistory(); // 重新显示对话框
-                            },
-                          ),
-                        ],
-                      ),
+          height: 400,
+          child: _navigationHistoryList.isEmpty
+              ? const Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.history, size: 64, color: Colors.grey),
+                    SizedBox(height: 16),
+                    Text('暂无导航历史记录'),
+                    SizedBox(height: 8),
+                    Text(
+                      '启动导航（启用历史记录）后会自动保存',
+                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                      textAlign: TextAlign.center,
                     ),
-                  );
-                },
-              ),
+                  ],
+                )
+              : ListView.builder(
+                  itemCount: _navigationHistoryList.length,
+                  itemBuilder: (context, index) {
+                    final history = _navigationHistoryList[index];
+
+                    return Card(
+                      child: ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: Colors.blue,
+                          child: Text('${index + 1}'),
+                        ),
+                        title: Text('导航记录 ${index + 1}'),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('开始时间: ${_formatDateTime(history.startTime)}'),
+                            if (history.startPointName != null &&
+                                history.startPointName!.isNotEmpty)
+                              Text('起点: ${history.startPointName}'),
+                            if (history.endPointName != null &&
+                                history.endPointName!.isNotEmpty)
+                              Text('终点: ${history.endPointName}'),
+                            if (history.duration != null)
+                              Text('时长: ${history.duration}秒'),
+                          ],
+                        ),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.delete, color: Colors.red),
+                          tooltip: '删除此记录',
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                            _deleteNavigationHistory(history.id);
+                          },
+                        ),
+                      ),
+                    );
+                  },
+                ),
         ),
         actions: [
           TextButton(
             onPressed: () {
-              setState(() {
-                _routeHistory.clear();
-                _statusMessage = "已清除所有历史记录";
-              });
               Navigator.of(context).pop();
+              _clearAllNavigationHistory();
             },
             child: const Text('清除全部'),
           ),
@@ -146,12 +397,25 @@ class _HistoryTestPageState extends State<HistoryTestPage> {
     );
   }
 
+  /// 格式化日期时间
+  String _formatDateTime(DateTime dateTime) {
+    return '${dateTime.year}-${dateTime.month.toString().padLeft(2, '0')}-${dateTime.day.toString().padLeft(2, '0')} '
+        '${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('历史记录测试'),
+        title: const Text('导航历史记录测试'),
         backgroundColor: Colors.orange,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _loadNavigationHistoryList,
+            tooltip: '刷新历史记录',
+          ),
+        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(16),
@@ -169,41 +433,124 @@ class _HistoryTestPageState extends State<HistoryTestPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '当前路径点: ${_currentWayPoints.length}个',
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    '导航历史记录: ${_navigationHistoryList.length}条',
+                    style: const TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.bold),
                   ),
-                  Text('历史记录: ${_routeHistory.length}条'),
-                  if (_statusMessage != null)
-                    Text('状态: $_statusMessage'),
+                  if (_statusMessage != null) Text('状态: $_statusMessage'),
+                  if (_isLoading)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 8),
+                      child: LinearProgressIndicator(),
+                    ),
                 ],
               ),
             ),
-            
+
             const SizedBox(height: 20),
-            
+
+            // 历史记录开关
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      '启用历史记录',
+                      style: TextStyle(fontSize: 16),
+                    ),
+                    Switch(
+                      value: _enableHistoryRecording,
+                      onChanged: (value) {
+                        setState(() {
+                          _enableHistoryRecording = value;
+                        });
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
             // 操作按钮
-            ElevatedButton(
-              onPressed: _addTestWayPoints,
-              child: const Text('添加测试路径点'),
+            ElevatedButton.icon(
+              onPressed: _testNavigationWithHistory,
+              icon: const Icon(Icons.navigation),
+              label: const Text('启动导航（启用历史记录）'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green,
+                foregroundColor: Colors.white,
+              ),
             ),
-            
+
             const SizedBox(height: 10),
-            
-            ElevatedButton(
-              onPressed: _currentWayPoints.isNotEmpty ? _saveCurrentRoute : null,
-              child: const Text('保存当前路线'),
+
+            ElevatedButton.icon(
+              onPressed: _testNavigationWithoutHistory,
+              icon: const Icon(Icons.navigation),
+              label: const Text('启动导航（禁用历史记录）'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange,
+                foregroundColor: Colors.white,
+              ),
             ),
-            
+
             const SizedBox(height: 10),
-            
-            ElevatedButton(
-              onPressed: _showRouteHistory,
-              child: const Text('查看历史记录'),
+
+            ElevatedButton.icon(
+              onPressed: _createTestHistoryRecord,
+              icon: const Icon(Icons.science),
+              label: const Text('创建测试历史记录'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.teal,
+                foregroundColor: Colors.white,
+              ),
             ),
-            
+
+            const SizedBox(height: 10),
+
+            ElevatedButton.icon(
+              onPressed: _finishNavigation,
+              icon: const Icon(Icons.stop),
+              label: const Text('结束当前导航'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.purple,
+                foregroundColor: Colors.white,
+              ),
+            ),
+
+            const SizedBox(height: 10),
+
+            ElevatedButton.icon(
+              onPressed: _showNavigationHistory,
+              icon: const Icon(Icons.history),
+              label: const Text('查看历史记录'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                foregroundColor: Colors.white,
+              ),
+            ),
+
+            const SizedBox(height: 10),
+
+            ElevatedButton.icon(
+              onPressed: _navigationHistoryList.isNotEmpty
+                  ? _clearAllNavigationHistory
+                  : null,
+              icon: const Icon(Icons.clear_all),
+              label: const Text('清除所有历史记录'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+              ),
+            ),
+
             const SizedBox(height: 20),
-            
-            // 当前路径点列表
+
+            // 历史记录列表预览
             Expanded(
               child: Container(
                 decoration: BoxDecoration(
@@ -223,7 +570,7 @@ class _HistoryTestPageState extends State<HistoryTestPage> {
                         ),
                       ),
                       child: const Text(
-                        '当前路径点',
+                        '历史记录预览',
                         style: TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
@@ -231,26 +578,45 @@ class _HistoryTestPageState extends State<HistoryTestPage> {
                       ),
                     ),
                     Expanded(
-                      child: _currentWayPoints.isEmpty
-                        ? const Center(
-                            child: Text('暂无路径点\n点击"添加测试路径点"'),
-                          )
-                        : ListView.builder(
-                            itemCount: _currentWayPoints.length,
-                            itemBuilder: (context, index) {
-                              final wayPoint = _currentWayPoints[index];
-                              return ListTile(
-                                leading: CircleAvatar(
-                                  backgroundColor: Colors.green,
-                                  child: Text('${index + 1}'),
-                                ),
-                                title: Text(wayPoint.name ?? '路径点 ${index + 1}'),
-                                subtitle: Text(
-                                  '${wayPoint.latitude?.toStringAsFixed(4)}, ${wayPoint.longitude?.toStringAsFixed(4)}'
-                                ),
-                              );
-                            },
-                          ),
+                      child: _navigationHistoryList.isEmpty
+                          ? const Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.history,
+                                      size: 48, color: Colors.grey),
+                                  SizedBox(height: 8),
+                                  Text('暂无历史记录'),
+                                  Text(
+                                    '启动导航（启用历史记录）后会自动保存',
+                                    style: TextStyle(
+                                        fontSize: 12, color: Colors.grey),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ],
+                              ),
+                            )
+                          : ListView.builder(
+                              itemCount: _navigationHistoryList.length,
+                              itemBuilder: (context, index) {
+                                final history = _navigationHistoryList[index];
+                                return ListTile(
+                                  leading: CircleAvatar(
+                                    backgroundColor: Colors.blue,
+                                    child: Text('${index + 1}'),
+                                  ),
+                                  title: Text('导航记录 ${index + 1}'),
+                                  subtitle:
+                                      Text(_formatDateTime(history.startTime)),
+                                  trailing: IconButton(
+                                    icon: const Icon(Icons.delete,
+                                        color: Colors.red),
+                                    onPressed: () =>
+                                        _deleteNavigationHistory(history.id),
+                                  ),
+                                );
+                              },
+                            ),
                     ),
                   ],
                 ),

@@ -200,60 +200,6 @@ class MethodChannelFlutterMapboxNavigation
     }
   }
 
-  @override
-  Future<bool> stopHistoryReplay() async {
-    try {
-      log('Stopping history replay');
-      final result =
-          await methodChannel.invokeMethod<bool>('stopHistoryReplay');
-      return result ?? false;
-    } catch (e) {
-      log('Error stopping history replay: $e');
-      return false;
-    }
-  }
-
-  @override
-  Future<bool> pauseHistoryReplay() async {
-    try {
-      log('Pausing history replay');
-      final result =
-          await methodChannel.invokeMethod<bool>('pauseHistoryReplay');
-      return result ?? false;
-    } catch (e) {
-      log('Error pausing history replay: $e');
-      return false;
-    }
-  }
-
-  @override
-  Future<bool> resumeHistoryReplay() async {
-    try {
-      log('Resuming history replay');
-      final result =
-          await methodChannel.invokeMethod<bool>('resumeHistoryReplay');
-      return result ?? false;
-    } catch (e) {
-      log('Error resuming history replay: $e');
-      return false;
-    }
-  }
-
-  @override
-  Future<bool> setHistoryReplaySpeed(double speed) async {
-    try {
-      log('Setting history replay speed to: $speed');
-      final result = await methodChannel.invokeMethod<bool>(
-        'setHistoryReplaySpeed',
-        {'speed': speed},
-      );
-      return result ?? false;
-    } catch (e) {
-      log('Error setting history replay speed: $e');
-      return false;
-    }
-  }
-
   /// Events Handling
   Stream<RouteEvent>? get routeEventsListener {
     return eventChannel

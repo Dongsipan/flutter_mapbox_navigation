@@ -135,33 +135,4 @@ abstract class FlutterMapboxNavigationPlatform extends PlatformInterface {
       'startHistoryReplay() has not been implemented.',
     );
   }
-
-  /// 停止历史记录回放
-  Future<bool> stopHistoryReplay() async {
-    throw UnimplementedError(
-      'stopHistoryReplay() has not been implemented.',
-    );
-  }
-
-  /// 暂停历史记录回放
-  Future<bool> pauseHistoryReplay() async {
-    throw UnimplementedError(
-      'pauseHistoryReplay() has not been implemented.',
-    );
-  }
-
-  /// 恢复历史记录回放
-  Future<bool> resumeHistoryReplay() async {
-    throw UnimplementedError(
-      'resumeHistoryReplay() has not been implemented.',
-    );
-  }
-
-  /// 设置历史记录回放速度
-  /// [speed] 回放速度倍数，1.0为正常速度
-  Future<bool> setHistoryReplaySpeed(double speed) async {
-    throw UnimplementedError(
-      'setHistoryReplaySpeed() has not been implemented.',
-    );
-  }
 }

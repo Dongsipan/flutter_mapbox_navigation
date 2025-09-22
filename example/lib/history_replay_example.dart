@@ -13,7 +13,6 @@ class _HistoryReplayExampleState extends State<HistoryReplayExample> {
   List<NavigationHistory> _historyList = [];
   bool _isLoading = false;
   bool _isReplaying = false;
-  double _replaySpeed = 1.0;
   String? _currentReplayFile;
 
   @override
@@ -74,71 +73,6 @@ class _HistoryReplayExampleState extends State<HistoryReplayExample> {
     }
   }
 
-  /// 停止回放
-  Future<void> _stopReplay() async {
-    try {
-      final success = await MapBoxNavigation.instance.stopHistoryReplay();
-      setState(() {
-        _isReplaying = !success;
-        _currentReplayFile = success ? null : _currentReplayFile;
-      });
-
-      if (success) {
-        _showSuccessDialog('历史记录回放已停止');
-      } else {
-        _showErrorDialog('停止历史记录回放失败');
-      }
-    } catch (e) {
-      _showErrorDialog('停止历史记录回放失败: $e');
-    }
-  }
-
-  /// 暂停回放
-  Future<void> _pauseReplay() async {
-    try {
-      final success = await MapBoxNavigation.instance.pauseHistoryReplay();
-      if (success) {
-        _showSuccessDialog('历史记录回放已暂停');
-      } else {
-        _showErrorDialog('暂停历史记录回放失败');
-      }
-    } catch (e) {
-      _showErrorDialog('暂停历史记录回放失败: $e');
-    }
-  }
-
-  /// 恢复回放
-  Future<void> _resumeReplay() async {
-    try {
-      final success = await MapBoxNavigation.instance.resumeHistoryReplay();
-      if (success) {
-        _showSuccessDialog('历史记录回放已恢复');
-      } else {
-        _showErrorDialog('恢复历史记录回放失败');
-      }
-    } catch (e) {
-      _showErrorDialog('恢复历史记录回放失败: $e');
-    }
-  }
-
-  /// 设置回放速度
-  Future<void> _setReplaySpeed(double speed) async {
-    try {
-      final success = await MapBoxNavigation.instance.setHistoryReplaySpeed(speed);
-      setState(() {
-        _replaySpeed = speed;
-      });
-
-      if (success) {
-        _showSuccessDialog('回放速度已设置为 ${speed}x');
-      } else {
-        _showErrorDialog('设置回放速度失败');
-      }
-    } catch (e) {
-      _showErrorDialog('设置回放速度失败: $e');
-    }
-  }
-
   /// 显示错误对话框
   void _showErrorDialog(String message) {
     showDialog(
@@ -189,7 +123,7 @@ class _HistoryReplayExampleState extends State<HistoryReplayExample> {
         children: [
           // 回放控制面板
           if (_isReplaying) _buildReplayControlPanel(),
-          
+
           // 历史记录列表
           Expanded(
             child: _isLoading
@@ -240,12 +174,6 @@ class _HistoryReplayExampleState extends State<HistoryReplayExample> {
                   color: Colors.blue,
                 ),
               ),
-              const Spacer(),
-              IconButton(
-                icon: const Icon(Icons.stop, color: Colors.red),
-                onPressed: _stopReplay,
-                tooltip: '停止回放',
-              ),
             ],
           ),
           const SizedBox(height: 8),
@@ -253,56 +181,10 @@ class _HistoryReplayExampleState extends State<HistoryReplayExample> {
             '文件: ${_currentReplayFile?.split('/').last ?? '未知'}',
             style: const TextStyle(fontSize: 12, color: Colors.grey),
           ),
-          const SizedBox(height: 16),
-          
-          // 回放控制按钮
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              ElevatedButton.icon(
-                onPressed: _pauseReplay,
-                icon: const Icon(Icons.pause, size: 16),
-                label: const Text('暂停'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.orange,
-                  foregroundColor: Colors.white,
-                ),
-              ),
-              ElevatedButton.icon(
-                onPressed: _resumeReplay,
-                icon: const Icon(Icons.play_arrow, size: 16),
-                label: const Text('恢复'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green,
-                  foregroundColor: Colors.white,
-                ),
-              ),
-            ],
-          ),
-          
-          const SizedBox(height: 16),
-          
-          // 速度控制
-          Row(
-            children: [
-              const Text('回放速度: '),
-              Text(
-                '${_replaySpeed}x',
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
-              Expanded(
-                child: Slider(
-                  value: _replaySpeed,
-                  min: 0.5,
-                  max: 3.0,
-                  divisions: 5,
-                  label: '${_replaySpeed}x',
-                  onChanged: (value) {
-                    _setReplaySpeed(value);
-                  },
-                ),
-              ),
-            ],
+          const SizedBox(height: 8),
+          const Text(
+            '回放会自动进行，完成后自动关闭',
+            style: TextStyle(fontSize: 12, color: Colors.grey),
           ),
         ],
       ),

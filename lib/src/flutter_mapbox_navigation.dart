@@ -140,26 +140,4 @@ class MapBoxNavigation {
       enableReplayUI: enableReplayUI,
     );
   }
-
-  /// 停止历史记录回放
-  Future<bool> stopHistoryReplay() async {
-    return FlutterMapboxNavigationPlatform.instance.stopHistoryReplay();
-  }
-
-  /// 暂停历史记录回放
-  Future<bool> pauseHistoryReplay() async {
-    return FlutterMapboxNavigationPlatform.instance.pauseHistoryReplay();
-  }
-
-  /// 恢复历史记录回放
-  Future<bool> resumeHistoryReplay() async {
-    return FlutterMapboxNavigationPlatform.instance.resumeHistoryReplay();
-  }
-
-  /// 设置历史记录回放速度
-  /// [speed] 回放速度倍数，1.0为正常速度，2.0为2倍速，0.5为0.5倍速
-  Future<bool> setHistoryReplaySpeed(double speed) async {
-    return FlutterMapboxNavigationPlatform.instance
-        .setHistoryReplaySpeed(speed);
-  }
 }

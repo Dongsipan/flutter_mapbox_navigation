@@ -12,8 +12,6 @@ class HistoryReplayExample extends StatefulWidget {
 class _HistoryReplayExampleState extends State<HistoryReplayExample> {
   List<NavigationHistory> _historyList = [];
   bool _isLoading = false;
-  bool _isReplaying = false;
-  String? _currentReplayFile;
 
   @override
   void initState() {
@@ -56,12 +54,10 @@ class _HistoryReplayExampleState extends State<HistoryReplayExample> {
 
       setState(() {
         _isLoading = false;
-        _isReplaying = success;
-        _currentReplayFile = success ? history.historyFilePath : null;
       });
 
       if (success) {
-        _showSuccessDialog('历史记录回放已开始');
+        _showSuccessDialog('历史记录回放已开始\n回放会自动进行，完成后自动关闭');
       } else {
         _showErrorDialog('启动历史记录回放失败');
       }
@@ -119,75 +115,23 @@ class _HistoryReplayExampleState extends State<HistoryReplayExample> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          // 回放控制面板
-          if (_isReplaying) _buildReplayControlPanel(),
-
-          // 历史记录列表
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _historyList.isEmpty
-                    ? const Center(
-                        child: Text(
-                          '暂无历史记录\n请先进行一次导航以生成历史记录',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 16, color: Colors.grey),
-                        ),
-                      )
-                    : ListView.builder(
-                        itemCount: _historyList.length,
-                        itemBuilder: (context, index) {
-                          final history = _historyList[index];
-                          return _buildHistoryItem(history);
-                        },
-                      ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// 构建回放控制面板
-  Widget _buildReplayControlPanel() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      margin: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: Colors.blue.shade50,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.blue.shade200),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.play_circle_filled, color: Colors.blue),
-              const SizedBox(width: 8),
-              const Text(
-                '正在回放',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.blue,
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _historyList.isEmpty
+              ? const Center(
+                  child: Text(
+                    '暂无历史记录\n请先进行一次导航以生成历史记录',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 16, color: Colors.grey),
+                  ),
+                )
+              : ListView.builder(
+                  itemCount: _historyList.length,
+                  itemBuilder: (context, index) {
+                    final history = _historyList[index];
+                    return _buildHistoryItem(history);
+                  },
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '文件: ${_currentReplayFile?.split('/').last ?? '未知'}',
-            style: const TextStyle(fontSize: 12, color: Colors.grey),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            '回放会自动进行，完成后自动关闭',
-            style: TextStyle(fontSize: 12, color: Colors.grey),
-          ),
-        ],
-      ),
     );
   }
 
@@ -214,7 +158,7 @@ class _HistoryReplayExampleState extends State<HistoryReplayExample> {
           ],
         ),
         trailing: ElevatedButton.icon(
-          onPressed: _isReplaying ? null : () => _startReplay(history),
+          onPressed: _isLoading ? null : () => _startReplay(history),
           icon: const Icon(Icons.play_arrow, size: 16),
           label: const Text('回放'),
           style: ElevatedButton.styleFrom(

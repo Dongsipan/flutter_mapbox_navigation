@@ -5,8 +5,55 @@ import MapboxNavigationUIKit
 import UIKit
 import Combine
 
+
+
+/// 自定义位置提供者，将历史回放位置流提供给地图的内置 puck
+class ReplayLocationProvider: LocationProvider {
+    private var observers = NSHashTable<AnyObject>.weakObjects()
+    private var lastLocation: MapboxCommon.Location?
+    private var cancellable: AnyCancellable?
+
+    func startReplay(with publisher: AnyPublisher<CLLocation, Never>) {
+        cancellable = publisher.sink { [weak self] clLocation in
+            guard let self = self else { return }
+            let location = MapboxCommon.Location(
+                coordinate: clLocation.coordinate,
+                timestamp: clLocation.timestamp,
+                altitude: clLocation.altitude,
+                horizontalAccuracy: clLocation.horizontalAccuracy,
+                verticalAccuracy: clLocation.verticalAccuracy,
+                speed: clLocation.speed >= 0 ? clLocation.speed : nil,
+                bearing: clLocation.course >= 0 ? clLocation.course : nil
+            )
+            self.lastLocation = location
+            for observer in self.observers.allObjects {
+                (observer as? LocationObserver)?.onLocationUpdateReceived(for: [location])
+            }
+        }
+    }
+
+    func getLastObservedLocation() -> MapboxCommon.Location? {
+        return lastLocation
+    }
+
+    func addLocationObserver(for observer: any LocationObserver) {
+        observers.add(observer)
+        if let lastLocation = lastLocation {
+            observer.onLocationUpdateReceived(for: [lastLocation])
+        }
+    }
+
+    func removeLocationObserver(for observer: any LocationObserver) {
+        observers.remove(observer)
+    }
+
+    deinit {
+        cancellable?.cancel()
+    }
+}
+
 /// 历史轨迹回放视图控制器
-/// 按照官方最新建议：订阅 HistoryReplayController.locations 位置流
+/// 按照官方最新建议：使用自定义 LocationProvider 将历史位置流提供给内置 puck
 /// 将位置更新到自定义 MapView，不启动导航相关组件
 final class HistoryReplayViewController: UIViewController {
 
@@ -32,47 +79,20 @@ final class HistoryReplayViewController: UIViewController {
 
     // 按照官方建议：仅创建 HistoryReplayController，不与导航引擎结合
     private lazy var historyReplayController: HistoryReplayController = {
-        print("Creating HistoryReplayController for trajectory-only replay: \(historyFilePath)")
-
         // Smart path resolution for iOS sandbox changes
         let currentHistoryDir = defaultHistoryDirectoryURL()
-        print("当前应用历史记录目录: \(currentHistoryDir.path)")
-
-        // List current directory contents
-        if let contents = try? FileManager.default.contentsOfDirectory(atPath: currentHistoryDir.path) {
-            print("当前历史记录目录内容 (\(contents.count) 个文件):")
-            for file in contents {
-                print("  - \(file)")
-            }
-        }
-
         let fileURL = URL(fileURLWithPath: historyFilePath)
-        print("提供的文件URL: \(fileURL)")
-        print("文件URL路径: \(fileURL.path)")
-        print("文件URL绝对字符串: \(fileURL.absoluteString)")
-
         var finalFileURL = fileURL
 
         // Check if file exists, if not try to find it in current directory
         if !FileManager.default.fileExists(atPath: fileURL.path) {
-            print("❌ 原始路径文件不存在")
-
             // Extract filename and try to find it in current directory
             let filename = fileURL.lastPathComponent
             let currentDirFileURL = currentHistoryDir.appendingPathComponent(filename)
-            print("在当前目录中查找文件: \(currentDirFileURL.path)")
-
             if FileManager.default.fileExists(atPath: currentDirFileURL.path) {
-                print("✅ 在当前目录中找到同名文件")
                 finalFileURL = currentDirFileURL
-            } else {
-                print("❌ 在当前目录中也未找到文件")
             }
-        } else {
-            print("✅ 原始路径文件存在")
         }
-
-        print("✅ 创建HistoryReader用于轨迹回放，使用路径: \(finalFileURL.path)")
 
         guard let historyReader = HistoryReader(fileUrl: finalFileURL, readOptions: nil) else {
             fatalError("Failed to create HistoryReader with file: \(finalFileURL.path)")
@@ -83,7 +103,8 @@ final class HistoryReplayViewController: UIViewController {
         return historyReplayController
     }()
 
-    // 按照官方最新建议：订阅 HistoryReplayController.locations 位置流
+    // 按照官方最新建议：使用自定义 LocationProvider 将历史位置流提供给内置 puck
+    private let replayLocationProvider = ReplayLocationProvider()
     private var locationSubscription: AnyCancellable?
 
     // 管理地图事件订阅的生命周期
@@ -93,8 +114,6 @@ final class HistoryReplayViewController: UIViewController {
     private var historyLocations: [CLLocation] = []
     private let historyRouteSourceId = "history-route-source"
     private let historyRouteLayerId = "history-route-layer"
-    private let currentLocationSourceId = "current-location-source"
-    private let currentLocationLayerId = "current-location-layer"
 
     // 不需要 MapboxNavigationProvider 和相关导航组件
 
@@ -114,7 +133,6 @@ final class HistoryReplayViewController: UIViewController {
         locationSubscription?.cancel()
         cancelables.removeAll()
         historyReplayController.pause()
-        print("HistoryReplayViewController deinitialized")
     }
 
     // MARK: - Lifecycle
@@ -138,15 +156,20 @@ final class HistoryReplayViewController: UIViewController {
             // 按照官方最新建议：使用普通的 MapView，不使用 NavigationMapView
             mapView = MapView(frame: view.bounds)
 
-            // 启用位置显示
-            mapView.location.options.puckType = .puck2D()
+            // 启用位置显示 - 使用带箭头的默认配置
+            let configuration = Puck2DConfiguration.makeDefault(showBearing: true)
+            mapView.location.options.puckType = .puck2D(configuration)
+            // 设置箭头方向跟随 course（行进方向）而不是 heading（设备朝向）
+            mapView.location.options.puckBearing = .course
+            // 关键：在 v11 中需要手动启用 puck 方向旋转（默认为 false）
+            mapView.location.options.puckBearingEnabled = true
 
             // 设置地图样式加载完成后的回调
             mapView.mapboxMap.onStyleLoaded.observeNext { [weak self] _ in
                 self?.setupTrajectoryLayers()
             }.store(in: &cancelables)
 
-            print("MapView created for trajectory display")
+
         }
     }
 
@@ -155,62 +178,45 @@ final class HistoryReplayViewController: UIViewController {
     }
 
     private func startHistoryReplay() {
-        print("🚀 Starting history trajectory replay by parsing history file first")
-
         // 按照官方建议：先解析历史文件获取完整轨迹
         Task {
             await parseHistoryFileAndDrawRoute()
 
             // 然后订阅位置流用于当前位置更新
             await MainActor.run {
-                print("🎯 Setting up location stream subscription")
+                // 将历史位置流连接到自定义 LocationProvider
+                // 这样内置的 puck 会自动显示和跟随历史轨迹
+                replayLocationProvider.startReplay(with: historyReplayController.locations.eraseToAnyPublisher())
 
                 locationSubscription = historyReplayController.locations
                     .receive(on: RunLoop.main)
                     .sink { [weak self] location in
-                        print("📍 Received location update: \(location.coordinate)")
                         self?.updateCurrentLocation(location)
                     }
 
                 // 开始回放
-                print("▶️ Starting history replay controller")
                 historyReplayController.play()
-
-                print("✅ History replay started - route drawn and location stream subscribed")
             }
         }
     }
 
     private func parseHistoryFileAndDrawRoute() async {
-        print("🔍 Parsing history file to extract trajectory")
-
         // 直接使用当前目录中的同名文件（与 HistoryReplayController 相同的方式）
         let currentHistoryDir = defaultHistoryDirectoryURL()
         let fileName = URL(fileURLWithPath: historyFilePath).lastPathComponent
         let finalFileURL = currentHistoryDir.appendingPathComponent(fileName)
 
-        print("✅ Using current directory file: \(finalFileURL.path)")
-
         do {
             // 按照官方建议：使用 HistoryReader 解析历史文件
             guard let reader = HistoryReader(fileUrl: finalFileURL, readOptions: nil) else {
-                print("❌ Failed to create HistoryReader")
                 return
             }
 
             let history = try await reader.parse()
             historyLocations = history.rawLocations
 
-            print("✅ Parsed \(historyLocations.count) locations from history file")
-
             if historyLocations.isEmpty {
-                print("⚠️ No locations found in history file")
                 return
-            }
-
-            // 打印前几个位置用于调试
-            for (index, location) in historyLocations.prefix(3).enumerated() {
-                print("📍 Location \(index): \(location.coordinate) at \(location.timestamp)")
             }
 
             // 在主线程绘制路线
@@ -219,24 +225,19 @@ final class HistoryReplayViewController: UIViewController {
             }
 
         } catch {
-            print("❌ Error parsing history file: \(error)")
+            // Handle error silently
         }
     }
 
     private func drawHistoryRoute() {
         guard !historyLocations.isEmpty else {
-            print("❌ No locations to draw")
             return
         }
 
-        print("🎯 Drawing history route with \(historyLocations.count) points")
-
         // 按照官方建议：提取坐标数组
         let coordinates = historyLocations.map { $0.coordinate }
-        print("📍 Coordinates: \(coordinates.prefix(3))...") // 打印前3个坐标用于调试
 
         guard let mapView = mapView else {
-            print("❌ MapView is nil")
             return
         }
 
@@ -254,9 +255,7 @@ final class HistoryReplayViewController: UIViewController {
 
         do {
             try mapView.mapboxMap.addSource(routeLineSource)
-            print("✅ Route source added successfully")
         } catch {
-            print("❌ Failed to add route source: \(error)")
             return
         }
 
@@ -269,9 +268,7 @@ final class HistoryReplayViewController: UIViewController {
 
         do {
             try mapView.mapboxMap.addLayer(lineLayer)
-            print("✅ Route layer added successfully")
         } catch {
-            print("❌ Failed to add route layer: \(error)")
             return
         }
 
@@ -282,60 +279,20 @@ final class HistoryReplayViewController: UIViewController {
                 zoom: 13.0
             )
             mapView.camera.ease(to: cameraOptions, duration: 1.0)
-            print("📷 Camera set to first location: \(firstLocation.coordinate)")
         }
-
-        print("✅ History route drawn successfully")
     }
 
     private func setupTrajectoryLayers() {
-        guard let mapView = mapView else {
-            print("❌ MapView is nil in setupTrajectoryLayers")
-            return
-        }
-
-        print("🎯 Setting up current location layer")
-
-        // 先移除已存在的图层和数据源（避免重复添加）
-        try? mapView.mapboxMap.removeLayer(withId: currentLocationLayerId)
-        try? mapView.mapboxMap.removeSource(withId: currentLocationSourceId)
-
-        // 只添加当前位置点数据源和图层
-        // 历史路线会在解析历史文件后单独绘制
-        var currentLocationSource = GeoJSONSource(id: currentLocationSourceId)
-        currentLocationSource.data = .featureCollection(FeatureCollection(features: []))
-
-        do {
-            try mapView.mapboxMap.addSource(currentLocationSource)
-            print("✅ Current location source added")
-        } catch {
-            print("❌ Failed to add current location source: \(error)")
-            return
-        }
-
-        // 添加当前位置点图层
-        var currentLocationLayer = CircleLayer(id: currentLocationLayerId, source: currentLocationSourceId)
-        currentLocationLayer.circleRadius = .constant(10.0)
-        currentLocationLayer.circleColor = .constant(StyleColor(.systemRed))
-        currentLocationLayer.circleStrokeWidth = .constant(3.0)
-        currentLocationLayer.circleStrokeColor = .constant(StyleColor(.white))
-
-        do {
-            try mapView.mapboxMap.addLayer(currentLocationLayer)
-            print("✅ Current location layer added")
-        } catch {
-            print("❌ Failed to add current location layer: \(error)")
-        }
-
-        print("✅ Current location layer setup completed")
+        // 不需要设置自定义位置图层
+        // HistoryReplayController 会自动提供位置流给内置的 puck
+        // 我们已经设置了 puckType 为带箭头的配置
     }
 
     private func updateCurrentLocation(_ location: CLLocation) {
-        // 更新当前回放位置点
-        print("Updating current location: \(location.coordinate)")
-
-        // 更新当前位置点在地图上的显示
-        updateCurrentLocationPoint(location.coordinate)
+        // 更新当前回放位置
+        // ReplayLocationProvider 会将位置流提供给内置的 puck
+        // 内置的 puck（箭头）会自动显示和更新
+        // 我们只需要更新相机跟随即可
 
         // 更新地图相机位置跟随当前位置
         let cameraOptions = CameraOptions(
@@ -347,17 +304,7 @@ final class HistoryReplayViewController: UIViewController {
         mapView?.camera.ease(to: cameraOptions, duration: 0.3)
     }
 
-    private func updateCurrentLocationPoint(_ coordinate: CLLocationCoordinate2D) {
-        guard let mapView = mapView else { return }
 
-        // 创建当前位置点
-        let point = Point(coordinate)
-        let feature = Feature(geometry: .point(point))
-        let featureCollection = FeatureCollection(features: [feature])
-
-        // 更新当前位置点数据源
-        try? mapView.mapboxMap.updateGeoJSONSource(withId: currentLocationSourceId, geoJSON: .featureCollection(featureCollection))
-    }
 
     private func setupNavigationBar() {
         // 设置导航栏标题
@@ -404,6 +351,9 @@ final class HistoryReplayViewController: UIViewController {
             mapView.topAnchor.constraint(equalTo: view.topAnchor),
             mapView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
         ])
+
+        // 使用自定义 LocationProvider 将历史位置流提供给内置 puck
+        mapView.location.override(locationProvider: replayLocationProvider)
     }
 
     // 移除导航界面相关方法，因为我们只做轨迹回放，不启动导航界面
@@ -411,8 +361,6 @@ final class HistoryReplayViewController: UIViewController {
     // private func presentAndRemoveNavigationMapView() - 已移除
 
     private func cleanupReplay() {
-        print("Cleaning up history trajectory replay")
-
         // 停止位置订阅
         locationSubscription?.cancel()
         locationSubscription = nil
@@ -429,16 +377,12 @@ final class HistoryReplayViewController: UIViewController {
         // 清理地图图层和数据源
         if let mapView = mapView {
             try? mapView.mapboxMap.removeLayer(withId: historyRouteLayerId)
-            try? mapView.mapboxMap.removeLayer(withId: currentLocationLayerId)
             try? mapView.mapboxMap.removeSource(withId: historyRouteSourceId)
-            try? mapView.mapboxMap.removeSource(withId: currentLocationSourceId)
         }
 
         // 清理地图视图
         mapView?.removeFromSuperview()
         mapView = nil
-
-        print("History replay stopped and cleaned up")
     }
 }
 
@@ -458,11 +402,8 @@ extension HistoryReplayViewController: HistoryReplayDelegate {
         wantsToSetRoutes routes: MapboxNavigationCore.NavigationRoutes
     ) {
         // 按照官方建议：不启动导航相关组件，仅记录路线信息
-        print("History replay controller detected routes - trajectory replay only, no navigation UI")
-
         // 可以选择在地图上显示路线轮廓，但不启动导航
         // 这里我们选择仅记录，让位置流自然显示轨迹
-        print("Routes detected but not starting navigation - letting location stream show trajectory")
 
         // 不调用任何导航相关方法：
         // - 不调用 presentNavigationController
@@ -472,8 +413,6 @@ extension HistoryReplayViewController: HistoryReplayDelegate {
 
     func historyReplayControllerDidFinishReplay(_: HistoryReplayController) {
         // 历史轨迹回放结束，直接关闭页面
-        print("History trajectory replay finished via locations stream, closing replay view")
-
         // 清理资源并关闭页面
         cleanupReplay()
 
@@ -495,8 +434,6 @@ extension HistoryReplayViewController: NavigationViewControllerDelegate {
     ) {
         // 注意：由于我们不启动导航界面，这个方法实际上不会被调用
         // 保留此方法仅为了协议完整性
-        print("Navigation dismissed (this should not be called in trajectory-only replay)")
-
         cleanupReplay()
 
         if let navigationController = self.navigationController {

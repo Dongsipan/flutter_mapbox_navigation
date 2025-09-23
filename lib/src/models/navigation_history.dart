@@ -3,8 +3,8 @@ class NavigationHistory {
   NavigationHistory({
     required this.id,
     required this.historyFilePath,
-    this.cover,
     required this.startTime,
+    this.cover,
     this.endTime,
     this.distance,
     this.duration,

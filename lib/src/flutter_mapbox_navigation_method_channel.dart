@@ -128,11 +128,11 @@ class MethodChannelFlutterMapboxNavigation
             log('Processing item: $item');
             try {
               // 安全地转换 Map<Object?, Object?> 到 Map<String, dynamic>
-              final Map<String, dynamic> itemMap =
+              final itemMap =
                   Map<String, dynamic>.from(item as Map);
               log('Converted item map: $itemMap');
               final history = NavigationHistory.fromMap(itemMap);
-              log('Successfully created NavigationHistory: ${history.toString()}');
+              log('Successfully created NavigationHistory: ${history}');
               return history;
             } catch (e, stackTrace) {
               log('Error creating NavigationHistory from item: $item');

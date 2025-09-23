@@ -237,6 +237,6 @@ class _HistoryReplayExampleState extends State<HistoryReplayExample> {
   String _formatDuration(int seconds) {
     final minutes = seconds ~/ 60;
     final remainingSeconds = seconds % 60;
-    return '${minutes}分${remainingSeconds}秒';
+    return '$minutes分$remainingSeconds秒';
   }
 }

@@ -58,7 +58,7 @@ void main() {
       test('should optimize route with multiple waypoints', () {
         final wayPoints = [
           WayPoint(
-              name: 'Start', latitude: 39.9042, longitude: 116.4074), // 天安门
+              name: 'Start', latitude: 39.9042, longitude: 116.4074,), // 天安门
           WayPoint(name: 'Far', latitude: 39.9500, longitude: 116.4500), // 远点
           WayPoint(name: 'Near', latitude: 39.9100, longitude: 116.4100), // 近点
           WayPoint(name: 'End', latitude: 39.9163, longitude: 116.3972), // 故宫
@@ -262,7 +262,7 @@ void main() {
 
         expect(receivedEvent, isNotNull);
         expect(receivedEvent!.type,
-            equals(NavigationExtensionEventType.routeSaved));
+            equals(NavigationExtensionEventType.routeSaved),);
         expect(receivedEvent!.data, equals(wayPoints));
 
         await subscription.cancel();

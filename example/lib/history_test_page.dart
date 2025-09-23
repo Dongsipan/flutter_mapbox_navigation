@@ -219,10 +219,6 @@ class _HistoryTestPageState extends State<HistoryTestPage> {
     });
 
     try {
-      // 这里我们需要直接调用平台方法来创建一个测试历史记录
-      // 由于没有直接的API，我们先检查现有的历史记录数量
-      final currentCount = _navigationHistoryList.length;
-
       // 模拟一个短暂的导航来触发历史记录
       final wayPoints = [
         WayPoint(

@@ -4,13 +4,23 @@ import MapboxMaps
 import MapboxDirections
 import MapboxNavigationCore
 import MapboxNavigationUIKit
+import MapboxSearch
+import MapboxSearchUI
 
 public class FlutterMapboxNavigationPlugin: NavigationFactory, FlutterPlugin {
+
+  private var searchController: SearchViewController?
+
   public static func register(with registrar: FlutterPluginRegistrar) {
     let channel = FlutterMethodChannel(name: "flutter_mapbox_navigation", binaryMessenger: registrar.messenger())
     let eventChannel = FlutterEventChannel(name: "flutter_mapbox_navigation/events", binaryMessenger: registrar.messenger())
+    let searchChannel = FlutterMethodChannel(name: "flutter_mapbox_navigation/search", binaryMessenger: registrar.messenger())
+
     let instance = FlutterMapboxNavigationPlugin()
+    instance.searchController = SearchViewController(methodChannel: searchChannel)
+
     registrar.addMethodCallDelegate(instance, channel: channel)
+    registrar.addMethodCallDelegate(instance.searchController!, channel: searchChannel)
 
     eventChannel.setStreamHandler(instance)
 

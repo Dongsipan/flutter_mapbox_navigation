@@ -5,6 +5,7 @@ import 'custom_navigation_example.dart';
 import 'advanced_features_example.dart';
 import 'history_test_page.dart';
 import 'history_replay_example.dart';
+import 'map_search_example.dart';
 
 void main() => runApp(const NavigationDemoApp());
 
@@ -34,7 +35,7 @@ class NavigationHomePage extends StatelessWidget {
         title: const Text('Mapbox Navigation 示例'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
       ),
-      body: Padding(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -108,6 +109,20 @@ class NavigationHomePage extends StatelessWidget {
                     builder: (context) => const HistoryReplayExample()),
               ),
             ),
+            const SizedBox(height: 16),
+            _buildDemoCard(
+              context,
+              title: '地图搜索界面',
+              description: '带有搜索框的完整地图界面，支持实时自动补全',
+              icon: Icons.map,
+              color: Colors.teal,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (context) => const MapSearchExamplePage()),
+              ),
+            ),
+            const SizedBox(height: 24), // 底部间距
           ],
         ),
       ),

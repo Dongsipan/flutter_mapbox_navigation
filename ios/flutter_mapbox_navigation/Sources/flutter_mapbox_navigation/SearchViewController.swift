@@ -150,9 +150,9 @@ class SearchMapViewController: UIViewController {
         // 显示用户位置
         mapView.location.options.puckType = .puck2D()
         mapView.viewport.transition(to: mapView.viewport.makeFollowPuckViewportState())
-        
-        // 创建注释管理器
-        annotationsManager = mapView.annotations.makePointAnnotationManager()
+
+        // 注释管理器已经通过lazy var创建，这里不需要重新创建
+        print("📍 Using existing annotations manager: \(annotationsManager)")
 
         // 添加点击手势来隐藏抽屉
         let tapGesture = UITapGestureRecognizer(target: self, action: #selector(mapViewTapped))
@@ -417,16 +417,22 @@ class SearchMapViewController: UIViewController {
     }
 
     func showAnnotations(results: [SearchResult], cameraShouldFollow: Bool = true) {
-        annotationsManager.annotations = results.map { result in
+        print("🔍 showAnnotations called with \(results.count) results")
+
+        let annotations = results.map { result in
             var point = PointAnnotation.pointAnnotation(result)
-            
+            print("📍 Creating annotation for: \(result.name) at \(result.coordinate)")
+
             // 点击标注时的处理
             point.tapHandler = { [weak self] _ in
                 return self?.handleAnnotationTap(result: result) ?? false
             }
             return point
         }
-        
+
+        annotationsManager.annotations = annotations
+        print("📍 Set \(annotations.count) annotations to manager")
+
         if cameraShouldFollow {
             cameraToAnnotations(annotationsManager.annotations)
         }
@@ -475,6 +481,8 @@ extension SearchMapViewController: SearchControllerDelegate {
 
     /// 当用户选择搜索结果时显示标注
     func searchResultSelected(_ searchResult: SearchResult) {
+        print("🔍 Search result selected: \(searchResult.name) at \(searchResult.coordinate)")
+
         // 停止跟随用户位置
         mapView.viewport.idle()
 
@@ -497,9 +505,19 @@ extension SearchMapViewController: SearchControllerDelegate {
 extension PointAnnotation {
     static func pointAnnotation(_ searchResult: SearchResult) -> PointAnnotation {
         var annotation = PointAnnotation(coordinate: searchResult.coordinate)
+
+        // 设置文本标签
         annotation.textField = searchResult.name
-        annotation.textColor = StyleColor(.black)
         annotation.textSize = 16
+        annotation.textColor = StyleColor(.black)
+        annotation.textOffset = [0, -2] // 文本偏移，避免与图标重叠
+
+        // 关键：设置标记图片 - 使用系统默认的红色标记
+        if let markerImage = UIImage(systemName: "mappin.circle.fill") {
+            annotation.image = .init(image: markerImage, name: "search-marker")
+        }
+
+        print("📍 Created annotation: \(searchResult.name) at \(searchResult.coordinate)")
         return annotation
     }
 }

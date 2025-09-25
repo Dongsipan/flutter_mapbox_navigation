@@ -37,6 +37,7 @@ class _AdvancedFeaturesExampleState extends State<AdvancedFeaturesExample> {
   MapBoxNavigationViewController? _controller;
 
   bool _isNavigating = false;
+  bool _simulateRoute = true;
   String? _statusMessage;
   double? _totalDistance;
 
@@ -837,7 +838,7 @@ class _AdvancedFeaturesExampleState extends State<AdvancedFeaturesExample> {
     try {
       final options = MapBoxOptions(
         mode: MapBoxNavigationMode.cycling,
-        simulateRoute: true,
+        simulateRoute: _simulateRoute,
         language: "zh-CN",
         units: VoiceUnits.metric,
         voiceInstructionsEnabled: true,
@@ -919,13 +920,31 @@ class _AdvancedFeaturesExampleState extends State<AdvancedFeaturesExample> {
                       child: const Text('保存路线'),
                     ),
                   ],
-                ),
-                const SizedBox(height: 8),
-                
-                // 第三行按钮
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
+        ),
+        const SizedBox(height: 8),
+        
+        // 模拟导航开关
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('开启模拟导航'),
+            Switch(
+              value: _simulateRoute,
+              onChanged: (value) {
+                setState(() {
+                  _simulateRoute = value;
+                });
+              },
+              activeColor: Colors.green,
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        
+        // 第三行按钮
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
                     ElevatedButton(
                       onPressed: _showRouteHistory,
                       child: const Text('历史记录'),

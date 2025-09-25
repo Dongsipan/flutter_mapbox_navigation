@@ -409,14 +409,22 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
     func sendEvent(eventType: MapBoxEventType, data: String = "")
     {
         let routeEvent = MapBoxRouteEvent(eventType: eventType, data: data)
-        
+
         let jsonEncoder = JSONEncoder()
         let jsonData = try! jsonEncoder.encode(routeEvent)
         let eventJson = String(data: jsonData, encoding: String.Encoding.utf8)
+
         if(_eventSink != nil){
-            _eventSink!(eventJson)
+            if let json = eventJson {
+                _eventSink!(json)
+            } else {
+                // 如果编码失败，发送一个简单的错误事件
+                print("Failed to encode event to JSON string: \(eventType)")
+                let fallbackJson = "{\"eventType\":\"\(eventType.rawValue)\",\"data\":\"encoding_failed\"}"
+                _eventSink!(fallbackJson)
+            }
         }
-        
+
     }
     
     func downloadOfflineRoute(arguments: NSDictionary?, flutterResult: @escaping FlutterResult)
@@ -763,13 +771,22 @@ extension NavigationFactory : NavigationViewControllerDelegate {
         if(_eventSink != nil)
         {
             let jsonEncoder = JSONEncoder()
-            
+
             let progressEvent = MapBoxRouteProgressEvent(progress: progress)
             let progressEventJsonData = try! jsonEncoder.encode(progressEvent)
-            let progressEventJson = String(data: progressEventJsonData, encoding: String.Encoding.ascii)
-            
-            _eventSink!(progressEventJson)
-            
+            // 使用 UTF-8 编码而不是 ASCII，避免编码失败返回 nil
+            let progressEventJson = String(data: progressEventJsonData, encoding: String.Encoding.utf8)
+
+            // 检查编码是否成功
+            if let eventJson = progressEventJson {
+                // 发送标准格式的进度事件，包含eventType和data字段
+                sendEvent(eventType: MapBoxEventType.progress_change, data: eventJson)
+            } else {
+                // 如果编码失败，发送一个错误事件
+                print("Failed to encode progress event to JSON string")
+                sendEvent(eventType: MapBoxEventType.progress_change, data: "encoding_failed")
+            }
+
             if(progress.isFinalLeg && progress.currentLegProgress.userHasArrivedAtWaypoint && !_showEndOfRouteFeedback)
             {
                 _eventSink = nil

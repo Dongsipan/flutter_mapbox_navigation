@@ -204,7 +204,16 @@ class MethodChannelFlutterMapboxNavigation
   Stream<RouteEvent>? get routeEventsListener {
     return eventChannel
         .receiveBroadcastStream()
-        .map((dynamic event) => _parseRouteEvent(event as String));
+        .map((dynamic event) {
+          if (event == null) {
+            // 如果事件为空，返回一个默认的事件
+            return RouteEvent(
+              eventType: MapBoxEvent.map_ready,
+              data: 'null event received',
+            );
+          }
+          return _parseRouteEvent(event as String);
+        });
   }
 
   void _onProgressData(RouteEvent event) {
@@ -220,19 +229,32 @@ class MethodChannelFlutterMapboxNavigation
   }
 
   RouteEvent _parseRouteEvent(String jsonString) {
-    RouteEvent event;
-    final map = json.decode(jsonString);
-    final progressEvent =
-        RouteProgressEvent.fromJson(map as Map<String, dynamic>);
-    if (progressEvent.isProgressEvent!) {
-      event = RouteEvent(
-        eventType: MapBoxEvent.progress_change,
-        data: progressEvent,
+    try {
+      if (jsonString.isEmpty) {
+        return RouteEvent(
+          eventType: MapBoxEvent.map_ready,
+          data: 'empty json string',
+        );
+      }
+
+      final map = json.decode(jsonString);
+      if (map == null) {
+        return RouteEvent(
+          eventType: MapBoxEvent.map_ready,
+          data: 'null json data',
+        );
+      }
+
+      // 直接使用 RouteEvent.fromJson 来解析，它会根据 eventType 正确处理不同类型的事件
+      return RouteEvent.fromJson(map as Map<String, dynamic>);
+    } catch (e) {
+      // 如果解析失败，返回一个错误事件
+      debugPrint('Error parsing route event: $e, jsonString: $jsonString');
+      return RouteEvent(
+        eventType: MapBoxEvent.map_ready,
+        data: 'parse error: $e',
       );
-    } else {
-      event = RouteEvent.fromJson(map);
     }
-    return event;
   }
 
   List<Map<String, Object?>> _getPointListFromWayPoints(

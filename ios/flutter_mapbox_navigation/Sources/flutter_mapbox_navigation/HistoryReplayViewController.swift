@@ -4,6 +4,14 @@ import MapboxNavigationCore
 import MapboxNavigationUIKit
 import UIKit
 
+// MARK: - Double Extension for Range Clamping
+
+extension Double {
+    func clamped(to range: ClosedRange<Double>) -> Double {
+        return Swift.min(Swift.max(self, range.lowerBound), range.upperBound)
+    }
+}
+
 // MARK: - UIColor Extension for Speed-based Colors
 
 extension UIColor {
@@ -156,10 +164,20 @@ final class HistoryReplayViewController: UIViewController {
     private var historyLocations: [CLLocation] = []
     private let historyRouteSourceId = "history-route-source"
     private let historyRouteLayerId = "history-route-layer"
+    private let startPointSourceId = "start-point-source"
+    private let endPointSourceId = "end-point-source"
+    private let startPointLayerId = "start-point-layer"
+    private let endPointLayerId = "end-point-layer"
 
-    // 速度和距离计算相关属性
-    private var traveledSpeedsKmh: [Double] = []
-    private var traveledCumDistMeters: [Double] = []
+    // 简化的速度数据存储（仅用于渐变显示）
+    private var locationSpeeds: [Double] = []
+    
+    // 全览/跟随模式
+    private var isOverviewMode = false
+    private var overviewButton: UIButton?
+    
+    // 回放控制
+    private var recommendedSpeed: Double = 16.0
 
     // 不需要 MapboxNavigationProvider 和相关导航组件
 
@@ -240,6 +258,10 @@ final class HistoryReplayViewController: UIViewController {
                         self?.updateCurrentLocation(location)
                     }
 
+                // 设置推荐回放速度
+                historyReplayController.playbackSpeed = recommendedSpeed
+                print("🎯 设置回放速度为 \(recommendedSpeed)x")
+
                 // 开始回放
                 historyReplayController.play()
             }
@@ -247,42 +269,42 @@ final class HistoryReplayViewController: UIViewController {
     }
 
     private func parseHistoryFileAndDrawRoute() async {
-        // 直接使用当前目录中的同名文件（与 HistoryReplayController 相同的方式）
+        // 智能路径解析 - 参照 Android 端逻辑
         let currentHistoryDir = defaultHistoryDirectoryURL()
-        let fileName = URL(fileURLWithPath: historyFilePath).lastPathComponent
-        let finalFileURL = currentHistoryDir.appendingPathComponent(fileName)
+        let fileURL = URL(fileURLWithPath: historyFilePath)
+        var finalFileURL = fileURL
+        
+        // 检查文件是否存在，如果不存在则尝试在当前目录中查找
+        if !FileManager.default.fileExists(atPath: fileURL.path) {
+            let filename = fileURL.lastPathComponent
+            let currentDirFileURL = currentHistoryDir.appendingPathComponent(filename)
+            if FileManager.default.fileExists(atPath: currentDirFileURL.path) {
+                finalFileURL = currentDirFileURL
+            }
+        }
 
         print("🔍 解析历史文件: \(finalFileURL.path)")
         print("🔍 文件是否存在: \(FileManager.default.fileExists(atPath: finalFileURL.path))")
 
         do {
-            // 按照官方建议：使用 HistoryReader 解析历史文件
+            // 使用 HistoryReader 解析历史文件
             guard let reader = HistoryReader(fileUrl: finalFileURL, readOptions: nil) else {
                 print("❌ 无法创建 HistoryReader")
                 return
             }
             print("✅ HistoryReader 创建成功")
 
-            let history = try await reader.parse()
-            historyLocations = history.rawLocations
-            print("✅ 历史文件解析成功，位置数量: \(historyLocations.count)")
+            // 预解析所有历史事件，类似 Android 端的 preDrawCompleteRoute
+            await preParseCompleteRoute(reader: reader)
+            
+            // 设置固定回放速度
+            recommendedSpeed = 16.0
+            print("🎯 设置回放速度: \(recommendedSpeed)x")
 
-            if historyLocations.isEmpty {
-                print("⚠️ 历史位置数据为空")
-                return
-            }
-
-            // 打印前几个位置用于调试
-            for (index, location) in historyLocations.prefix(3).enumerated() {
-                print("  位置 \(index): lat=\(location.coordinate.latitude), lng=\(location.coordinate.longitude)")
-            }
-
-            // 计算速度和累计距离
-            calculateSpeedsAndDistances()
-
-            // 在主线程绘制路线
+            // 在主线程绘制完整路线
             await MainActor.run {
-                drawHistoryRoute()
+                drawCompleteHistoryRoute()
+                setupOverviewButton()
             }
 
         } catch {
@@ -290,37 +312,84 @@ final class HistoryReplayViewController: UIViewController {
         }
     }
 
-    /// 计算每个轨迹点的速度和累计距离
-    private func calculateSpeedsAndDistances() {
+    /// 预解析所有历史事件中的位置数据，类似 Android 端的 preDrawCompleteRoute
+    private func preParseCompleteRoute(reader: HistoryReader) async {
+        do {
+            print("🔍 开始预解析历史事件中的位置数据...")
+            
+            let history = try await reader.parse()
+            let allEvents = history.events
+            print("📊 总事件数: \(allEvents.count)")
+            
+            var allLocations: [CLLocation] = []
+            
+            // 遍历所有事件，提取位置信息
+            for event in allEvents {
+                if let locationEvent = event as? LocationUpdateHistoryEvent {
+                    let location = CLLocation(
+                        coordinate: locationEvent.location.coordinate,
+                        altitude: locationEvent.location.altitude ?? 0,
+                        horizontalAccuracy: locationEvent.location.horizontalAccuracy ?? 0,
+                        verticalAccuracy: locationEvent.location.verticalAccuracy ?? 0,
+                        course: locationEvent.location.bearing ?? -1,
+                        speed: locationEvent.location.speed ?? -1,
+                        timestamp: locationEvent.location.timestamp
+                    )
+                    
+                    // 过滤过近的点，类似 Android 端的逻辑
+                    if allLocations.isEmpty {
+                        allLocations.append(location)
+                        print("📍 添加起点: lat=\(location.coordinate.latitude), lng=\(location.coordinate.longitude)")
+                    } else {
+                        let lastLocation = allLocations.last!
+                        let distance = location.distance(from: lastLocation)
+                        if distance > 0.5 { // 过滤0.5米内的点
+                            allLocations.append(location)
+                            if allLocations.count <= 5 {
+                                print("📍 添加轨迹点\(allLocations.count): lat=\(location.coordinate.latitude), lng=\(location.coordinate.longitude), 距离上点=\(Int(distance))m")
+                            }
+                        }
+                    }
+                }
+            }
+            
+            historyLocations = allLocations
+            print("✅ 预解析完成: 总点数=\(historyLocations.count)")
+            
+            // 计算基础速度数据
+            if !historyLocations.isEmpty {
+                calculateLocationSpeeds()
+            }
+            
+        } catch {
+            print("❌ 预解析历史事件失败: \(error)")
+            // 回退到原始方法
+            let history = try await reader.parse()
+            historyLocations = history.rawLocations
+            calculateLocationSpeeds()
+        }
+    }
+
+    /// 计算轨迹点的基础速度数据（仅用于渐变显示）
+    private func calculateLocationSpeeds() {
         guard !historyLocations.isEmpty else { return }
 
-        traveledSpeedsKmh.removeAll()
-        traveledCumDistMeters.removeAll()
+        locationSpeeds.removeAll()
 
-        var cumulativeDistance: Double = 0.0
-
-        for (index, location) in historyLocations.enumerated() {
+        for location in historyLocations {
             // 计算速度（从 m/s 转换为 km/h）
             let speedKmh = location.speed >= 0 ? location.speed * 3.6 : 0.0
-            traveledSpeedsKmh.append(speedKmh)
-
-            // 计算累计距离
-            if index > 0 {
-                let previousLocation = historyLocations[index - 1]
-                let distance = location.distance(from: previousLocation)
-                cumulativeDistance += distance
-            }
-            traveledCumDistMeters.append(cumulativeDistance)
+            locationSpeeds.append(speedKmh)
         }
 
-        print("计算完成 - 轨迹点数: \(historyLocations.count), 总距离: \(cumulativeDistance)m")
-        print("速度范围: \(traveledSpeedsKmh.min() ?? 0) - \(traveledSpeedsKmh.max() ?? 0) km/h")
+        print("计算完成 - 轨迹点数: \(historyLocations.count)")
     }
+    
+    
 
     /// 构建基于速度的渐变表达式
     private func buildSpeedGradientExpression() -> Exp {
-        guard let totalDist = traveledCumDistMeters.last, totalDist > 0,
-              !traveledSpeedsKmh.isEmpty else {
+        guard !locationSpeeds.isEmpty else {
             // 如果没有有效数据，返回默认颜色
             return Exp(.literal, UIColor.systemBlue)
         }
@@ -328,13 +397,13 @@ final class HistoryReplayViewController: UIViewController {
         var stops: [(Double, UIColor)] = []
 
         // 起点
-        stops.append((0.0, UIColor.colorForSpeed(traveledSpeedsKmh.first ?? 0.0)))
+        stops.append((0.0, UIColor.colorForSpeed(locationSpeeds.first ?? 0.0)))
 
         // 中间节点（每隔几个点采样，避免节点过多影响性能）
-        let step = max(1, traveledSpeedsKmh.count / 20)
-        for i in stride(from: step, to: traveledSpeedsKmh.count, by: step) {
-            let progress = min(traveledCumDistMeters[i] / totalDist, 1.0)
-            let color = UIColor.colorForSpeed(traveledSpeedsKmh[i])
+        let step = max(1, locationSpeeds.count / 20)
+        for i in stride(from: step, to: locationSpeeds.count, by: step) {
+            let progress = Double(i) / Double(locationSpeeds.count - 1)
+            let color = UIColor.colorForSpeed(locationSpeeds[i])
 
             // 确保进度值递增
             if stops.isEmpty || progress > stops.last!.0 {
@@ -344,12 +413,7 @@ final class HistoryReplayViewController: UIViewController {
 
         // 终点
         if stops.last?.0 ?? 0 < 1.0 {
-            stops.append((1.0, UIColor.colorForSpeed(traveledSpeedsKmh.last ?? 0.0)))
-        }
-
-        print("渐变节点数: \(stops.count)")
-        for (progress, color) in stops.prefix(5) {
-            print("  进度: \(String(format: "%.3f", progress)), 颜色: \(color)")
+            stops.append((1.0, UIColor.colorForSpeed(locationSpeeds.last ?? 0.0)))
         }
 
         // 构建参数数组 - 按照官方文档的正确写法
@@ -363,94 +427,287 @@ final class HistoryReplayViewController: UIViewController {
         return Exp(.interpolate, args)
     }
 
-    private func drawHistoryRoute() {
+    /// 一次性绘制完整历史路线，类似 Android 端的 drawCompleteRoute
+    private func drawCompleteHistoryRoute() {
         guard !historyLocations.isEmpty else {
+            print("⚠️ 历史位置数据为空，无法绘制路线")
             return
         }
-
-        // 按照官方建议：提取坐标数组
-        let coordinates = historyLocations.map { $0.coordinate }
 
         guard let mapView = mapView else {
+            print("⚠️ MapView 未初始化")
             return
         }
 
-        // 按照官方建议：先移除已存在的数据源和图层（避免重复添加）
-        try? mapView.mapboxMap.removeLayer(withId: historyRouteLayerId)
-        try? mapView.mapboxMap.removeSource(withId: historyRouteSourceId)
+        print("🎨 开始绘制完整历史路线，轨迹点数: \(historyLocations.count)")
 
-        // 创建 LineString 并绘制轨迹线 - 按照官方示例
+        // 提取坐标数组
+        let coordinates = historyLocations.map { $0.coordinate }
+
+        // 清理现有图层和数据源
+        cleanupExistingLayers()
+
+        // 1. 绘制轨迹线
+        drawTrajectoryLine(coordinates: coordinates)
+        
+        // 2. 绘制起终点标记
+        drawStartEndMarkers(coordinates: coordinates)
+
+        // 3. 设置地图视角以显示完整路线
+        setOverviewCamera(coordinates: coordinates)
+        
+        print("✅ 完整历史路线绘制完成")
+    }
+    
+    /// 清理现有的图层和数据源
+    private func cleanupExistingLayers() {
+        guard let mapView = mapView else { return }
+        
+        let layersToRemove = [historyRouteLayerId, startPointLayerId, endPointLayerId]
+        let sourcesToRemove = [historyRouteSourceId, startPointSourceId, endPointSourceId]
+        
+        for layerId in layersToRemove {
+            try? mapView.mapboxMap.removeLayer(withId: layerId)
+        }
+        
+        for sourceId in sourcesToRemove {
+            try? mapView.mapboxMap.removeSource(withId: sourceId)
+        }
+    }
+    
+    /// 绘制轨迹线
+    private func drawTrajectoryLine(coordinates: [CLLocationCoordinate2D]) {
+        guard let mapView = mapView else { return }
+        
+        // 创建 LineString
         let lineString = LineString(coordinates)
 
-        // 创建并添加历史路线数据源 - 按照官方示例使用 .geometry()
+        // 创建并添加数据源
         var routeLineSource = GeoJSONSource(id: historyRouteSourceId)
-        routeLineSource.data = .geometry(Geometry(lineString))  // 使用 .geometry() 而不是 .feature()
-        routeLineSource.lineMetrics = true  // 必须启用才能使用 line-progress
+        routeLineSource.data = .geometry(Geometry(lineString))
+        routeLineSource.lineMetrics = true  // 启用线条度量，用于渐变
 
         do {
             try mapView.mapboxMap.addSource(routeLineSource)
+            print("✅ 轨迹线数据源添加成功")
         } catch {
-            print("Failed to add route source: \(error)")
+            print("❌ 添加轨迹线数据源失败: \(error)")
             return
         }
 
-        // 创建并添加历史路线图层 - 使用速度渐变
+        // 创建并添加线条图层
         var lineLayer = LineLayer(id: historyRouteLayerId, source: historyRouteSourceId)
 
         // 根据是否有速度数据决定使用渐变还是单色
-        // 🔧 临时使用简单的单色线条进行测试
-        lineLayer.lineColor = .constant(StyleColor(.red))  // 使用红色便于观察
-        print("🔧 临时使用红色单色线条进行测试")
-
-        // 注释掉渐变逻辑，先确保基本线条能显示
-        /*
-        if !traveledSpeedsKmh.isEmpty && traveledCumDistMeters.last ?? 0 > 0 {
+        if !locationSpeeds.isEmpty {
             // 使用速度渐变
             lineLayer.lineGradient = .expression(buildSpeedGradientExpression())
             print("✅ 使用速度渐变绘制轨迹线")
         } else {
             // 使用默认单色
             lineLayer.lineColor = .constant(StyleColor(.systemBlue))
-            print("⚠️ 使用默认单色绘制轨迹线")
+            print("⚠️ 使用默认蓝色绘制轨迹线")
         }
-        */
 
-        lineLayer.lineWidth = .constant(8.0)  // 稍微加粗以更好显示渐变效果
+        lineLayer.lineWidth = .constant(8.0)
         lineLayer.lineCap = .constant(.round)
         lineLayer.lineJoin = .constant(.round)
 
         do {
-            try mapView.mapboxMap.addPersistentLayer(lineLayer)  // 使用 addPersistentLayer 按照官方示例
+            try mapView.mapboxMap.addPersistentLayer(lineLayer)
             print("✅ 轨迹线图层添加成功")
         } catch {
-            print("Failed to add route layer: \(error)")
-            return
+            print("❌ 添加轨迹线图层失败: \(error)")
         }
-
-        // 设置地图视角以显示完整路线 - 改进版本
-        if !historyLocations.isEmpty {
-            // 计算所有位置的边界框
-            let coordinates = historyLocations.map { $0.coordinate }
+    }
+    
+    /// 绘制起终点标记
+    private func drawStartEndMarkers(coordinates: [CLLocationCoordinate2D]) {
+        guard let mapView = mapView, !coordinates.isEmpty else { return }
+        
+        // 起点标记
+        let startPoint = coordinates.first!
+        var startSource = GeoJSONSource(id: startPointSourceId)
+        startSource.data = .geometry(Geometry(.point(Point(startPoint))))
+        
+        do {
+            try mapView.mapboxMap.addSource(startSource)
+            
+            var startLayer = CircleLayer(id: startPointLayerId, source: startPointSourceId)
+            startLayer.circleColor = .constant(StyleColor(UIColor(hex: "#00E676"))) // 绿色起点
+            startLayer.circleRadius = .constant(6.0)
+            startLayer.circleStrokeColor = .constant(StyleColor(.white))
+            startLayer.circleStrokeWidth = .constant(2.0)
+            
+            try mapView.mapboxMap.addPersistentLayer(startLayer)
+            print("✅ 起点标记添加成功")
+        } catch {
+            print("❌ 添加起点标记失败: \(error)")
+        }
+        
+        // 终点标记
+        if coordinates.count > 1 {
+            let endPoint = coordinates.last!
+            var endSource = GeoJSONSource(id: endPointSourceId)
+            endSource.data = .geometry(Geometry(.point(Point(endPoint))))
+            
+            do {
+                try mapView.mapboxMap.addSource(endSource)
+                
+                var endLayer = CircleLayer(id: endPointLayerId, source: endPointSourceId)
+                endLayer.circleColor = .constant(StyleColor(UIColor(hex: "#FF5252"))) // 红色终点
+                endLayer.circleRadius = .constant(6.0)
+                endLayer.circleStrokeColor = .constant(StyleColor(.white))
+                endLayer.circleStrokeWidth = .constant(2.0)
+                
+                try mapView.mapboxMap.addPersistentLayer(endLayer)
+                print("✅ 终点标记添加成功")
+            } catch {
+                print("❌ 添加终点标记失败: \(error)")
+            }
+        }
+    }
+    
+    /// 设置全览相机视角
+    private func setOverviewCamera(coordinates: [CLLocationCoordinate2D]) {
+        guard let mapView = mapView, !coordinates.isEmpty else { return }
+        
+        // 计算边界框
             let minLat = coordinates.map { $0.latitude }.min() ?? 0
             let maxLat = coordinates.map { $0.latitude }.max() ?? 0
             let minLng = coordinates.map { $0.longitude }.min() ?? 0
             let maxLng = coordinates.map { $0.longitude }.max() ?? 0
+        
+        // 添加边距
+        let latPadding = (maxLat - minLat) * 0.3
+        let lngPadding = (maxLng - minLng) * 0.3
 
             let center = CLLocationCoordinate2D(
                 latitude: (minLat + maxLat) / 2,
                 longitude: (minLng + maxLng) / 2
             )
 
-            print("🔍 设置地图视角:")
+        // 计算合适的缩放级别
+        let latDiff = maxLat - minLat + latPadding * 2
+        let lngDiff = maxLng - minLng + lngPadding * 2
+        let maxDiff = max(latDiff, lngDiff)
+        
+        let zoom: Double
+        switch maxDiff {
+        case ..<0.005: zoom = 17.0
+        case ..<0.01:  zoom = 16.0
+        case ..<0.02:  zoom = 14.0
+        case ..<0.05:  zoom = 12.0
+        case ..<0.1:   zoom = 10.0
+        default:       zoom = 8.0
+        }
+        
+        print("🔍 设置全览视角:")
             print("  - 中心点: lat=\(center.latitude), lng=\(center.longitude)")
-            print("  - 边界: lat[\(minLat), \(maxLat)], lng[\(minLng), \(maxLng)]")
+        print("  - 边界差值: lat=\(latDiff), lng=\(lngDiff)")
+        print("  - 计算缩放级别: \(zoom)")
+        
+        let cameraOptions = CameraOptions(center: center, zoom: zoom)
+        mapView.camera.ease(to: cameraOptions, duration: 1.0)
+        
+        isOverviewMode = true
+    }
+    
+    /// 设置全览按钮
+    private func setupOverviewButton() {
+        guard let mapView = mapView else { return }
+        
+        // 创建全览按钮
+        let button = UIButton(type: .system)
+        button.setImage(UIImage(systemName: "viewfinder"), for: .normal)
+        button.backgroundColor = UIColor.systemBackground.withAlphaComponent(0.9)
+        button.tintColor = .systemBlue
+        button.layer.cornerRadius = 8
+        button.layer.shadowColor = UIColor.black.cgColor
+        button.layer.shadowOffset = CGSize(width: 0, height: 2)
+        button.layer.shadowRadius = 4
+        button.layer.shadowOpacity = 0.1
+        button.translatesAutoresizingMaskIntoConstraints = false
+        
+        // 添加点击事件
+        button.addTarget(self, action: #selector(overviewButtonTapped), for: .touchUpInside)
+        
+        mapView.addSubview(button)
+        overviewButton = button
+        
+        // 设置约束
+        NSLayoutConstraint.activate([
+            button.widthAnchor.constraint(equalToConstant: 44),
+            button.heightAnchor.constraint(equalToConstant: 44),
+            button.trailingAnchor.constraint(equalTo: mapView.trailingAnchor, constant: -16),
+            button.topAnchor.constraint(equalTo: mapView.safeAreaLayoutGuide.topAnchor, constant: 16)
+        ])
+        
+        // 设置初始状态
+        updateOverviewButtonState()
+        print("✅ 全览按钮设置完成")
+    }
+    
+    @objc private func overviewButtonTapped() {
+        print("🔄 全览按钮被点击，当前模式: \(isOverviewMode ? "全览" : "跟随")")
+        
+        if isOverviewMode {
+            switchToFollowingMode()
+        } else {
+            switchToOverviewMode()
+        }
+    }
+    
+    /// 切换到全览模式
+    private func switchToOverviewMode() {
+        guard !historyLocations.isEmpty else {
+            print("⚠️ 轨迹数据为空，无法切换到全览模式")
+            return
+        }
+        
+        let coordinates = historyLocations.map { $0.coordinate }
+        setOverviewCamera(coordinates: coordinates)
+        isOverviewMode = true
+        updateOverviewButtonState()
+        print("🔄 已切换到全览模式")
+    }
+    
+    /// 切换到跟随模式
+    private func switchToFollowingMode() {
+        guard let currentLocation = replayLocationProvider.getLastObservedLocation() else {
+            print("⚠️ 当前位置为空，无法切换到跟随模式")
+            return
+        }
+        
+        let coordinate = CLLocationCoordinate2D(
+            latitude: currentLocation.coordinate.latitude,
+            longitude: currentLocation.coordinate.longitude
+        )
 
             let cameraOptions = CameraOptions(
-                center: center,
-                zoom: 12.0  // 稍微降低缩放级别以确保轨迹可见
-            )
-            mapView.camera.ease(to: cameraOptions, duration: 1.0)
-            print("✅ 地图视角设置完成")
+            center: coordinate,
+            zoom: 16.0,
+            bearing: currentLocation.bearing
+        )
+        
+        mapView?.camera.ease(to: cameraOptions, duration: 1.0)
+        isOverviewMode = false
+        updateOverviewButtonState()
+        print("🔄 已切换到跟随模式")
+    }
+    
+    /// 更新全览按钮的状态显示
+    private func updateOverviewButtonState() {
+        guard let button = overviewButton else { return }
+        
+        if isOverviewMode {
+            // 全览模式：按钮高亮显示
+            button.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.9)
+            button.tintColor = .white
+        } else {
+            // 跟随模式：按钮普通显示
+            button.backgroundColor = UIColor.systemBackground.withAlphaComponent(0.9)
+            button.tintColor = .systemBlue
         }
     }
 
@@ -464,16 +721,16 @@ final class HistoryReplayViewController: UIViewController {
         // 更新当前回放位置
         // ReplayLocationProvider 会将位置流提供给内置的 puck
         // 内置的 puck（箭头）会自动显示和更新
-        // 我们只需要更新相机跟随即可
 
-        // 更新地图相机位置跟随当前位置
+        // 只在跟随模式下更新相机
+        if !isOverviewMode {
         let cameraOptions = CameraOptions(
             center: location.coordinate,
-            zoom: 15.0,
+                zoom: 16.0,
             bearing: location.course >= 0 ? location.course : nil
         )
-
         mapView?.camera.ease(to: cameraOptions, duration: 0.3)
+        }
     }
 
 
@@ -545,12 +802,16 @@ final class HistoryReplayViewController: UIViewController {
 
         // 清理历史数据
         historyLocations.removeAll()
+        locationSpeeds.removeAll()
 
         // 清理地图图层和数据源
         if let mapView = mapView {
-            try? mapView.mapboxMap.removeLayer(withId: historyRouteLayerId)
-            try? mapView.mapboxMap.removeSource(withId: historyRouteSourceId)
+            cleanupExistingLayers()
         }
+        
+        // 清理全览按钮
+        overviewButton?.removeFromSuperview()
+        overviewButton = nil
 
         // 清理地图视图
         mapView?.removeFromSuperview()

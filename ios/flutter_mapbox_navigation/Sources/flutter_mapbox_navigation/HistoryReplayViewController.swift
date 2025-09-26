@@ -224,6 +224,10 @@ final class HistoryReplayViewController: UIViewController {
         // 开始历史轨迹回放，仅显示轨迹，不启动导航界面
         startHistoryReplay()
     }
+    
+    override var preferredStatusBarStyle: UIStatusBarStyle {
+        return .default
+    }
 
     // MARK: - Private Methods
 
@@ -787,10 +791,34 @@ final class HistoryReplayViewController: UIViewController {
         // 设置导航栏左侧按钮
         navigationItem.leftBarButtonItem = backButton
 
-        // 设置导航栏样式
-        navigationController?.navigationBar.isHidden = false
-        navigationController?.navigationBar.backgroundColor = UIColor.systemBackground
-        navigationController?.navigationBar.tintColor = UIColor.systemBlue
+        // 设置导航栏样式 - 确保状态栏与导航栏一体化
+        guard let navigationController = navigationController else { return }
+        
+        navigationController.navigationBar.isHidden = false
+        
+        // 设置导航栏外观，让状态栏区域与导航栏一体
+        let appearance = UINavigationBarAppearance()
+        appearance.configureWithOpaqueBackground()
+        appearance.backgroundColor = UIColor.systemBackground
+        appearance.titleTextAttributes = [.foregroundColor: UIColor.label]
+        
+        // 移除导航栏底部的分隔线
+        appearance.shadowColor = .clear
+        
+        // 应用外观配置
+        navigationController.navigationBar.standardAppearance = appearance
+        navigationController.navigationBar.scrollEdgeAppearance = appearance
+        navigationController.navigationBar.compactAppearance = appearance
+        
+        // 设置按钮颜色
+        navigationController.navigationBar.tintColor = UIColor.systemBlue
+        
+        // 确保状态栏样式正确
+        navigationController.navigationBar.barStyle = .default
+        
+        // 让导航栏延伸到状态栏区域
+        navigationController.navigationBar.prefersLargeTitles = false
+        extendedLayoutIncludesOpaqueBars = true
     }
 
     @objc private func backButtonTapped() {
@@ -873,15 +901,13 @@ extension HistoryReplayViewController: HistoryReplayDelegate {
     }
 
     func historyReplayControllerDidFinishReplay(_: HistoryReplayController) {
-        // 历史轨迹回放结束，直接关闭页面
-        // 清理资源并关闭页面
-        cleanupReplay()
-
-        // 关闭历史回放页面 - 由于是通过 present 方式展示的，需要 dismiss
-        if let navigationController = self.navigationController {
-            navigationController.dismiss(animated: true, completion: nil)
-        } else {
-            self.dismiss(animated: true, completion: nil)
+        // 历史轨迹回放结束，停留在最后位置
+        print("✅ 历史轨迹回放结束")
+        
+        // 不关闭页面，用户可以继续查看轨迹
+        // 可以选择切换到全览模式以显示完整轨迹
+        if !isOverviewMode {
+            switchToOverviewMode()
         }
     }
 }

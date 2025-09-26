@@ -40,6 +40,19 @@ extension UIColor {
         )
     }
 
+    /// 获取颜色的十六进制字符串表示（用于Mapbox表达式）
+    var hexString: String {
+        guard let components = self.cgColor.components, components.count >= 3 else {
+            return "#000000"
+        }
+        
+        let r = Int(components[0] * 255)
+        let g = Int(components[1] * 255)
+        let b = Int(components[2] * 255)
+        
+        return String(format: "#%02X%02X%02X", r, g, b)
+    }
+
     /// 根据速度获取对应的颜色
     static func colorForSpeed(_ speedKmh: Double) -> UIColor {
         switch speedKmh {
@@ -134,9 +147,8 @@ final class HistoryReplayViewController: UIViewController {
         let fileURL = URL(fileURLWithPath: historyFilePath)
         var finalFileURL = fileURL
 
-        // Check if file exists, if not try to find it in current directory
+        // 文件路径智能解析
         if !FileManager.default.fileExists(atPath: fileURL.path) {
-            // Extract filename and try to find it in current directory
             let filename = fileURL.lastPathComponent
             let currentDirFileURL = currentHistoryDir.appendingPathComponent(filename)
             if FileManager.default.fileExists(atPath: currentDirFileURL.path) {
@@ -171,6 +183,7 @@ final class HistoryReplayViewController: UIViewController {
 
     // 简化的速度数据存储（仅用于渐变显示）
     private var locationSpeeds: [Double] = []
+    private var cumulativeDistances: [Double] = []
     
     // 全览/跟随模式
     private var isOverviewMode = false
@@ -179,7 +192,6 @@ final class HistoryReplayViewController: UIViewController {
     // 回放控制
     private var recommendedSpeed: Double = 16.0
 
-    // 不需要 MapboxNavigationProvider 和相关导航组件
 
     // MARK: - Initialization
 
@@ -228,9 +240,14 @@ final class HistoryReplayViewController: UIViewController {
             // 关键：在 v11 中需要手动启用 puck 方向旋转（默认为 false）
             mapView.location.options.puckBearingEnabled = true
 
-            // 设置地图样式加载完成后的回调
-            mapView.mapboxMap.onStyleLoaded.observeNext { [weak self] _ in
+            // 设置地图加载完成后的回调
+            mapView.mapboxMap.onMapLoaded.observeNext { [weak self] _ in
                 self?.setupTrajectoryLayers()
+                
+                // 如果历史数据已准备好，立即绘制路线
+                if let self = self, !self.historyLocations.isEmpty {
+                    self.drawCompleteHistoryRoute()
+                }
             }.store(in: &cancelables)
 
 
@@ -259,8 +276,7 @@ final class HistoryReplayViewController: UIViewController {
                     }
 
                 // 设置推荐回放速度
-                historyReplayController.playbackSpeed = recommendedSpeed
-                print("🎯 设置回放速度为 \(recommendedSpeed)x")
+                historyReplayController.speedMultiplier = recommendedSpeed
 
                 // 开始回放
                 historyReplayController.play()
@@ -283,28 +299,26 @@ final class HistoryReplayViewController: UIViewController {
             }
         }
 
-        print("🔍 解析历史文件: \(finalFileURL.path)")
-        print("🔍 文件是否存在: \(FileManager.default.fileExists(atPath: finalFileURL.path))")
-
         do {
             // 使用 HistoryReader 解析历史文件
             guard let reader = HistoryReader(fileUrl: finalFileURL, readOptions: nil) else {
-                print("❌ 无法创建 HistoryReader")
+                print("❌ 无法创建 HistoryReader: \(finalFileURL.path)")
                 return
             }
-            print("✅ HistoryReader 创建成功")
 
             // 预解析所有历史事件，类似 Android 端的 preDrawCompleteRoute
             await preParseCompleteRoute(reader: reader)
             
             // 设置固定回放速度
             recommendedSpeed = 16.0
-            print("🎯 设置回放速度: \(recommendedSpeed)x")
 
-            // 在主线程绘制完整路线
+            // 在主线程创建按钮，但不立即绘制路线
             await MainActor.run {
-                drawCompleteHistoryRoute()
                 setupOverviewButton()
+                // 如果地图已加载完成则立即绘制，否则等待地图加载回调
+                if mapView?.mapboxMap.isStyleLoaded == true {
+                    drawCompleteHistoryRoute()
+                }
             }
 
         } catch {
@@ -315,11 +329,8 @@ final class HistoryReplayViewController: UIViewController {
     /// 预解析所有历史事件中的位置数据，类似 Android 端的 preDrawCompleteRoute
     private func preParseCompleteRoute(reader: HistoryReader) async {
         do {
-            print("🔍 开始预解析历史事件中的位置数据...")
-            
             let history = try await reader.parse()
             let allEvents = history.events
-            print("📊 总事件数: \(allEvents.count)")
             
             var allLocations: [CLLocation] = []
             
@@ -331,7 +342,7 @@ final class HistoryReplayViewController: UIViewController {
                         altitude: locationEvent.location.altitude ?? 0,
                         horizontalAccuracy: locationEvent.location.horizontalAccuracy ?? 0,
                         verticalAccuracy: locationEvent.location.verticalAccuracy ?? 0,
-                        course: locationEvent.location.bearing ?? -1,
+                        course: locationEvent.location.course ?? -1,
                         speed: locationEvent.location.speed ?? -1,
                         timestamp: locationEvent.location.timestamp
                     )
@@ -339,22 +350,17 @@ final class HistoryReplayViewController: UIViewController {
                     // 过滤过近的点，类似 Android 端的逻辑
                     if allLocations.isEmpty {
                         allLocations.append(location)
-                        print("📍 添加起点: lat=\(location.coordinate.latitude), lng=\(location.coordinate.longitude)")
                     } else {
                         let lastLocation = allLocations.last!
                         let distance = location.distance(from: lastLocation)
                         if distance > 0.5 { // 过滤0.5米内的点
                             allLocations.append(location)
-                            if allLocations.count <= 5 {
-                                print("📍 添加轨迹点\(allLocations.count): lat=\(location.coordinate.latitude), lng=\(location.coordinate.longitude), 距离上点=\(Int(distance))m")
-                            }
                         }
                     }
                 }
             }
             
             historyLocations = allLocations
-            print("✅ 预解析完成: 总点数=\(historyLocations.count)")
             
             // 计算基础速度数据
             if !historyLocations.isEmpty {
@@ -364,37 +370,58 @@ final class HistoryReplayViewController: UIViewController {
         } catch {
             print("❌ 预解析历史事件失败: \(error)")
             // 回退到原始方法
-            let history = try await reader.parse()
-            historyLocations = history.rawLocations
-            calculateLocationSpeeds()
+            if let history = try? await reader.parse() {
+                historyLocations = history.rawLocations
+                calculateLocationSpeeds()
+            } else {
+                print("❌ 无法解析历史位置数据")
+            }
         }
     }
 
-    /// 计算轨迹点的基础速度数据（仅用于渐变显示）
+    /// 计算轨迹点的基础速度数据和累计距离（用于渐变显示）
     private func calculateLocationSpeeds() {
         guard !historyLocations.isEmpty else { return }
 
         locationSpeeds.removeAll()
+        cumulativeDistances.removeAll()
 
-        for location in historyLocations {
+        var cumulativeDistance: Double = 0.0
+
+        for (index, location) in historyLocations.enumerated() {
+            // 计算累计距离
+            cumulativeDistances.append(cumulativeDistance)
+            
             // 计算速度（从 m/s 转换为 km/h）
             let speedKmh = location.speed >= 0 ? location.speed * 3.6 : 0.0
             locationSpeeds.append(speedKmh)
+            
+            // 为下一个点计算距离增量
+            if index < historyLocations.count - 1 {
+                let nextLocation = historyLocations[index + 1]
+                cumulativeDistance += location.distance(from: nextLocation)
+            }
         }
 
-        print("计算完成 - 轨迹点数: \(historyLocations.count)")
+        // 计算完成
     }
     
     
 
     /// 构建基于速度的渐变表达式
     private func buildSpeedGradientExpression() -> Exp {
-        guard !locationSpeeds.isEmpty else {
+        guard !locationSpeeds.isEmpty, !cumulativeDistances.isEmpty else {
             // 如果没有有效数据，返回默认颜色
-            return Exp(.literal, UIColor.systemBlue)
+            return Exp(.literal, UIColor.systemBlue.hexString)
         }
 
         var stops: [(Double, UIColor)] = []
+
+        // 总距离
+        let totalDistance = cumulativeDistances.last ?? 1.0
+        guard totalDistance > 0 else {
+            return Exp(.literal, UIColor.systemBlue.hexString)
+        }
 
         // 起点
         stops.append((0.0, UIColor.colorForSpeed(locationSpeeds.first ?? 0.0)))
@@ -402,12 +429,13 @@ final class HistoryReplayViewController: UIViewController {
         // 中间节点（每隔几个点采样，避免节点过多影响性能）
         let step = max(1, locationSpeeds.count / 20)
         for i in stride(from: step, to: locationSpeeds.count, by: step) {
-            let progress = Double(i) / Double(locationSpeeds.count - 1)
+            let progress = cumulativeDistances[i] / totalDistance
             let color = UIColor.colorForSpeed(locationSpeeds[i])
 
-            // 确保进度值递增
-            if stops.isEmpty || progress > stops.last!.0 {
-                stops.append((progress, color))
+            // 确保进度值递增且在[0,1]范围内
+            let clampedProgress = max(0.0, min(1.0, progress))
+            if clampedProgress > stops.last!.0 {
+                stops.append((clampedProgress, color))
             }
         }
 
@@ -416,33 +444,43 @@ final class HistoryReplayViewController: UIViewController {
             stops.append((1.0, UIColor.colorForSpeed(locationSpeeds.last ?? 0.0)))
         }
 
-        // 构建参数数组 - 按照官方文档的正确写法
-        var args: [Any] = [Exp(.linear), Exp(.lineProgress)]
-        for (progress, color) in stops {
-            args.append(progress)
-            args.append(color)
+        // 根据文档中的实现，严格按照 SPEED_GRADIENT_IMPLEMENTATION.md 指导
+        guard stops.count >= 2 else {
+            // 至少需要两个停止点才能创建插值
+            let fallbackColor = stops.first?.1 ?? UIColor.systemBlue
+            return Exp(.literal, fallbackColor.hexString)
         }
-
-        // 用参数数组初始化表达式 - 这是唯一正确的方式
-        return Exp(.interpolate, args)
+        
+        // 构建 Mapbox表达式 - 使用字典格式停止点
+        var stopsDict: [Double: UIColor] = [:]
+        for (progress, color) in stops {
+            stopsDict[progress] = color
+        }
+        
+        return Exp(.interpolate) {
+            Exp(.linear)
+            Exp(.lineProgress)
+            stopsDict
+        }
     }
 
     /// 一次性绘制完整历史路线，类似 Android 端的 drawCompleteRoute
     private func drawCompleteHistoryRoute() {
         guard !historyLocations.isEmpty else {
-            print("⚠️ 历史位置数据为空，无法绘制路线")
             return
         }
 
         guard let mapView = mapView else {
-            print("⚠️ MapView 未初始化")
             return
         }
 
-        print("🎨 开始绘制完整历史路线，轨迹点数: \(historyLocations.count)")
-
         // 提取坐标数组
         let coordinates = historyLocations.map { $0.coordinate }
+
+        // 检查地图是否已加载完成
+        guard mapView.mapboxMap.isStyleLoaded else {
+            return
+        }
 
         // 清理现有图层和数据源
         cleanupExistingLayers()
@@ -455,8 +493,6 @@ final class HistoryReplayViewController: UIViewController {
 
         // 3. 设置地图视角以显示完整路线
         setOverviewCamera(coordinates: coordinates)
-        
-        print("✅ 完整历史路线绘制完成")
     }
     
     /// 清理现有的图层和数据源
@@ -477,7 +513,19 @@ final class HistoryReplayViewController: UIViewController {
     
     /// 绘制轨迹线
     private func drawTrajectoryLine(coordinates: [CLLocationCoordinate2D]) {
-        guard let mapView = mapView else { return }
+        guard let mapView = mapView else { 
+            return 
+        }
+        
+        // 验证坐标数据
+        guard !coordinates.isEmpty else {
+            return
+        }
+        
+        // 需要至少两个点才能绘制线
+        guard coordinates.count >= 2 else {
+            return
+        }
         
         // 创建 LineString
         let lineString = LineString(coordinates)
@@ -489,7 +537,6 @@ final class HistoryReplayViewController: UIViewController {
 
         do {
             try mapView.mapboxMap.addSource(routeLineSource)
-            print("✅ 轨迹线数据源添加成功")
         } catch {
             print("❌ 添加轨迹线数据源失败: \(error)")
             return
@@ -498,15 +545,12 @@ final class HistoryReplayViewController: UIViewController {
         // 创建并添加线条图层
         var lineLayer = LineLayer(id: historyRouteLayerId, source: historyRouteSourceId)
 
-        // 根据是否有速度数据决定使用渐变还是单色
+        // 使用速度渐变功能
         if !locationSpeeds.isEmpty {
-            // 使用速度渐变
-            lineLayer.lineGradient = .expression(buildSpeedGradientExpression())
-            print("✅ 使用速度渐变绘制轨迹线")
+            let gradientExpression = buildSpeedGradientExpression()
+            lineLayer.lineGradient = .expression(gradientExpression)
         } else {
-            // 使用默认单色
-            lineLayer.lineColor = .constant(StyleColor(.systemBlue))
-            print("⚠️ 使用默认蓝色绘制轨迹线")
+            lineLayer.lineColor = .constant(StyleColor(UIColor.systemBlue))
         }
 
         lineLayer.lineWidth = .constant(8.0)
@@ -514,10 +558,15 @@ final class HistoryReplayViewController: UIViewController {
         lineLayer.lineJoin = .constant(.round)
 
         do {
-            try mapView.mapboxMap.addPersistentLayer(lineLayer)
-            print("✅ 轨迹线图层添加成功")
+            // 优先使用 addLayer
+            try mapView.mapboxMap.addLayer(lineLayer)
         } catch {
-            print("❌ 添加轨迹线图层失败: \(error)")
+            // 回退使用 addPersistentLayer
+            do {
+                try mapView.mapboxMap.addPersistentLayer(lineLayer)
+            } catch {
+                print("❌ 轨迹线图层添加失败: \(error)")
+            }
         }
     }
     
@@ -528,7 +577,7 @@ final class HistoryReplayViewController: UIViewController {
         // 起点标记
         let startPoint = coordinates.first!
         var startSource = GeoJSONSource(id: startPointSourceId)
-        startSource.data = .geometry(Geometry(.point(Point(startPoint))))
+        startSource.data = .geometry(Geometry.point(Point(startPoint)))
         
         do {
             try mapView.mapboxMap.addSource(startSource)
@@ -540,7 +589,6 @@ final class HistoryReplayViewController: UIViewController {
             startLayer.circleStrokeWidth = .constant(2.0)
             
             try mapView.mapboxMap.addPersistentLayer(startLayer)
-            print("✅ 起点标记添加成功")
         } catch {
             print("❌ 添加起点标记失败: \(error)")
         }
@@ -549,7 +597,7 @@ final class HistoryReplayViewController: UIViewController {
         if coordinates.count > 1 {
             let endPoint = coordinates.last!
             var endSource = GeoJSONSource(id: endPointSourceId)
-            endSource.data = .geometry(Geometry(.point(Point(endPoint))))
+            endSource.data = .geometry(Geometry.point(Point(endPoint)))
             
             do {
                 try mapView.mapboxMap.addSource(endSource)
@@ -561,7 +609,6 @@ final class HistoryReplayViewController: UIViewController {
                 endLayer.circleStrokeWidth = .constant(2.0)
                 
                 try mapView.mapboxMap.addPersistentLayer(endLayer)
-                print("✅ 终点标记添加成功")
             } catch {
                 print("❌ 添加终点标记失败: \(error)")
             }
@@ -602,10 +649,6 @@ final class HistoryReplayViewController: UIViewController {
         default:       zoom = 8.0
         }
         
-        print("🔍 设置全览视角:")
-            print("  - 中心点: lat=\(center.latitude), lng=\(center.longitude)")
-        print("  - 边界差值: lat=\(latDiff), lng=\(lngDiff)")
-        print("  - 计算缩放级别: \(zoom)")
         
         let cameraOptions = CameraOptions(center: center, zoom: zoom)
         mapView.camera.ease(to: cameraOptions, duration: 1.0)
@@ -645,11 +688,9 @@ final class HistoryReplayViewController: UIViewController {
         
         // 设置初始状态
         updateOverviewButtonState()
-        print("✅ 全览按钮设置完成")
     }
     
     @objc private func overviewButtonTapped() {
-        print("🔄 全览按钮被点击，当前模式: \(isOverviewMode ? "全览" : "跟随")")
         
         if isOverviewMode {
             switchToFollowingMode()
@@ -661,7 +702,6 @@ final class HistoryReplayViewController: UIViewController {
     /// 切换到全览模式
     private func switchToOverviewMode() {
         guard !historyLocations.isEmpty else {
-            print("⚠️ 轨迹数据为空，无法切换到全览模式")
             return
         }
         
@@ -669,13 +709,11 @@ final class HistoryReplayViewController: UIViewController {
         setOverviewCamera(coordinates: coordinates)
         isOverviewMode = true
         updateOverviewButtonState()
-        print("🔄 已切换到全览模式")
     }
     
     /// 切换到跟随模式
     private func switchToFollowingMode() {
         guard let currentLocation = replayLocationProvider.getLastObservedLocation() else {
-            print("⚠️ 当前位置为空，无法切换到跟随模式")
             return
         }
         
@@ -693,7 +731,6 @@ final class HistoryReplayViewController: UIViewController {
         mapView?.camera.ease(to: cameraOptions, duration: 1.0)
         isOverviewMode = false
         updateOverviewButtonState()
-        print("🔄 已切换到跟随模式")
     }
     
     /// 更新全览按钮的状态显示
@@ -785,9 +822,6 @@ final class HistoryReplayViewController: UIViewController {
         mapView.location.override(locationProvider: replayLocationProvider)
     }
 
-    // 移除导航界面相关方法，因为我们只做轨迹回放，不启动导航界面
-    // private func presentNavigationController(with navigationRoutes: NavigationRoutes) - 已移除
-    // private func presentAndRemoveNavigationMapView() - 已移除
 
     private func cleanupReplay() {
         // 停止位置订阅
@@ -803,6 +837,7 @@ final class HistoryReplayViewController: UIViewController {
         // 清理历史数据
         historyLocations.removeAll()
         locationSpeeds.removeAll()
+        cumulativeDistances.removeAll()
 
         // 清理地图图层和数据源
         if let mapView = mapView {
@@ -834,14 +869,7 @@ extension HistoryReplayViewController: HistoryReplayDelegate {
         _: MapboxNavigationCore.HistoryReplayController,
         wantsToSetRoutes routes: MapboxNavigationCore.NavigationRoutes
     ) {
-        // 按照官方建议：不启动导航相关组件，仅记录路线信息
-        // 可以选择在地图上显示路线轮廓，但不启动导航
-        // 这里我们选择仅记录，让位置流自然显示轨迹
-
-        // 不调用任何导航相关方法：
-        // - 不调用 presentNavigationController
-        // - 不调用 startActiveGuidance
-        // - 不使用 NavigationMapView 的导航功能
+        // 不启动导航相关组件，仅显示轨迹
     }
 
     func historyReplayControllerDidFinishReplay(_: HistoryReplayController) {
@@ -865,8 +893,7 @@ extension HistoryReplayViewController: NavigationViewControllerDelegate {
         _ navigationViewController: NavigationViewController,
         byCanceling canceled: Bool
     ) {
-        // 注意：由于我们不启动导航界面，这个方法实际上不会被调用
-        // 保留此方法仅为了协议完整性
+        // 协议完整性方法
         cleanupReplay()
 
         if let navigationController = self.navigationController {

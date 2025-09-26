@@ -653,8 +653,11 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
                     print("Actual path: \(historyFileUrl.path)")
                 }
 
-                // 直接保存历史记录信息，使用SDK返回的文件路径
-                self.saveHistoryRecord(filePath: historyFileUrl.path)
+                // 先生成封面，再保存历史记录信息
+                let historyId = self._currentHistoryId ?? UUID().uuidString
+                HistoryCoverGenerator.shared.generateHistoryCover(filePath: historyFileUrl.path, historyId: historyId) { coverPath in
+                    self.saveHistoryRecord(filePath: historyFileUrl.path, coverPath: coverPath)
+                }
             }
         }
     }
@@ -706,7 +709,7 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
     /**
      * 保存历史记录信息
      */
-    private func saveHistoryRecord(filePath: String) {
+    private func saveHistoryRecord(filePath: String, coverPath: String? = nil) {
         print("saveHistoryRecord called with filePath: \(filePath)")
         do {
             let fileManager = FileManager.default
@@ -718,7 +721,7 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
                 
                 let duration = _historyStartTime != nil ? Date().timeIntervalSince(_historyStartTime!) : 0
                 
-                let historyData: [String: Any] = [
+                var historyData: [String: Any] = [
                     "id": _currentHistoryId ?? UUID().uuidString,
                     "filePath": filePath,
                     "startTime": _historyStartTime?.timeIntervalSince1970 ?? 0,
@@ -728,6 +731,10 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
                     "endPointName": _wayPoints.last?.name ?? "未知终点",
                     "navigationMode": _navigationMode ?? "driving"
                 ]
+
+                if let coverPath = coverPath {
+                    historyData["cover"] = coverPath
+                }
                 
                 // 使用历史记录管理器保存
                 if historyManager == nil {
@@ -985,7 +992,8 @@ class HistoryManager {
                 duration: historyData["duration"] as? Int ?? 0,
                 startPointName: historyData["startPointName"] as? String,
                 endPointName: historyData["endPointName"] as? String,
-                navigationMode: historyData["navigationMode"] as? String
+                navigationMode: historyData["navigationMode"] as? String,
+                cover: historyData["cover"] as? String
             )
 
             print("Created history record: \(historyRecord)")
@@ -1121,4 +1129,5 @@ struct HistoryRecord: Codable {
     let startPointName: String?
     let endPointName: String?
     let navigationMode: String?
+    let cover: String?
 }

@@ -135,4 +135,15 @@ abstract class FlutterMapboxNavigationPlatform extends PlatformInterface {
       'startHistoryReplay() has not been implemented.',
     );
   }
+
+  /// 手动生成封面（仅调试用途）
+  /// 返回生成的封面本地路径，失败返回 null
+  Future<String?> generateHistoryCover({
+    required String historyFilePath,
+    String? historyId,
+  }) async {
+    throw UnimplementedError(
+      'generateHistoryCover() has not been implemented.',
+    );
+  }
 }

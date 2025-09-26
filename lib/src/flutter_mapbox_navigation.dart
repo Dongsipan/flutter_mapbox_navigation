@@ -140,4 +140,15 @@ class MapBoxNavigation {
       enableReplayUI: enableReplayUI,
     );
   }
+
+  /// 手动生成历史封面（仅调试用，不写入记录）
+  Future<String?> generateHistoryCover({
+    required String historyFilePath,
+    String? historyId,
+  }) async {
+    return FlutterMapboxNavigationPlatform.instance.generateHistoryCover(
+      historyFilePath: historyFilePath,
+      historyId: historyId,
+    );
+  }
 }

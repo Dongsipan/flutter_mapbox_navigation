@@ -81,6 +81,22 @@ public class FlutterMapboxNavigationPlugin: NavigationFactory, FlutterPlugin {
         {
             startHistoryReplay(arguments: arguments, result: result)
         }
+        else if(call.method == "generateHistoryCover")
+        {
+            guard let args = arguments,
+                  let historyFilePath = args["historyFilePath"] as? String else {
+                result(FlutterError(code: "INVALID_ARGUMENTS", message: "Missing historyFilePath", details: nil))
+                return
+            }
+            let historyId = (args["historyId"] as? String) ?? UUID().uuidString
+            HistoryCoverGenerator.shared.generateHistoryCover(filePath: historyFilePath, historyId: historyId) { coverPath in
+                if let coverPath = coverPath {
+                    result(coverPath)
+                } else {
+                    result(nil)
+                }
+            }
+        }
 
         else
         {

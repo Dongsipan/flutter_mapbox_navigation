@@ -200,6 +200,26 @@ class MethodChannelFlutterMapboxNavigation
     }
   }
 
+  @override
+  Future<String?> generateHistoryCover({
+    required String historyFilePath,
+    String? historyId,
+  }) async {
+    try {
+      final result = await methodChannel.invokeMethod<String>(
+        'generateHistoryCover',
+        {
+          'historyFilePath': historyFilePath,
+          'historyId': historyId,
+        },
+      );
+      return result;
+    } catch (e) {
+      log('Error generating history cover: $e');
+      return null;
+    }
+  }
+
   /// Events Handling
   Stream<RouteEvent>? get routeEventsListener {
     return eventChannel

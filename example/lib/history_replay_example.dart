@@ -78,8 +78,8 @@ class _HistoryReplayExampleState extends State<HistoryReplayExample> {
         _isLoading = true;
       });
 
-      final coverPath = await FlutterMapboxNavigationPlatform.instance
-          .generateHistoryCover(
+      final coverPath =
+          await FlutterMapboxNavigationPlatform.instance.generateHistoryCover(
         historyFilePath: history.historyFilePath,
         historyId: history.id,
       );
@@ -137,14 +137,16 @@ class _HistoryReplayExampleState extends State<HistoryReplayExample> {
         _isLoading = true;
       });
 
-      final coverPath = await FlutterMapboxNavigationPlatform.instance
-          .generateHistoryCover(
+      final coverPath =
+          await FlutterMapboxNavigationPlatform.instance.generateHistoryCover(
         historyFilePath: history.historyFilePath,
         historyId: history.id,
       );
 
       if (coverPath == null) {
-        setState(() { _isLoading = false; });
+        setState(() {
+          _isLoading = false;
+        });
         _showErrorDialog('生成封面失败');
         return;
       }
@@ -238,54 +240,189 @@ class _HistoryReplayExampleState extends State<HistoryReplayExample> {
 
   /// 构建历史记录项
   Widget _buildHistoryItem(NavigationHistory history) {
+    final hasCover = history.cover != null &&
+        history.cover!.isNotEmpty &&
+        File(history.cover!).existsSync();
+
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      child: ListTile(
-        leading: const CircleAvatar(
-          backgroundColor: Colors.blue,
-          child: Icon(Icons.history, color: Colors.white),
-        ),
-        title: Text(
-          '${history.startPointName} → ${history.endPointName}',
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('开始时间: ${_formatDateTime(history.startTime)}'),
-            if (history.duration != null)
-              Text('持续时间: ${_formatDuration(history.duration!)}'),
-            Text('导航模式: ${history.navigationMode ?? '未知'}'),
-          ],
-        ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ElevatedButton.icon(
-              onPressed: _isLoading ? null : () => _generateCover(history),
-              icon: const Icon(Icons.image_outlined, size: 16),
-              label: const Text('封面'),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 封面图片区域
+          if (hasCover)
+            Stack(
+              children: [
+                Image.file(
+                  File(history.cover!),
+                  width: double.infinity,
+                  height: 200,
+                  fit: BoxFit.cover,
+                ),
+                // 渐变遮罩，使底部文字更清晰
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: Container(
+                    height: 80,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.transparent,
+                          Colors.black.withOpacity(0.7),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                // 封面上的路线信息
+                Positioned(
+                  bottom: 8,
+                  left: 12,
+                  right: 12,
+                  child: Text(
+                    '${history.startPointName} → ${history.endPointName}',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: Colors.white,
+                      shadows: [
+                        Shadow(
+                          offset: Offset(0, 1),
+                          blurRadius: 3,
+                          color: Colors.black,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(width: 8),
-            ElevatedButton.icon(
-              onPressed: _isLoading ? null : () => _generateCoverAndUpdate(history),
-              icon: const Icon(Icons.save_alt, size: 16),
-              label: const Text('写入'),
+
+          // 信息和操作区域
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 如果没有封面，显示标题
+                if (!hasCover)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      children: [
+                        const CircleAvatar(
+                          backgroundColor: Colors.blue,
+                          radius: 20,
+                          child: Icon(Icons.history,
+                              color: Colors.white, size: 20),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            '${history.startPointName} → ${history.endPointName}',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                // 详细信息
+                Wrap(
+                  spacing: 16,
+                  runSpacing: 4,
+                  children: [
+                    _buildInfoChip(
+                      icon: Icons.access_time,
+                      label: _formatDateTime(history.startTime),
+                    ),
+                    if (history.duration != null)
+                      _buildInfoChip(
+                        icon: Icons.timer,
+                        label: _formatDuration(history.duration!),
+                      ),
+                    _buildInfoChip(
+                      icon: Icons.navigation,
+                      label: history.navigationMode ?? '未知',
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 12),
+
+                // 操作按钮
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    if (!hasCover) ...[
+                      OutlinedButton.icon(
+                        onPressed:
+                            _isLoading ? null : () => _generateCover(history),
+                        icon: const Icon(Icons.image_outlined, size: 16),
+                        label: const Text('生成封面'),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                    if (hasCover) ...[
+                      OutlinedButton.icon(
+                        onPressed: _isLoading
+                            ? null
+                            : () => _generateCoverAndUpdate(history),
+                        icon: const Icon(Icons.refresh, size: 16),
+                        label: const Text('更新封面'),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                    if (!hasCover) ...[
+                      OutlinedButton.icon(
+                        onPressed: _isLoading
+                            ? null
+                            : () => _generateCoverAndUpdate(history),
+                        icon: const Icon(Icons.save_alt, size: 16),
+                        label: const Text('生成并保存'),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                    ElevatedButton.icon(
+                      onPressed:
+                          _isLoading ? null : () => _startReplay(history),
+                      icon: const Icon(Icons.play_arrow, size: 16),
+                      label: const Text('回放'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
-            const SizedBox(width: 8),
-            ElevatedButton.icon(
-              onPressed: _isLoading ? null : () => _startReplay(history),
-              icon: const Icon(Icons.play_arrow, size: 16),
-              label: const Text('回放'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
-                foregroundColor: Colors.white,
-              ),
-            ),
-          ],
-        ),
-        isThreeLine: true,
+          ),
+        ],
       ),
+    );
+  }
+
+  /// 构建信息芯片
+  Widget _buildInfoChip({required IconData icon, required String label}) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 14, color: Colors.grey[600]),
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+        ),
+      ],
     );
   }
 

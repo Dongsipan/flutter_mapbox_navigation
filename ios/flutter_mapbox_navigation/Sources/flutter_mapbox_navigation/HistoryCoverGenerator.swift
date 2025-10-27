@@ -1,6 +1,8 @@
 import UIKit
 import CoreLocation
 import MapboxMaps
+import MapboxNavigationCore
+import MapboxDirections
 
 final class HistoryCoverGenerator {
 
@@ -59,7 +61,7 @@ final class HistoryCoverGenerator {
                 }
 
                 let size = CGSize(width: 720, height: 405) // 16:9 封面
-                let pixelRatio = Float(UIScreen.main.scale)
+                let pixelRatio = CGFloat(UIScreen.main.scale)
 
                 let coords = locations.map { $0.coordinate }
                 let lats = coords.map { $0.latitude }
@@ -91,66 +93,68 @@ final class HistoryCoverGenerator {
                     return
                 }
 
-                let resourceOptions = ResourceOptions(accessToken: token)
-                let options = SnapshotOptions(size: size, pixelRatio: pixelRatio)
-                let snapshotter = Snapshotter(options: options, resourceOptions: resourceOptions)
+                // v11: 使用全局 MapboxOptions 设置 token；使用 MapSnapshotOptions
+                MapboxOptions.accessToken = token
+                let options = MapSnapshotOptions(size: size, pixelRatio: pixelRatio)
+                let snapshotter = Snapshotter(options: options)
 
-                try await snapshotter.setStyle(StyleURI.streets)
+                snapshotter.styleURI = .streets
                 snapshotter.setCamera(to: CameraOptions(center: center, zoom: zoom))
 
-                let baseImage = try await snapshotter.start()
+                snapshotter.start { overlay in
+                    // 使用 overlay 提供的投影将经纬度转换为像素点
+                    let ctx = overlay.context
+                    ctx.setLineWidth(6)
+                    ctx.setLineJoin(.round)
+                    ctx.setLineCap(.round)
+                    ctx.setStrokeColor(UIColor.systemBlue.cgColor)
 
-                // 叠加轨迹
-                UIGraphicsBeginImageContextWithOptions(baseImage.size, true, baseImage.scale)
-                baseImage.draw(at: .zero)
+                    if let first = coords.first {
+                        let p0 = overlay.pointForCoordinate(first)
+                        ctx.move(to: p0)
+                        for c in coords.dropFirst() {
+                            let p = overlay.pointForCoordinate(c)
+                            ctx.addLine(to: p)
+                        }
+                        ctx.strokePath()
+                    }
 
-                let contextRect = CGRect(origin: .zero, size: baseImage.size)
-                let padding: CGFloat = 20
-                let drawRect = contextRect.insetBy(dx: padding, dy: padding)
+                    // 起点
+                    if let startCoord = coords.first {
+                        let p = overlay.pointForCoordinate(startCoord)
+                        let r: CGFloat = 5
+                        ctx.setFillColor(UIColor.systemGreen.cgColor)
+                        ctx.addEllipse(in: CGRect(x: p.x - r, y: p.y - r, width: r * 2, height: r * 2))
+                        ctx.fillPath()
+                    }
 
-                let latSpan = maxLat - minLat
-                let lngSpan = maxLng - minLng
-                func point(for coordinate: CLLocationCoordinate2D) -> CGPoint {
-                    let xRatio = (coordinate.longitude - minLng) / lngSpan
-                    let yRatio = (maxLat - coordinate.latitude) / latSpan
-                    let x = drawRect.minX + CGFloat(xRatio) * drawRect.width
-                    let y = drawRect.minY + CGFloat(yRatio) * drawRect.height
-                    return CGPoint(x: x, y: y)
-                }
-
-                let path = UIBezierPath()
-                path.lineWidth = 6
-                path.lineJoinStyle = .round
-                path.lineCapStyle = .round
-                path.move(to: point(for: coords.first!))
-                for c in coords.dropFirst() { path.addLine(to: point(for: c)) }
-                UIColor.systemBlue.setStroke()
-                path.stroke()
-
-                let start = point(for: coords.first!)
-                let startCircle = UIBezierPath(ovalIn: CGRect(x: start.x - 5, y: start.y - 5, width: 10, height: 10))
-                UIColor.systemGreen.setFill()
-                startCircle.fill()
-                let end = point(for: coords.last!)
-                let endCircle = UIBezierPath(ovalIn: CGRect(x: end.x - 5, y: end.y - 5, width: 10, height: 10))
-                UIColor.systemRed.setFill()
-                endCircle.fill()
-
-                let composed = UIGraphicsGetImageFromCurrentImageContext()
-                UIGraphicsEndImageContext()
-
-                guard let finalImage = composed, let data = finalImage.pngData() else {
-                    completion(nil)
-                    return
-                }
-
-                let coverURL = defaultHistoryDirectoryURL().appendingPathComponent("\(historyId)_cover.png")
-                do {
-                    try data.write(to: coverURL)
-                    completion(coverURL.path)
-                } catch {
-                    print("❌ 封面保存失败: \(error)")
-                    completion(nil)
+                    // 终点
+                    if let endCoord = coords.last {
+                        let p = overlay.pointForCoordinate(endCoord)
+                        let r: CGFloat = 5
+                        ctx.setFillColor(UIColor.systemRed.cgColor)
+                        ctx.addEllipse(in: CGRect(x: p.x - r, y: p.y - r, width: r * 2, height: r * 2))
+                        ctx.fillPath()
+                    }
+                } completion: { result in
+                    switch result {
+                    case .success(let image):
+                        if let data = image.pngData() {
+                            let coverURL = defaultHistoryDirectoryURL().appendingPathComponent("\(historyId)_cover.png")
+                            do {
+                                try data.write(to: coverURL)
+                                completion(coverURL.path)
+                            } catch {
+                                print("❌ 封面保存失败: \(error)")
+                                completion(nil)
+                            }
+                        } else {
+                            completion(nil)
+                        }
+                    case .failure(let error):
+                        print("❌ Snapshotter 失败: \(error)")
+                        completion(nil)
+                    }
                 }
             } catch {
                 print("❌ 解析历史文件失败: \(error)")

@@ -14,6 +14,19 @@ final class HistoryCoverGenerator {
     private var cancelables = Set<AnyCancellable>()
 
     private init() {}
+    
+    /// 根据速度获取对应的颜色（与 HistoryReplayViewController 保持一致）
+    private func colorForSpeed(_ speedKmh: Double) -> UIColor {
+        switch speedKmh {
+        case ..<5.0:   return UIColor(hex: "#2E7DFF")  // 蓝色 - 很慢
+        case ..<10.0:  return UIColor(hex: "#00E5FF")  // 青色 - 慢
+        case ..<15.0:  return UIColor(hex: "#00E676")  // 绿色 - 中等偏慢
+        case ..<20.0:  return UIColor(hex: "#C6FF00")  // 黄绿色 - 中等
+        case ..<25.0:  return UIColor(hex: "#FFD600")  // 黄色 - 中等偏快
+        case ..<30.0:  return UIColor(hex: "#FF9100")  // 橙色 - 快
+        default:       return UIColor(hex: "#FF1744")  // 红色 - 很快
+        }
+    }
 
     /// 根据历史文件生成封面，完成后返回图片路径
     func generateHistoryCover(filePath: String, historyId: String, completion: @escaping (String?) -> Void) {
@@ -123,7 +136,7 @@ final class HistoryCoverGenerator {
                 // 在主线程创建和使用 Snapshotter
                 await MainActor.run {
                     self.createSnapshot(
-                        coords: coords,
+                        locations: locations,  // 传递完整的位置信息（包含速度）
                         center: center,
                         zoom: zoom,
                         historyId: historyId,
@@ -140,7 +153,7 @@ final class HistoryCoverGenerator {
     /// 在主线程创建快照（确保线程安全）
     @MainActor
     private func createSnapshot(
-        coords: [CLLocationCoordinate2D],
+        locations: [CLLocation],
         center: CLLocationCoordinate2D,
         zoom: Double,
         historyId: String,
@@ -168,7 +181,7 @@ final class HistoryCoverGenerator {
             guard let self = self else { return }
             self.performSnapshot(
                 snapshotter: snapshotter,
-                coords: coords,
+                locations: locations,
                 historyId: historyId,
                 completion: completion
             )
@@ -179,43 +192,92 @@ final class HistoryCoverGenerator {
     @MainActor
     private func performSnapshot(
         snapshotter: Snapshotter,
-        coords: [CLLocationCoordinate2D],
+        locations: [CLLocation],
         historyId: String,
         completion: @escaping (String?) -> Void
     ) {
+        let coords = locations.map { $0.coordinate }
+        
         snapshotter.start(overlayHandler: { overlay in
-            // 使用 overlay 提供的投影将经纬度转换为像素点
             let ctx = overlay.context
             ctx.setLineWidth(6)
             ctx.setLineJoin(.round)
             ctx.setLineCap(.round)
-            ctx.setStrokeColor(UIColor.systemBlue.cgColor)
 
-            // 绘制轨迹线
-            if let first = coords.first {
-                let p0 = overlay.pointForCoordinate(first)
-                ctx.move(to: p0)
-                for c in coords.dropFirst() {
-                    let p = overlay.pointForCoordinate(c)
-                    ctx.addLine(to: p)
+            // 🎨 使用 Core Graphics 渐变绘制平滑过渡的速度轨迹
+            if locations.count >= 2 {
+                // 1. 创建路径
+                let path = CGMutablePath()
+                let firstPoint = overlay.pointForCoordinate(locations[0].coordinate)
+                path.move(to: firstPoint)
+                
+                for i in 1..<locations.count {
+                    let point = overlay.pointForCoordinate(locations[i].coordinate)
+                    path.addLine(to: point)
                 }
-                ctx.strokePath()
+                
+                // 2. 构建颜色数组和位置数组
+                var colors: [CGColor] = []
+                var colorLocations: [CGFloat] = []
+                
+                for (index, location) in locations.enumerated() {
+                    let speedKmh = location.speed >= 0 ? location.speed * 3.6 : 0.0
+                    let color = self.colorForSpeed(speedKmh)
+                    colors.append(color.cgColor)
+                    
+                    // 计算归一化位置 [0.0, 1.0]
+                    let normalizedLocation = CGFloat(index) / CGFloat(locations.count - 1)
+                    colorLocations.append(normalizedLocation)
+                }
+                
+                // 3. 创建线性渐变
+                if let gradient = CGGradient(
+                    colorsSpace: CGColorSpaceCreateDeviceRGB(),
+                    colors: colors as CFArray,
+                    locations: colorLocations
+                ) {
+                    let startPoint = overlay.pointForCoordinate(locations.first!.coordinate)
+                    let endPoint = overlay.pointForCoordinate(locations.last!.coordinate)
+                    
+                    // 4. 使用渐变绘制路径
+                    ctx.saveGState()
+                    ctx.addPath(path)
+                    ctx.replacePathWithStrokedPath()  // 将路径转换为描边路径
+                    ctx.clip()  // 使用描边路径作为裁剪区域
+                    
+                    // 绘制线性渐变
+                    ctx.drawLinearGradient(
+                        gradient,
+                        start: startPoint,
+                        end: endPoint,
+                        options: [.drawsBeforeStartLocation, .drawsAfterEndLocation]
+                    )
+                    
+                    ctx.restoreGState()
+                }
+            } else if coords.count == 1 {
+                // 只有一个点，绘制为圆点
+                let point = overlay.pointForCoordinate(coords[0])
+                let speedKmh = locations[0].speed >= 0 ? locations[0].speed * 3.6 : 0.0
+                let color = self.colorForSpeed(speedKmh)
+                ctx.setFillColor(color.cgColor)
+                ctx.fillEllipse(in: CGRect(x: point.x - 3, y: point.y - 3, width: 6, height: 6))
             }
 
             // 绘制起点（绿色）
             if let startCoord = coords.first {
                 let p = overlay.pointForCoordinate(startCoord)
                 let r: CGFloat = 5
-                ctx.setFillColor(UIColor.systemGreen.cgColor)
+                ctx.setFillColor(UIColor(hex: "#00E676").cgColor)  // 使用与回放页面一致的绿色
                 ctx.addEllipse(in: CGRect(x: p.x - r, y: p.y - r, width: r * 2, height: r * 2))
                 ctx.fillPath()
             }
 
             // 绘制终点（红色）
-            if let endCoord = coords.last {
+            if let endCoord = coords.last, coords.count > 1 {
                 let p = overlay.pointForCoordinate(endCoord)
                 let r: CGFloat = 5
-                ctx.setFillColor(UIColor.systemRed.cgColor)
+                ctx.setFillColor(UIColor(hex: "#FF5252").cgColor)  // 使用与回放页面一致的红色
                 ctx.addEllipse(in: CGRect(x: p.x - r, y: p.y - r, width: r * 2, height: r * 2))
                 ctx.fillPath()
             }

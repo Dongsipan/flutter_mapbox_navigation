@@ -240,8 +240,9 @@ class _HistoryReplayExampleState extends State<HistoryReplayExample> {
 
   /// 构建历史记录项
   Widget _buildHistoryItem(NavigationHistory history) {
-    final hasCover = history.cover != null &&
-        history.cover!.isNotEmpty &&
+    // iOS 端已经处理了沙箱路径问题，这里直接使用即可
+    final hasCover = history.cover != null && 
+        history.cover!.isNotEmpty && 
         File(history.cover!).existsSync();
 
     return Card(
@@ -259,6 +260,21 @@ class _HistoryReplayExampleState extends State<HistoryReplayExample> {
                   width: double.infinity,
                   height: 200,
                   fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      width: double.infinity,
+                      height: 200,
+                      color: Colors.grey[300],
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.broken_image, size: 48, color: Colors.grey[600]),
+                          const SizedBox(height: 8),
+                          Text('封面加载失败', style: TextStyle(color: Colors.grey[600])),
+                        ],
+                      ),
+                    );
+                  },
                 ),
                 // 渐变遮罩，使底部文字更清晰
                 Positioned(
@@ -358,9 +374,11 @@ class _HistoryReplayExampleState extends State<HistoryReplayExample> {
 
                 const SizedBox(height: 12),
 
-                // 操作按钮
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
+                // 操作按钮（使用 Wrap 防止溢出）
+                Wrap(
+                  alignment: WrapAlignment.end,
+                  spacing: 8,
+                  runSpacing: 8,
                   children: [
                     if (!hasCover) ...[
                       OutlinedButton.icon(
@@ -368,8 +386,10 @@ class _HistoryReplayExampleState extends State<HistoryReplayExample> {
                             _isLoading ? null : () => _generateCover(history),
                         icon: const Icon(Icons.image_outlined, size: 16),
                         label: const Text('生成封面'),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        ),
                       ),
-                      const SizedBox(width: 8),
                     ],
                     if (hasCover) ...[
                       OutlinedButton.icon(
@@ -378,8 +398,10 @@ class _HistoryReplayExampleState extends State<HistoryReplayExample> {
                             : () => _generateCoverAndUpdate(history),
                         icon: const Icon(Icons.refresh, size: 16),
                         label: const Text('更新封面'),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        ),
                       ),
-                      const SizedBox(width: 8),
                     ],
                     if (!hasCover) ...[
                       OutlinedButton.icon(
@@ -388,8 +410,10 @@ class _HistoryReplayExampleState extends State<HistoryReplayExample> {
                             : () => _generateCoverAndUpdate(history),
                         icon: const Icon(Icons.save_alt, size: 16),
                         label: const Text('生成并保存'),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        ),
                       ),
-                      const SizedBox(width: 8),
                     ],
                     ElevatedButton.icon(
                       onPressed:
@@ -399,6 +423,7 @@ class _HistoryReplayExampleState extends State<HistoryReplayExample> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.green,
                         foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       ),
                     ),
                   ],

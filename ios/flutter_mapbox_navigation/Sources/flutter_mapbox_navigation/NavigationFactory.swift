@@ -75,7 +75,7 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
     // Mapbox Navigation v3 components
     var mapboxNavigationProvider: MapboxNavigationProvider?
     var mapboxNavigation: MapboxNavigation?
-    private var historyManager: HistoryManager?
+    var historyManager: HistoryManager?  // Changed from private to internal for cover update access
 
     // History Replay components
     private var historyReplayController: HistoryReplayController?
@@ -519,20 +519,10 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
             let historyList = historyManager!.getHistoryList()
             print("Retrieved \(historyList.count) history records")
 
-            let historyMaps = historyList.map { history in
-                let startTimeMillis = Int64(history.startTime.timeIntervalSince1970 * 1000)
-                let historyMap: [String: Any] = [
-                    "id": history.id,
-                    "historyFilePath": history.historyFilePath,
-                    "startTime": startTimeMillis, // 确保是整数类型
-                    "duration": history.duration,
-                    "startPointName": history.startPointName ?? "",
-                    "endPointName": history.endPointName ?? "",
-                    "navigationMode": history.navigationMode ?? ""
-                ]
-                print("History map: \(historyMap)")
-                return historyMap
-            }
+            let historyMaps = historyList.map { $0.toFlutterMap() }
+            
+            // 调试：打印每条记录
+            historyMaps.forEach { print("History map: \($0)") }
 
             print("Returning \(historyMaps.count) history maps to Flutter")
             result(historyMaps)
@@ -1029,6 +1019,12 @@ class HistoryManager {
         }
 
         print("Successfully decoded \(historyList.count) history records")
+        
+        // 🔍 调试：打印每条记录的 cover 字段
+        for (index, record) in historyList.enumerated() {
+            print("🔍 记录 \(index): ID=\(record.id), cover=\(record.cover ?? "nil")")
+        }
+        
         return historyList
     }
     
@@ -1040,10 +1036,17 @@ class HistoryManager {
         if let index = historyList.firstIndex(where: { $0.id == historyId }) {
             let record = historyList[index]
             
-            // 删除文件
+            // 删除历史文件
             let fileManager = FileManager.default
             if fileManager.fileExists(atPath: record.historyFilePath) {
                 try? fileManager.removeItem(atPath: record.historyFilePath)
+                print("✅ 已删除历史文件: \(record.historyFilePath)")
+            }
+            
+            // 删除封面文件
+            if let coverPath = record.cover, fileManager.fileExists(atPath: coverPath) {
+                try? fileManager.removeItem(atPath: coverPath)
+                print("✅ 已删除封面文件: \(coverPath)")
             }
             
             // 从列表中移除
@@ -1062,13 +1065,69 @@ class HistoryManager {
         // 删除所有文件
         let fileManager = FileManager.default
         for record in historyList {
+            // 删除历史文件
             if fileManager.fileExists(atPath: record.historyFilePath) {
                 try? fileManager.removeItem(atPath: record.historyFilePath)
+                print("✅ 已删除历史文件: \(record.historyFilePath)")
+            }
+            
+            // 删除封面文件
+            if let coverPath = record.cover, fileManager.fileExists(atPath: coverPath) {
+                try? fileManager.removeItem(atPath: coverPath)
+                print("✅ 已删除封面文件: \(coverPath)")
             }
         }
         
         // 清空列表
         return saveHistoryList([])
+    }
+    
+    /**
+     * 更新指定历史记录的封面路径
+     */
+    func updateHistoryCover(historyId: String, coverPath: String) -> Bool {
+        var historyList = getHistoryList()
+        
+        print("🔍 更新封面 - 当前历史记录总数: \(historyList.count)")
+        
+        if let index = historyList.firstIndex(where: { $0.id == historyId }) {
+            let oldRecord = historyList[index]
+            print("🔍 找到记录:")
+            print("   ID: \(oldRecord.id)")
+            print("   旧封面: \(oldRecord.cover ?? "nil")")
+            print("   新封面: \(coverPath)")
+            
+            let newRecord = HistoryRecord(
+                id: oldRecord.id,
+                historyFilePath: oldRecord.historyFilePath,
+                startTime: oldRecord.startTime,
+                duration: oldRecord.duration,
+                startPointName: oldRecord.startPointName,
+                endPointName: oldRecord.endPointName,
+                navigationMode: oldRecord.navigationMode,
+                cover: coverPath
+            )
+            
+            print("🔍 新记录创建完成，cover = \(newRecord.cover ?? "nil")")
+            
+            historyList[index] = newRecord
+            
+            print("🔍 列表中第 \(index) 条记录的 cover = \(historyList[index].cover ?? "nil")")
+            
+            let success = saveHistoryList(historyList)
+            
+            if success {
+                print("✅ 历史记录封面已更新: \(historyId)")
+                print("   封面路径: \(coverPath)")
+            } else {
+                print("❌ 更新历史记录封面失败")
+            }
+            
+            return success
+        } else {
+            print("⚠️ 未找到历史记录: \(historyId)")
+            return false
+        }
     }
     
     /**
@@ -1130,4 +1189,76 @@ struct HistoryRecord: Codable {
     let endPointName: String?
     let navigationMode: String?
     let cover: String?
+    
+    /**
+     * 转换为 Flutter 可用的 Map 格式
+     * 统一管理字段映射，避免多处维护
+     */
+    func toFlutterMap() -> [String: Any] {
+        let startTimeMillis = Int64(startTime.timeIntervalSince1970 * 1000)
+        
+        var map: [String: Any] = [
+            "id": id,
+            "historyFilePath": resolveCurrentPath(historyFilePath),  // 🆕 动态解析路径
+            "startTime": startTimeMillis,
+            "duration": duration,
+            "startPointName": startPointName ?? "",
+            "endPointName": endPointName ?? "",
+            "navigationMode": navigationMode ?? ""
+        ]
+        
+        // 可选字段：只在有值时添加
+        if let cover = cover {
+            map["cover"] = resolveCurrentPath(cover)  // 🆕 动态解析封面路径
+        }
+        
+        return map
+    }
+    
+    /**
+     * 将存储的路径解析为当前沙箱的实际路径
+     * iOS 最佳实践：处理沙箱路径变化问题
+     *
+     * 策略：
+     * 1. 如果路径已经在当前沙箱中，直接返回
+     * 2. 如果路径在旧沙箱中，提取文件名并重建当前路径
+     * 3. 如果文件不存在，返回原路径（让调用方处理）
+     */
+    private func resolveCurrentPath(_ storedPath: String) -> String {
+        // 1. 检查存储的路径是否仍然有效
+        if FileManager.default.fileExists(atPath: storedPath) {
+            return storedPath
+        }
+        
+        // 2. 路径失效，尝试在当前沙箱中重建路径
+        let fileURL = URL(fileURLWithPath: storedPath)
+        let fileName = fileURL.lastPathComponent
+        
+        // 3. 判断文件类型，构建正确的目标目录
+        let currentPath: String
+        if storedPath.contains("NavigationHistory") {
+            // 历史文件和封面文件都在 NavigationHistory 目录
+            currentPath = defaultHistoryDirectoryURL().appendingPathComponent(fileName).path
+        } else if storedPath.contains("Documents/navigation_history") {
+            // 兼容旧版本可能的路径
+            let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+            currentPath = documentsPath.appendingPathComponent("navigation_history")
+                .appendingPathComponent(fileName).path
+        } else {
+            // 未知路径模式，返回原路径
+            return storedPath
+        }
+        
+        // 4. 验证重建的路径是否存在
+        if FileManager.default.fileExists(atPath: currentPath) {
+            print("✅ 路径已更新: \(fileName)")
+            print("   旧路径: \(storedPath)")
+            print("   新路径: \(currentPath)")
+            return currentPath
+        }
+        
+        // 5. 文件确实不存在，返回原路径
+        print("⚠️ 文件不存在: \(fileName)")
+        return storedPath
+    }
 }

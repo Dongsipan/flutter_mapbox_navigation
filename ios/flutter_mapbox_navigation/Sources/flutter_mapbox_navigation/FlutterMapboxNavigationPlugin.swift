@@ -84,15 +84,35 @@ public class FlutterMapboxNavigationPlugin: NavigationFactory, FlutterPlugin {
         else if(call.method == "generateHistoryCover")
         {
             guard let args = arguments,
-                  let historyFilePath = args["historyFilePath"] as? String else {
-                result(FlutterError(code: "INVALID_ARGUMENTS", message: "Missing historyFilePath", details: nil))
+                  let historyFilePath = args["historyFilePath"] as? String,
+                  let historyId = args["historyId"] as? String else {
+                result(FlutterError(code: "INVALID_ARGUMENTS", message: "Missing required parameters (historyFilePath, historyId)", details: nil))
                 return
             }
-            let historyId = (args["historyId"] as? String) ?? UUID().uuidString
-            HistoryCoverGenerator.shared.generateHistoryCover(filePath: historyFilePath, historyId: historyId) { coverPath in
+            
+            HistoryCoverGenerator.shared.generateHistoryCover(filePath: historyFilePath, historyId: historyId) { [weak self] coverPath in
+                guard let self = self else {
+                    result(nil)
+                    return
+                }
+                
                 if let coverPath = coverPath {
-                    result(coverPath)
+                    // 🆕 更新历史记录数据库中的封面路径
+                    if self.historyManager == nil {
+                        self.historyManager = HistoryManager()
+                    }
+                    
+                    let updateSuccess = self.historyManager!.updateHistoryCover(historyId: historyId, coverPath: coverPath)
+                    
+                    if updateSuccess {
+                        print("✅ 封面生成并更新成功: \(coverPath)")
+                        result(coverPath)
+                    } else {
+                        print("⚠️ 封面生成成功但更新记录失败")
+                        result(coverPath)  // 仍然返回路径，让用户知道封面已生成
+                    }
                 } else {
+                    print("❌ 封面生成失败")
                     result(nil)
                 }
             }

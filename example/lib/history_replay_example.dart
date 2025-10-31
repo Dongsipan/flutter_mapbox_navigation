@@ -291,7 +291,7 @@ class _HistoryReplayExampleState extends State<HistoryReplayExample> {
                           Colors.transparent,
                           Colors.black.withOpacity(0.7),
                         ],
-                      ),
+        ),
                     ),
                   ),
                 ),
@@ -301,7 +301,7 @@ class _HistoryReplayExampleState extends State<HistoryReplayExample> {
                   left: 12,
                   right: 12,
                   child: Text(
-                    '${history.startPointName} → ${history.endPointName}',
+          '${history.startPointName} → ${history.endPointName}',
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
@@ -315,7 +315,7 @@ class _HistoryReplayExampleState extends State<HistoryReplayExample> {
                       ],
                     ),
                   ),
-                ),
+        ),
               ],
             ),
 
@@ -323,8 +323,8 @@ class _HistoryReplayExampleState extends State<HistoryReplayExample> {
           Padding(
             padding: const EdgeInsets.all(12),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
                 // 如果没有封面，显示标题
                 if (!hasCover)
                   Padding(
@@ -360,7 +360,7 @@ class _HistoryReplayExampleState extends State<HistoryReplayExample> {
                       icon: Icons.access_time,
                       label: _formatDateTime(history.startTime),
                     ),
-                    if (history.duration != null)
+            if (history.duration != null)
                       _buildInfoChip(
                         icon: Icons.timer,
                         label: _formatDuration(history.duration!),
@@ -369,8 +369,8 @@ class _HistoryReplayExampleState extends State<HistoryReplayExample> {
                       icon: Icons.navigation,
                       label: history.navigationMode ?? '未知',
                     ),
-                  ],
-                ),
+          ],
+        ),
 
                 const SizedBox(height: 12),
 
@@ -418,19 +418,19 @@ class _HistoryReplayExampleState extends State<HistoryReplayExample> {
                     ElevatedButton.icon(
                       onPressed:
                           _isLoading ? null : () => _startReplay(history),
-                      icon: const Icon(Icons.play_arrow, size: 16),
-                      label: const Text('回放'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green,
-                        foregroundColor: Colors.white,
+          icon: const Icon(Icons.play_arrow, size: 16),
+          label: const Text('回放'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.green,
+            foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       ),
                     ),
                   ],
                 ),
               ],
-            ),
           ),
+        ),
         ],
       ),
     );

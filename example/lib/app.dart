@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -87,6 +88,83 @@ class _SampleNavigationAppState extends State<SampleNavigationApp> {
     //_navigationOption.initialLongitude = -115.1839524;
     MapBoxNavigation.instance.registerRouteEventListener(_onEmbeddedRouteEvent);
 
+    // Standalone logging listener (prints all navigation events)
+    await MapBoxNavigation.instance.registerRouteEventListener((RouteEvent e) {
+      final ts = DateTime.now().toIso8601String();
+      debugPrint('[$ts] [RouteEvent] type=${e.eventType} raw=${e.data}');
+
+      if (e.eventType == MapBoxEvent.progress_change) {
+        final p = e.data as RouteProgressEvent;
+        // 基础进度
+        debugPrint('[$ts] [Progress] arrived=${p.arrived}');
+        debugPrint('[$ts] [Progress] distance=${p.distance}m, duration=${p.duration}s');
+        debugPrint('[$ts] [Progress] distanceTraveled=${p.distanceTraveled}m');
+        debugPrint('[$ts] [Progress] legDistanceTraveled=${p.currentLegDistanceTraveled}m, legDistanceRemaining=${p.currentLegDistanceRemaining}m');
+        debugPrint('[$ts] [Progress] legIndex=${p.legIndex}, stepIndex=${p.stepIndex}');
+        debugPrint('[$ts] [Progress] instruction=${p.currentStepInstruction}');
+
+        // 当前 Leg 概览
+        final leg = p.currentLeg;
+        if (leg != null) {
+          debugPrint('[$ts] [Leg] name=${leg.name}, distance=${leg.distance}m, eta=${leg.expectedTravelTime}s');
+          debugPrint('[$ts] [Leg] steps=${leg.steps?.length ?? 0}');
+          if ((leg.steps?.isNotEmpty ?? false)) {
+            final s0 = leg.steps!.first;
+            debugPrint('[$ts] [Leg.step0] name=${s0.name}, distance=${s0.distance}m, eta=${s0.expectedTravelTime}s');
+            debugPrint('[$ts] [Leg.step0] instructions=${s0.instructions}');
+          }
+        }
+
+        // 其他 Leg 信息
+        debugPrint('[$ts] [Leg.prior] exists=${p.priorLeg != null}');
+        debugPrint('[$ts] [Leg.remaining] count=${p.remainingLegs?.length ?? 0}');
+
+        // currentVisualInstruction 详细日志
+        final v = p.currentVisualInstruction;
+        if (v != null) {
+          debugPrint('[$ts] [VIS] text=${v.text}');
+          debugPrint('[$ts] [VIS] secondary=${v.secondaryText}');
+          debugPrint('[$ts] [VIS] type=${v.maneuverType}, dir=${v.maneuverDirection}');
+          debugPrint('[$ts] [VIS] distanceAlongStep=${v.distanceAlongStep}');
+        } else {
+          debugPrint('[$ts] [VIS] null');
+        }
+
+        // 以字符串(JSON)形式输出 RouteProgressEvent（摘要字段）
+        final progressJson = jsonEncode({
+          'arrived': p.arrived,
+          'distance': p.distance,
+          'duration': p.duration,
+          'distanceTraveled': p.distanceTraveled,
+          'currentLegDistanceTraveled': p.currentLegDistanceTraveled,
+          'currentLegDistanceRemaining': p.currentLegDistanceRemaining,
+          'currentStepInstruction': p.currentStepInstruction,
+          'legIndex': p.legIndex,
+          'stepIndex': p.stepIndex,
+          'currentLeg': p.currentLeg == null
+              ? null
+              : {
+                  'name': p.currentLeg!.name,
+                  'distance': p.currentLeg!.distance,
+                  'expectedTravelTime': p.currentLeg!.expectedTravelTime,
+                  'steps': p.currentLeg!.steps?.length,
+                },
+          'priorLegExists': p.priorLeg != null,
+          'remainingLegsCount': p.remainingLegs?.length ?? 0,
+          'currentVisualInstruction': p.currentVisualInstruction == null
+              ? null
+              : {
+                  'text': p.currentVisualInstruction!.text,
+                  'secondaryText': p.currentVisualInstruction!.secondaryText,
+                  'maneuverType': p.currentVisualInstruction!.maneuverType,
+                  'maneuverDirection': p.currentVisualInstruction!.maneuverDirection,
+                  'distanceAlongStep': p.currentVisualInstruction!.distanceAlongStep,
+                },
+        });
+        debugPrint('[$ts] [Progress.json] $progressJson');
+      }
+    });
+
     String? platformVersion;
     // Platform messages may fail, so we use a try/catch PlatformException.
     try {
@@ -153,8 +231,10 @@ class _SampleNavigationAppState extends State<SampleNavigationApp> {
                         ],
                       ),
                     ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                    Wrap(
+                      alignment: WrapAlignment.center,
+                      spacing: 8,
+                      runSpacing: 8,
                       children: [
                         ElevatedButton(
                           child: const Text("Start A to B"),
@@ -173,9 +253,6 @@ class _SampleNavigationAppState extends State<SampleNavigationApp> {
                             await MapBoxNavigation.instance.startNavigation(
                                 wayPoints: wayPoints, options: opt);
                           },
-                        ),
-                        const SizedBox(
-                          width: 10,
                         ),
                         ElevatedButton(
                           child: const Text("Start Multi Stop"),
@@ -209,9 +286,6 @@ class _SampleNavigationAppState extends State<SampleNavigationApp> {
                                 .addWayPoints(wayPoints: [stop]);
                           },
                         ),
-                        const SizedBox(
-                          width: 10,
-                        ),
                         ElevatedButton(
                           child: const Text("Free Drive"),
                           onPressed: () async {
@@ -232,8 +306,10 @@ class _SampleNavigationAppState extends State<SampleNavigationApp> {
                         )),
                       ),
                     ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                    Wrap(
+                      alignment: WrapAlignment.center,
+                      spacing: 8,
+                      runSpacing: 8,
                       children: [
                         ElevatedButton(
                           onPressed: _isNavigating
@@ -255,9 +331,6 @@ class _SampleNavigationAppState extends State<SampleNavigationApp> {
                               ? "Clear Route"
                               : "Build Route"),
                         ),
-                        const SizedBox(
-                          width: 10,
-                        ),
                         ElevatedButton(
                           onPressed: _routeBuilt && !_isNavigating
                               ? () {
@@ -265,9 +338,6 @@ class _SampleNavigationAppState extends State<SampleNavigationApp> {
                                 }
                               : null,
                           child: const Text('Start '),
-                        ),
-                        const SizedBox(
-                          width: 10,
                         ),
                         ElevatedButton(
                           onPressed: _isNavigating

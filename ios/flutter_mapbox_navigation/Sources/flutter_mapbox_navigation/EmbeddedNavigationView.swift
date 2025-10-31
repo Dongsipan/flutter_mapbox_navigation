@@ -16,6 +16,8 @@ public class FlutterMapboxNavigationView : NavigationFactory, FlutterPlatformVie
     let eventChannel: FlutterEventChannel
 
     var navigationMapView: NavigationMapView?
+    // Persistent container view returned to Flutter; we add subviews into this
+    var containerView: UIView = UIView()
     var arguments: NSDictionary?
 
     var navigationRoutes: NavigationRoutes?
@@ -31,6 +33,10 @@ public class FlutterMapboxNavigationView : NavigationFactory, FlutterPlatformVie
         self.frame = frame
         self.viewId = viewId
         self.arguments = args as! NSDictionary?
+
+        // Initialize persistent container
+        self.containerView = UIView(frame: frame)
+        self.containerView.backgroundColor = UIColor.lightGray
 
         self.messenger = messenger
         self.channel = FlutterMethodChannel(name: "flutter_mapbox_navigation/\(viewId)", binaryMessenger: messenger)
@@ -101,20 +107,13 @@ public class FlutterMapboxNavigationView : NavigationFactory, FlutterPlatformVie
 
     public func view() -> UIView
     {
-        if let mapView = navigationMapView, _mapInitialized {
-            return mapView
+        if !_mapInitialized {
+            // Setup map view on main actor asynchronously (only once)
+            Task { @MainActor in
+                await setupMapViewAsync()
+            }
         }
-
-        // Create a placeholder view that will be replaced once the map is initialized
-        let placeholderView = UIView(frame: frame)
-        placeholderView.backgroundColor = UIColor.lightGray
-
-        // Setup map view on main actor asynchronously
-        Task { @MainActor in
-            await setupMapViewAsync()
-        }
-
-        return placeholderView
+        return containerView
     }
 
     
@@ -194,6 +193,14 @@ public class FlutterMapboxNavigationView : NavigationFactory, FlutterPlatformVie
             onTapGesture.numberOfTapsRequired = 1
             onTapGesture.delegate = self
             navigationMapView?.addGestureRecognizer(onTapGesture)
+        }
+
+        // Add the map view into the persistent container and pin constraints
+        if let mapView = navigationMapView, !_mapInitialized {
+            mapView.translatesAutoresizingMaskIntoConstraints = false
+            containerView.addSubview(mapView)
+            constraintsWithPaddingBetween(holderView: containerView, topView: mapView, padding: 0.0)
+            _mapInitialized = true
         }
     }
 
@@ -334,6 +341,8 @@ public class FlutterMapboxNavigationView : NavigationFactory, FlutterPlatformVie
 
                                     switch await request.result {
                                     case .success(let navigationRoutes):
+                                        // Save for starting embedded navigation later
+                                        strongSelf.navigationRoutes = navigationRoutes
                                         strongSelf.navigationMapView?.showcase(
                                             navigationRoutes,
                                             routesPresentationStyle: .all(shouldFit: true),
@@ -425,7 +434,7 @@ public class FlutterMapboxNavigationView : NavigationFactory, FlutterPlatformVie
             nightStyle = CustomNightStyle(url: _mapStyleUrlNight)
         }
 
-        // Create NavigationViewController with v3 API
+        // Create NavigationViewController with v3 API and embed it into mapView
         Task { @MainActor in
             let navigationOptions = NavigationOptions()
             _navigationViewController = NavigationViewController(
@@ -433,24 +442,22 @@ public class FlutterMapboxNavigationView : NavigationFactory, FlutterPlatformVie
                 navigationOptions: navigationOptions
             )
             _navigationViewController!.delegate = self
+
+            // Add as child to Flutter root and embed into our map view
+            let flutterViewController = UIApplication.shared.delegate?.window?!.rootViewController as! FlutterViewController
+            flutterViewController.addChild(_navigationViewController!)
+
+            guard let mapView = self.navigationMapView else {
+                result(false)
+                return
+            }
+            mapView.addSubview(_navigationViewController!.view)
+            _navigationViewController!.view.translatesAutoresizingMaskIntoConstraints = false
+            constraintsWithPaddingBetween(holderView: mapView, topView: _navigationViewController!.view, padding: 0.0)
+            // Notify child controller moved to parent
+            _navigationViewController!.didMove(toParent: flutterViewController)
+            result(true)
         }
-
-        // Note: showsReportFeedback and showsEndOfRouteFeedback may have different APIs in v3
-        // _navigationViewController!.showsReportFeedback = _showReportFeedbackButton
-        // _navigationViewController!.showsEndOfRouteFeedback = _showEndOfRouteFeedback
-
-        let flutterViewController = UIApplication.shared.delegate?.window?!.rootViewController as! FlutterViewController
-        flutterViewController.addChild(_navigationViewController!)
-
-        guard let mapView = self.navigationMapView else {
-            result(false)
-            return
-        }
-        mapView.addSubview(_navigationViewController!.view)
-        _navigationViewController!.view.translatesAutoresizingMaskIntoConstraints = false
-        constraintsWithPaddingBetween(holderView: mapView, topView: _navigationViewController!.view, padding: 0.0)
-        flutterViewController.didMove(toParent: flutterViewController)
-        result(true)
 
     }
 
@@ -675,6 +682,8 @@ extension FlutterMapboxNavigationView : UIGestureRecognizerDelegate {
 
                                             switch await request.result {
                                             case .success(let navigationRoutes):
+                                                // Save for starting embedded navigation later
+                                                strongSelf.navigationRoutes = navigationRoutes
                                                 strongSelf.navigationMapView?.showcase(
                                                     navigationRoutes,
                                                     routesPresentationStyle: .all(shouldFit: true),

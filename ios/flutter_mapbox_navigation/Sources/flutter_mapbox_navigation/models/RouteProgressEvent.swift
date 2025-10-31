@@ -17,6 +17,8 @@ public class MapBoxRouteProgressEvent : Codable
     let currentLeg: MapBoxRouteLeg
     var priorLeg: MapBoxRouteLeg? = nil
     var remainingLegs: [MapBoxRouteLeg] = []
+    // Added current visual instruction info (subset for Flutter)
+    var currentVisualInstruction: MapBoxVisualInstructionBanner? = nil
 
     init(progress: RouteProgress) {
 
@@ -42,7 +44,31 @@ public class MapBoxRouteProgressEvent : Codable
         currentLegDistanceTraveled = progress.currentLegProgress.distanceTraveled
         currentLegDistanceRemaining = progress.currentLegProgress.distanceRemaining
         currentStepInstruction = progress.currentLegProgress.currentStep.description
+
+        // Map current visual instruction (v3)
+        if let banner = progress.currentLegProgress.currentStepProgress.currentVisualInstruction {
+            let primaryText = banner.primaryInstruction.text
+            let secondaryText = banner.secondaryInstruction?.text
+            let maneuverType = banner.primaryInstruction.maneuverType?.rawValue
+            let maneuverDirection = banner.primaryInstruction.maneuverDirection?.rawValue
+            let distanceAlongStep = banner.distanceAlongStep
+            currentVisualInstruction = MapBoxVisualInstructionBanner(
+                text: primaryText,
+                secondaryText: secondaryText,
+                maneuverType: maneuverType,
+                maneuverDirection: maneuverDirection,
+                distanceAlongStep: distanceAlongStep
+            )
+        }
     }
 
 
+}
+
+public struct MapBoxVisualInstructionBanner: Codable {
+    let text: String?
+    let secondaryText: String?
+    let maneuverType: String?
+    let maneuverDirection: String?
+    let distanceAlongStep: Double?
 }

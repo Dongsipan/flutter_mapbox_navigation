@@ -1,3 +1,24 @@
 include: package:very_good_analysis/analysis_options.yaml
-# Additional information about this file can be found at
-# https://dart.dev/guides/language/analysis-options
+
+# Exclude generated files
+analyzer:
+  exclude:
+    - 'example/**/*.g.dart'
+    - '**/*.g.dart'
+    - '**/*.freezed.dart'
+
+# Selectively disable strict rules for existing codebase
+linter:
+  rules:
+    # Allow print in example code
+    avoid_print: false
+    
+    # Keep existing code style for member documentation
+    public_member_api_docs: false
+    
+    # Don't enforce const everywhere (reduces refactoring burden)
+    prefer_const_constructors: false
+    prefer_const_literals_to_create_immutables: false
+    
+    # Allow longer lines for readability
+    lines_longer_than_80_chars: false

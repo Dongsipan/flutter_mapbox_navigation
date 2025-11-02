@@ -2,16 +2,24 @@
 
 # flutter_mapbox_navigation
 
-Add Turn By Turn Navigation to Your Flutter Application Using MapBox. Never leave your app when you need to navigate your users to a location.
+A comprehensive Flutter plugin for Mapbox Navigation SDK that brings professional-grade navigation capabilities to your Flutter applications. Build immersive navigation experiences with advanced features including turn-by-turn guidance, navigation history recording and replay, automatic route cover generation, and real-time traffic updates.
 
 ## Features
 
-* A full-fledged turn-by-turn navigation UI for Flutter that’s ready to drop into your application
-* [Professionally designed map styles](https://www.mapbox.com/maps/) for daytime and nighttime driving
-* Worldwide driving, cycling, and walking directions powered by [open data](https://www.mapbox.com/about/open/) and user feedback
-* Traffic avoidance and proactive rerouting based on current conditions in [over 55 countries](https://docs.mapbox.com/help/how-mapbox-works/directions/#traffic-data)
-* Natural-sounding turn instructions powered by [Amazon Polly](https://aws.amazon.com/polly/) (no configuration needed)
-* [Support for over two dozen languages](https://docs.mapbox.com/ios/navigation/overview/localization-and-internationalization/)
+### Core Navigation
+* **Full-fledged turn-by-turn navigation UI** - Production-ready navigation interface that drops seamlessly into your Flutter app
+* **[Professional map styles](https://www.mapbox.com/maps/)** - Beautifully designed maps for daytime and nighttime driving
+* **Multi-modal routing** - Worldwide driving, cycling, and walking directions powered by [open data](https://www.mapbox.com/about/open/)
+* **Smart traffic handling** - Traffic avoidance and proactive rerouting in [over 55 countries](https://docs.mapbox.com/help/how-mapbox-works/directions/#traffic-data)
+* **Natural voice guidance** - Turn instructions powered by [Amazon Polly](https://aws.amazon.com/polly/) (no configuration needed)
+* **Global language support** - [20+ languages](https://docs.mapbox.com/ios/navigation/overview/localization-and-internationalization/) for international audiences
+
+### Advanced Features
+* **📍 Navigation History Recording** - Automatically record complete navigation sessions with route data, timestamps, and metadata
+* **🎬 History Replay** - Replay past navigation sessions with animated trajectory visualization and speed-based color gradients
+* **🖼️ Automatic Cover Generation** - Generate beautiful route cover images from navigation history using Mapbox's static map API
+* **🔄 Smart Path Resolution** - Intelligent file path handling for iOS sandbox changes
+* **📊 Detailed Analytics** - Track distance, duration, start/end points, and navigation modes
 
 ## IOS Configuration
 

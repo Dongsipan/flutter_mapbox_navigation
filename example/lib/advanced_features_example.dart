@@ -17,17 +17,17 @@ class RouteEventLog {
     this.data,
   });
 
-  String get formattedTime =>
-    '${timestamp.hour.toString().padLeft(2, '0')}:'
-    '${timestamp.minute.toString().padLeft(2, '0')}:'
-    '${timestamp.second.toString().padLeft(2, '0')}';
+  String get formattedTime => '${timestamp.hour.toString().padLeft(2, '0')}:'
+      '${timestamp.minute.toString().padLeft(2, '0')}:'
+      '${timestamp.second.toString().padLeft(2, '0')}';
 }
 
 class AdvancedFeaturesExample extends StatefulWidget {
   const AdvancedFeaturesExample({super.key});
 
   @override
-  State<AdvancedFeaturesExample> createState() => _AdvancedFeaturesExampleState();
+  State<AdvancedFeaturesExample> createState() =>
+      _AdvancedFeaturesExampleState();
 }
 
 class _AdvancedFeaturesExampleState extends State<AdvancedFeaturesExample> {
@@ -67,9 +67,10 @@ class _AdvancedFeaturesExampleState extends State<AdvancedFeaturesExample> {
       // 为不同类型的数据提供更有用的日志信息
       if (event.data is RouteProgressEvent) {
         final progress = event.data as RouteProgressEvent;
-        debugPrint('📊 导航进度: 剩余${((progress.distance ?? 0) / 1000).toStringAsFixed(1)}km, '
-                  '预计${((progress.duration ?? 0) / 60).toStringAsFixed(0)}分钟, '
-                  '指令: ${progress.currentStepInstruction ?? "无"}');
+        debugPrint(
+            '📊 导航进度: 剩余${((progress.distance ?? 0) / 1000).toStringAsFixed(1)}km, '
+            '预计${((progress.duration ?? 0) / 60).toStringAsFixed(0)}分钟, '
+            '指令: ${progress.currentStepInstruction ?? "无"}');
       } else {
         debugPrint('📊 事件数据: ${event.data}');
       }
@@ -121,8 +122,9 @@ class _AdvancedFeaturesExampleState extends State<AdvancedFeaturesExample> {
           final duration = progressEvent.duration;
           if (distance != null && duration != null) {
             setState(() {
-              _statusMessage = "剩余距离: ${(distance / 1000).toStringAsFixed(1)}km, "
-                             "预计时间: ${(duration / 60).toStringAsFixed(0)}分钟";
+              _statusMessage =
+                  "剩余距离: ${(distance / 1000).toStringAsFixed(1)}km, "
+                  "预计时间: ${(duration / 60).toStringAsFixed(0)}分钟";
             });
           }
         }
@@ -328,9 +330,12 @@ class _AdvancedFeaturesExampleState extends State<AdvancedFeaturesExample> {
       if (data is RouteProgressEvent) {
         final buffer = StringBuffer();
         buffer.writeln('📍 导航进度信息:');
-        buffer.writeln('- 剩余距离: ${((data.distance ?? 0) / 1000).toStringAsFixed(1)} km');
-        buffer.writeln('- 预计时间: ${((data.duration ?? 0) / 60).toStringAsFixed(0)} 分钟');
-        buffer.writeln('- 已行驶: ${((data.distanceTraveled ?? 0) / 1000).toStringAsFixed(1)} km');
+        buffer.writeln(
+            '- 剩余距离: ${((data.distance ?? 0) / 1000).toStringAsFixed(1)} km');
+        buffer.writeln(
+            '- 预计时间: ${((data.duration ?? 0) / 60).toStringAsFixed(0)} 分钟');
+        buffer.writeln(
+            '- 已行驶: ${((data.distanceTraveled ?? 0) / 1000).toStringAsFixed(1)} km');
         buffer.writeln('- 当前指令: ${data.currentStepInstruction ?? "无"}');
         buffer.writeln('- 是否到达: ${data.arrived == true ? "是" : "否"}');
         if (data.legIndex != null) {
@@ -345,9 +350,9 @@ class _AdvancedFeaturesExampleState extends State<AdvancedFeaturesExample> {
       // 如果是 WayPoint 对象
       if (data is WayPoint) {
         return '路径点:\n'
-               '- 名称: ${data.name ?? 'N/A'}\n'
-               '- 纬度: ${data.latitude?.toStringAsFixed(6) ?? 'N/A'}\n'
-               '- 经度: ${data.longitude?.toStringAsFixed(6) ?? 'N/A'}';
+            '- 名称: ${data.name ?? 'N/A'}\n'
+            '- 纬度: ${data.latitude?.toStringAsFixed(6) ?? 'N/A'}\n'
+            '- 经度: ${data.longitude?.toStringAsFixed(6) ?? 'N/A'}';
       }
 
       // 如果是字符串，尝试解析为 JSON
@@ -421,8 +426,6 @@ class _AdvancedFeaturesExampleState extends State<AdvancedFeaturesExample> {
     return true;
   }
 
-
-
   // 添加预设的示例路径点
   void _addSampleWayPoints() {
     setState(() {
@@ -454,7 +457,8 @@ class _AdvancedFeaturesExampleState extends State<AdvancedFeaturesExample> {
 
       // 转换为经纬度偏移
       final latOffset = distance * cos(angle) / 111.0; // 大约111km每度
-      final lonOffset = distance * sin(angle) / (111.0 * cos(centerLat * pi / 180));
+      final lonOffset =
+          distance * sin(angle) / (111.0 * cos(centerLat * pi / 180));
 
       randomPoints.add(WayPoint(
         name: "随机点${i + 1}",
@@ -544,15 +548,18 @@ class _AdvancedFeaturesExampleState extends State<AdvancedFeaturesExample> {
   }
 
   // 计算两点间距离（Haversine公式）
-  double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+  double _calculateDistance(
+      double lat1, double lon1, double lat2, double lon2) {
     const double earthRadius = 6371000; // 地球半径（米）
 
     final double dLat = (lat2 - lat1) * pi / 180;
     final double dLon = (lon2 - lon1) * pi / 180;
 
     final double a = sin(dLat / 2) * sin(dLat / 2) +
-        cos(lat1 * pi / 180) * cos(lat2 * pi / 180) *
-        sin(dLon / 2) * sin(dLon / 2);
+        cos(lat1 * pi / 180) *
+            cos(lat2 * pi / 180) *
+            sin(dLon / 2) *
+            sin(dLon / 2);
 
     final double c = 2 * atan2(sqrt(a), sqrt(1 - a));
 
@@ -643,7 +650,8 @@ class _AdvancedFeaturesExampleState extends State<AdvancedFeaturesExample> {
 
     _routeHistory.add(List<WayPoint>.from(_currentWayPoints));
     setState(() {
-      _statusMessage = "路线已保存到历史记录（${_currentWayPoints.length}个点，共${_routeHistory.length}条历史）";
+      _statusMessage =
+          "路线已保存到历史记录（${_currentWayPoints.length}个点，共${_routeHistory.length}条历史）";
     });
 
     // 添加调试信息
@@ -679,69 +687,69 @@ class _AdvancedFeaturesExampleState extends State<AdvancedFeaturesExample> {
           width: double.maxFinite,
           height: 300,
           child: history.isEmpty
-            ? const Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.history, size: 64, color: Colors.grey),
-                  SizedBox(height: 16),
-                  Text('暂无历史记录'),
-                  SizedBox(height: 8),
-                  Text(
-                    '先添加一些路径点，然后点击"保存路线"',
-                    style: TextStyle(fontSize: 12, color: Colors.grey),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              )
-            : ListView.builder(
-                itemCount: history.length,
-                itemBuilder: (context, index) {
-                  final route = history[index];
-                  final distance = _calculateTotalDistanceForRoute(route);
-
-                  return Card(
-                    child: ListTile(
-                      leading: CircleAvatar(
-                        backgroundColor: Colors.blue,
-                        child: Text('${index + 1}'),
-                      ),
-                      title: Text('路线 ${index + 1}'),
-                      subtitle: Text(
-                        '${route.length}个路径点 - ${_formatDistance(distance)}'
-                      ),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.restore, color: Colors.green),
-                            tooltip: '恢复此路线',
-                            onPressed: () {
-                              setState(() {
-                                _currentWayPoints.clear();
-                                _currentWayPoints.addAll(route);
-                                _calculateTotalDistance();
-                                _statusMessage = "已恢复路线 ${index + 1}";
-                              });
-                              Navigator.of(context).pop();
-                            },
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.delete, color: Colors.red),
-                            tooltip: '删除此路线',
-                            onPressed: () {
-                              setState(() {
-                                _routeHistory.removeAt(index);
-                              });
-                              Navigator.of(context).pop();
-                              _showRouteHistory(); // 重新显示对话框
-                            },
-                          ),
-                        ],
-                      ),
+              ? const Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.history, size: 64, color: Colors.grey),
+                    SizedBox(height: 16),
+                    Text('暂无历史记录'),
+                    SizedBox(height: 8),
+                    Text(
+                      '先添加一些路径点，然后点击"保存路线"',
+                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                      textAlign: TextAlign.center,
                     ),
-                  );
-                },
-              ),
+                  ],
+                )
+              : ListView.builder(
+                  itemCount: history.length,
+                  itemBuilder: (context, index) {
+                    final route = history[index];
+                    final distance = _calculateTotalDistanceForRoute(route);
+
+                    return Card(
+                      child: ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: Colors.blue,
+                          child: Text('${index + 1}'),
+                        ),
+                        title: Text('路线 ${index + 1}'),
+                        subtitle: Text(
+                            '${route.length}个路径点 - ${_formatDistance(distance)}'),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.restore,
+                                  color: Colors.green),
+                              tooltip: '恢复此路线',
+                              onPressed: () {
+                                setState(() {
+                                  _currentWayPoints.clear();
+                                  _currentWayPoints.addAll(route);
+                                  _calculateTotalDistance();
+                                  _statusMessage = "已恢复路线 ${index + 1}";
+                                });
+                                Navigator.of(context).pop();
+                              },
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete, color: Colors.red),
+                              tooltip: '删除此路线',
+                              onPressed: () {
+                                setState(() {
+                                  _routeHistory.removeAt(index);
+                                });
+                                Navigator.of(context).pop();
+                                _showRouteHistory(); // 重新显示对话框
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
         ),
         actions: [
           TextButton(
@@ -837,14 +845,13 @@ class _AdvancedFeaturesExampleState extends State<AdvancedFeaturesExample> {
 
     try {
       final options = MapBoxOptions(
-        mode: MapBoxNavigationMode.cycling,
-        simulateRoute: _simulateRoute,
-        language: "zh-CN",
-        units: VoiceUnits.metric,
-        voiceInstructionsEnabled: true,
-        bannerInstructionsEnabled: true,
-        enableHistoryRecording: true
-      );
+          mode: MapBoxNavigationMode.cycling,
+          simulateRoute: _simulateRoute,
+          language: "zh-CN",
+          units: VoiceUnits.metric,
+          voiceInstructionsEnabled: true,
+          bannerInstructionsEnabled: true,
+          enableHistoryRecording: true);
 
       await MapBoxNavigation.instance.startNavigation(
         wayPoints: _currentWayPoints,
@@ -876,12 +883,12 @@ class _AdvancedFeaturesExampleState extends State<AdvancedFeaturesExample> {
               children: [
                 Text(
                   '当前路径点: ${_currentWayPoints.length}个',
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 if (_totalDistance != null)
                   Text('总距离: ${_formatDistance(_totalDistance!)}'),
-                if (_statusMessage != null)
-                  Text('状态: $_statusMessage'),
+                if (_statusMessage != null) Text('状态: $_statusMessage'),
               ],
             ),
           ),
@@ -906,45 +913,49 @@ class _AdvancedFeaturesExampleState extends State<AdvancedFeaturesExample> {
                   ],
                 ),
                 const SizedBox(height: 8),
-                
+
                 // 第二行按钮
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
                     ElevatedButton(
-                      onPressed: _currentWayPoints.length >= 3 ? _optimizeCurrentRoute : null,
+                      onPressed: _currentWayPoints.length >= 3
+                          ? _optimizeCurrentRoute
+                          : null,
                       child: const Text('优化路线'),
                     ),
                     ElevatedButton(
-                      onPressed: _currentWayPoints.isNotEmpty ? _saveCurrentRoute : null,
+                      onPressed: _currentWayPoints.isNotEmpty
+                          ? _saveCurrentRoute
+                          : null,
                       child: const Text('保存路线'),
                     ),
                   ],
-        ),
-        const SizedBox(height: 8),
-        
-        // 模拟导航开关
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text('开启模拟导航'),
-            Switch(
-              value: _simulateRoute,
-              onChanged: (value) {
-                setState(() {
-                  _simulateRoute = value;
-                });
-              },
-              activeColor: Colors.green,
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        
-        // 第三行按钮
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: [
+                ),
+                const SizedBox(height: 8),
+
+                // 模拟导航开关
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('开启模拟导航'),
+                    Switch(
+                      value: _simulateRoute,
+                      onChanged: (value) {
+                        setState(() {
+                          _simulateRoute = value;
+                        });
+                      },
+                      activeColor: Colors.green,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+
+                // 第三行按钮
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
                     ElevatedButton(
                       onPressed: _showRouteHistory,
                       child: const Text('历史记录'),
@@ -967,12 +978,13 @@ class _AdvancedFeaturesExampleState extends State<AdvancedFeaturesExample> {
                   children: [
                     ElevatedButton(
                       onPressed: _currentWayPoints.length >= 2 && !_isNavigating
-                        ? _startNavigation
-                        : null,
+                          ? _startNavigation
+                          : null,
                       child: const Text('开始导航'),
                     ),
                     ElevatedButton(
-                      onPressed: _currentWayPoints.isNotEmpty ? _clearWayPoints : null,
+                      onPressed:
+                          _currentWayPoints.isNotEmpty ? _clearWayPoints : null,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.red,
                         foregroundColor: Colors.white,
@@ -1020,38 +1032,39 @@ class _AdvancedFeaturesExampleState extends State<AdvancedFeaturesExample> {
                         ),
                         Expanded(
                           child: _currentWayPoints.isEmpty
-                            ? const Center(
-                                child: Text('暂无路径点\n点击上方按钮添加路线'),
-                              )
-                            : ListView.builder(
-                                itemCount: _currentWayPoints.length,
-                                itemBuilder: (context, index) {
-                                  final wayPoint = _currentWayPoints[index];
-                                  return ListTile(
-                                    leading: CircleAvatar(
-                                      backgroundColor: index == 0
-                                        ? Colors.green
-                                        : index == _currentWayPoints.length - 1
-                                          ? Colors.red
-                                          : Colors.blue,
-                                      child: Text('${index + 1}'),
-                                    ),
-                                    title: Text(wayPoint.name ?? '路径点 ${index + 1}'),
-                                    subtitle: Text(
-                                      '${wayPoint.latitude?.toStringAsFixed(4) ?? 'N/A'}, ${wayPoint.longitude?.toStringAsFixed(4) ?? 'N/A'}'
-                                    ),
-                                    trailing: IconButton(
-                                      icon: const Icon(Icons.delete),
-                                      onPressed: () {
-                                        setState(() {
-                                          _currentWayPoints.removeAt(index);
-                                          _calculateTotalDistance();
-                                        });
-                                      },
-                                    ),
-                                  );
-                                },
-                              ),
+                              ? const Center(
+                                  child: Text('暂无路径点\n点击上方按钮添加路线'),
+                                )
+                              : ListView.builder(
+                                  itemCount: _currentWayPoints.length,
+                                  itemBuilder: (context, index) {
+                                    final wayPoint = _currentWayPoints[index];
+                                    return ListTile(
+                                      leading: CircleAvatar(
+                                        backgroundColor: index == 0
+                                            ? Colors.green
+                                            : index ==
+                                                    _currentWayPoints.length - 1
+                                                ? Colors.red
+                                                : Colors.blue,
+                                        child: Text('${index + 1}'),
+                                      ),
+                                      title: Text(
+                                          wayPoint.name ?? '路径点 ${index + 1}'),
+                                      subtitle: Text(
+                                          '${wayPoint.latitude?.toStringAsFixed(4) ?? 'N/A'}, ${wayPoint.longitude?.toStringAsFixed(4) ?? 'N/A'}'),
+                                      trailing: IconButton(
+                                        icon: const Icon(Icons.delete),
+                                        onPressed: () {
+                                          setState(() {
+                                            _currentWayPoints.removeAt(index);
+                                            _calculateTotalDistance();
+                                          });
+                                        },
+                                      ),
+                                    );
+                                  },
+                                ),
                         ),
                       ],
                     ),
@@ -1116,36 +1129,37 @@ class _AdvancedFeaturesExampleState extends State<AdvancedFeaturesExample> {
                         ),
                         Expanded(
                           child: _eventLogs.isEmpty
-                            ? const Center(
-                                child: Text('暂无事件日志\n开始导航后会显示事件'),
-                              )
-                            : ListView.builder(
-                                itemCount: _eventLogs.length,
-                                itemBuilder: (context, index) {
-                                  final log = _eventLogs[index];
-                                  return ListTile(
-                                    dense: true,
-                                    leading: CircleAvatar(
-                                      radius: 12,
-                                      backgroundColor: _getEventColor(log.eventType),
-                                      child: Icon(
-                                        _getEventIcon(log.eventType),
-                                        size: 16,
-                                        color: Colors.white,
+                              ? const Center(
+                                  child: Text('暂无事件日志\n开始导航后会显示事件'),
+                                )
+                              : ListView.builder(
+                                  itemCount: _eventLogs.length,
+                                  itemBuilder: (context, index) {
+                                    final log = _eventLogs[index];
+                                    return ListTile(
+                                      dense: true,
+                                      leading: CircleAvatar(
+                                        radius: 12,
+                                        backgroundColor:
+                                            _getEventColor(log.eventType),
+                                        child: Icon(
+                                          _getEventIcon(log.eventType),
+                                          size: 16,
+                                          color: Colors.white,
+                                        ),
                                       ),
-                                    ),
-                                    title: Text(
-                                      log.eventName,
-                                      style: const TextStyle(fontSize: 12),
-                                    ),
-                                    subtitle: Text(
-                                      log.formattedTime,
-                                      style: const TextStyle(fontSize: 10),
-                                    ),
-                                    onTap: () => _showEventDetails(log),
-                                  );
-                                },
-                              ),
+                                      title: Text(
+                                        log.eventName,
+                                        style: const TextStyle(fontSize: 12),
+                                      ),
+                                      subtitle: Text(
+                                        log.formattedTime,
+                                        style: const TextStyle(fontSize: 10),
+                                      ),
+                                      onTap: () => _showEventDetails(log),
+                                    );
+                                  },
+                                ),
                         ),
                       ],
                     ),
@@ -1154,7 +1168,7 @@ class _AdvancedFeaturesExampleState extends State<AdvancedFeaturesExample> {
               ],
             ),
           ),
-          
+
           const SizedBox(height: 16),
         ],
       ),

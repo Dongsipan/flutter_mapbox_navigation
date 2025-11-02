@@ -14,7 +14,7 @@ final class HistoryCoverGenerator {
     private var cancelables = Set<AnyCancellable>()
 
     private init() {}
-    
+
     /// 根据速度获取对应的颜色（与 HistoryReplayViewController 保持一致）
     private func colorForSpeed(_ speedKmh: Double) -> UIColor {
         switch speedKmh {
@@ -104,7 +104,11 @@ final class HistoryCoverGenerator {
                     return
                 }
 
-                let coords = locations.map { $0.coordinate }
+                // 提取坐标和速度信息（避免并发问题）
+                let coordsWithSpeed = locations.map { loc -> (coord: CLLocationCoordinate2D, speed: Double) in
+                    return (coord: loc.coordinate, speed: loc.speed >= 0 ? loc.speed * 3.6 : 0.0)
+                }
+                let coords = coordsWithSpeed.map { $0.coord }
                 let lats = coords.map { $0.latitude }
                 let lngs = coords.map { $0.longitude }
                 guard let minLat = lats.min(), let maxLat = lats.max(), 
@@ -136,7 +140,7 @@ final class HistoryCoverGenerator {
                 // 在主线程创建和使用 Snapshotter
                 await MainActor.run {
                     self.createSnapshot(
-                        locations: locations,  // 传递完整的位置信息（包含速度）
+                        coordsWithSpeed: coordsWithSpeed,
                         center: center,
                         zoom: zoom,
                         historyId: historyId,
@@ -153,7 +157,7 @@ final class HistoryCoverGenerator {
     /// 在主线程创建快照（确保线程安全）
     @MainActor
     private func createSnapshot(
-        locations: [CLLocation],
+        coordsWithSpeed: [(coord: CLLocationCoordinate2D, speed: Double)],
         center: CLLocationCoordinate2D,
         zoom: Double,
         historyId: String,
@@ -174,14 +178,14 @@ final class HistoryCoverGenerator {
         self.currentSnapshotter = snapshotter
 
         snapshotter.styleURI = .streets
-        snapshotter.setCamera(to: CameraOptions(center: center, zoom: zoom))
+                snapshotter.setCamera(to: CameraOptions(center: center, zoom: zoom))
 
         // 等待样式加载完成再开始生成快照
         snapshotter.onStyleLoaded.observeNext { [weak self] _ in
             guard let self = self else { return }
             self.performSnapshot(
                 snapshotter: snapshotter,
-                locations: locations,
+                coordsWithSpeed: coordsWithSpeed,
                 historyId: historyId,
                 completion: completion
             )
@@ -192,12 +196,10 @@ final class HistoryCoverGenerator {
     @MainActor
     private func performSnapshot(
         snapshotter: Snapshotter,
-        locations: [CLLocation],
+        coordsWithSpeed: [(coord: CLLocationCoordinate2D, speed: Double)],
         historyId: String,
         completion: @escaping (String?) -> Void
     ) {
-        let coords = locations.map { $0.coordinate }
-        
         snapshotter.start(overlayHandler: { overlay in
             let ctx = overlay.context
             ctx.setLineWidth(6)
@@ -205,14 +207,14 @@ final class HistoryCoverGenerator {
             ctx.setLineCap(.round)
 
             // 🎨 使用 Core Graphics 渐变绘制平滑过渡的速度轨迹
-            if locations.count >= 2 {
+            if coordsWithSpeed.count >= 2 {
                 // 1. 创建路径
                 let path = CGMutablePath()
-                let firstPoint = overlay.pointForCoordinate(locations[0].coordinate)
+                let firstPoint = overlay.pointForCoordinate(coordsWithSpeed[0].coord)
                 path.move(to: firstPoint)
                 
-                for i in 1..<locations.count {
-                    let point = overlay.pointForCoordinate(locations[i].coordinate)
+                for i in 1..<coordsWithSpeed.count {
+                    let point = overlay.pointForCoordinate(coordsWithSpeed[i].coord)
                     path.addLine(to: point)
                 }
                 
@@ -220,13 +222,12 @@ final class HistoryCoverGenerator {
                 var colors: [CGColor] = []
                 var colorLocations: [CGFloat] = []
                 
-                for (index, location) in locations.enumerated() {
-                    let speedKmh = location.speed >= 0 ? location.speed * 3.6 : 0.0
-                    let color = self.colorForSpeed(speedKmh)
+                for (index, item) in coordsWithSpeed.enumerated() {
+                    let color = self.colorForSpeed(item.speed)
                     colors.append(color.cgColor)
                     
                     // 计算归一化位置 [0.0, 1.0]
-                    let normalizedLocation = CGFloat(index) / CGFloat(locations.count - 1)
+                    let normalizedLocation = CGFloat(index) / CGFloat(coordsWithSpeed.count - 1)
                     colorLocations.append(normalizedLocation)
                 }
                 
@@ -236,8 +237,8 @@ final class HistoryCoverGenerator {
                     colors: colors as CFArray,
                     locations: colorLocations
                 ) {
-                    let startPoint = overlay.pointForCoordinate(locations.first!.coordinate)
-                    let endPoint = overlay.pointForCoordinate(locations.last!.coordinate)
+                    let startPoint = overlay.pointForCoordinate(coordsWithSpeed.first!.coord)
+                    let endPoint = overlay.pointForCoordinate(coordsWithSpeed.last!.coord)
                     
                     // 4. 使用渐变绘制路径
                     ctx.saveGState()
@@ -255,17 +256,16 @@ final class HistoryCoverGenerator {
                     
                     ctx.restoreGState()
                 }
-            } else if coords.count == 1 {
+            } else if coordsWithSpeed.count == 1 {
                 // 只有一个点，绘制为圆点
-                let point = overlay.pointForCoordinate(coords[0])
-                let speedKmh = locations[0].speed >= 0 ? locations[0].speed * 3.6 : 0.0
-                let color = self.colorForSpeed(speedKmh)
+                let point = overlay.pointForCoordinate(coordsWithSpeed[0].coord)
+                let color = self.colorForSpeed(coordsWithSpeed[0].speed)
                 ctx.setFillColor(color.cgColor)
                 ctx.fillEllipse(in: CGRect(x: point.x - 3, y: point.y - 3, width: 6, height: 6))
             }
 
             // 绘制起点（绿色）
-            if let startCoord = coords.first {
+            if let startCoord = coordsWithSpeed.first?.coord {
                 let p = overlay.pointForCoordinate(startCoord)
                 let r: CGFloat = 5
                 ctx.setFillColor(UIColor(hex: "#00E676").cgColor)  // 使用与回放页面一致的绿色
@@ -274,7 +274,7 @@ final class HistoryCoverGenerator {
             }
 
             // 绘制终点（红色）
-            if let endCoord = coords.last, coords.count > 1 {
+            if let endCoord = coordsWithSpeed.last?.coord, coordsWithSpeed.count > 1 {
                 let p = overlay.pointForCoordinate(endCoord)
                 let r: CGFloat = 5
                 ctx.setFillColor(UIColor(hex: "#FF5252").cgColor)  // 使用与回放页面一致的红色
@@ -308,11 +308,11 @@ final class HistoryCoverGenerator {
         // 改进的错误处理
         guard let data = image.pngData() else {
             print("❌ 无法将图片转换为 PNG 数据")
-            completion(nil)
-            return
-        }
+                    completion(nil)
+                    return
+                }
 
-        let coverURL = defaultHistoryDirectoryURL().appendingPathComponent("\(historyId)_cover.png")
+                let coverURL = defaultHistoryDirectoryURL().appendingPathComponent("\(historyId)_cover.png")
         
         // 确保目录存在
         let directory = coverURL.deletingLastPathComponent()

@@ -241,8 +241,8 @@ class _HistoryReplayExampleState extends State<HistoryReplayExample> {
   /// 构建历史记录项
   Widget _buildHistoryItem(NavigationHistory history) {
     // iOS 端已经处理了沙箱路径问题，这里直接使用即可
-    final hasCover = history.cover != null && 
-        history.cover!.isNotEmpty && 
+    final hasCover = history.cover != null &&
+        history.cover!.isNotEmpty &&
         File(history.cover!).existsSync();
 
     return Card(
@@ -268,9 +268,11 @@ class _HistoryReplayExampleState extends State<HistoryReplayExample> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.broken_image, size: 48, color: Colors.grey[600]),
+                          Icon(Icons.broken_image,
+                              size: 48, color: Colors.grey[600]),
                           const SizedBox(height: 8),
-                          Text('封面加载失败', style: TextStyle(color: Colors.grey[600])),
+                          Text('封面加载失败',
+                              style: TextStyle(color: Colors.grey[600])),
                         ],
                       ),
                     );
@@ -291,7 +293,7 @@ class _HistoryReplayExampleState extends State<HistoryReplayExample> {
                           Colors.transparent,
                           Colors.black.withOpacity(0.7),
                         ],
-        ),
+                      ),
                     ),
                   ),
                 ),
@@ -301,7 +303,7 @@ class _HistoryReplayExampleState extends State<HistoryReplayExample> {
                   left: 12,
                   right: 12,
                   child: Text(
-          '${history.startPointName} → ${history.endPointName}',
+                    '${history.startPointName} → ${history.endPointName}',
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
@@ -315,7 +317,7 @@ class _HistoryReplayExampleState extends State<HistoryReplayExample> {
                       ],
                     ),
                   ),
-        ),
+                ),
               ],
             ),
 
@@ -323,8 +325,8 @@ class _HistoryReplayExampleState extends State<HistoryReplayExample> {
           Padding(
             padding: const EdgeInsets.all(12),
             child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
                 // 如果没有封面，显示标题
                 if (!hasCover)
                   Padding(
@@ -360,7 +362,7 @@ class _HistoryReplayExampleState extends State<HistoryReplayExample> {
                       icon: Icons.access_time,
                       label: _formatDateTime(history.startTime),
                     ),
-            if (history.duration != null)
+                    if (history.duration != null)
                       _buildInfoChip(
                         icon: Icons.timer,
                         label: _formatDuration(history.duration!),
@@ -369,8 +371,8 @@ class _HistoryReplayExampleState extends State<HistoryReplayExample> {
                       icon: Icons.navigation,
                       label: history.navigationMode ?? '未知',
                     ),
-          ],
-        ),
+                  ],
+                ),
 
                 const SizedBox(height: 12),
 
@@ -387,7 +389,8 @@ class _HistoryReplayExampleState extends State<HistoryReplayExample> {
                         icon: const Icon(Icons.image_outlined, size: 16),
                         label: const Text('生成封面'),
                         style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 8),
                         ),
                       ),
                     ],
@@ -399,7 +402,8 @@ class _HistoryReplayExampleState extends State<HistoryReplayExample> {
                         icon: const Icon(Icons.refresh, size: 16),
                         label: const Text('更新封面'),
                         style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 8),
                         ),
                       ),
                     ],
@@ -411,26 +415,28 @@ class _HistoryReplayExampleState extends State<HistoryReplayExample> {
                         icon: const Icon(Icons.save_alt, size: 16),
                         label: const Text('生成并保存'),
                         style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 8),
                         ),
                       ),
                     ],
                     ElevatedButton.icon(
                       onPressed:
                           _isLoading ? null : () => _startReplay(history),
-          icon: const Icon(Icons.play_arrow, size: 16),
-          label: const Text('回放'),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.green,
-            foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      icon: const Icon(Icons.play_arrow, size: 16),
+                      label: const Text('回放'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
                       ),
                     ),
                   ],
                 ),
               ],
+            ),
           ),
-        ),
         ],
       ),
     );

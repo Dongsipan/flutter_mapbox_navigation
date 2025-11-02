@@ -330,8 +330,10 @@ public class FlutterMapboxNavigationView : NavigationFactory, FlutterPlatformVie
                                 if strongSelf.mapboxNavigation == nil {
                                     let locationSource: LocationSource = strongSelf._simulateRoute ? .simulation() : .live
                                     let coreConfig = CoreConfig(locationSource: locationSource)
-                                    let mapboxNavigationProvider = MapboxNavigationProvider(coreConfig: coreConfig)
+                                    // 使用全局单例管理器，避免重复实例化
+                                    let mapboxNavigationProvider = MapboxNavigationManager.shared.getOrCreateProvider(coreConfig: coreConfig)
                                     strongSelf.mapboxNavigation = mapboxNavigationProvider.mapboxNavigation
+                                    strongSelf.mapboxNavigationProvider = mapboxNavigationProvider
                                 }
 
                                 // Use RoutingProvider to get NavigationRoutes
@@ -399,10 +401,12 @@ public class FlutterMapboxNavigationView : NavigationFactory, FlutterPlatformVie
             return
         }
 
-        // Initialize MapboxNavigation with v3 API
+        // Initialize MapboxNavigation with v3 API using singleton manager
         let locationSource: LocationSource = _simulateRoute ? .simulation() : .live
         let coreConfig = CoreConfig(locationSource: locationSource)
-        let mapboxNavigationProvider = MapboxNavigationProvider(coreConfig: coreConfig)
+        // 使用全局单例管理器，避免重复实例化
+        let mapboxNavigationProvider = MapboxNavigationManager.shared.getOrCreateProvider(coreConfig: coreConfig)
+        self.mapboxNavigationProvider = mapboxNavigationProvider
 
         Task { @MainActor in
             mapboxNavigation = mapboxNavigationProvider.mapboxNavigation
@@ -436,7 +440,19 @@ public class FlutterMapboxNavigationView : NavigationFactory, FlutterPlatformVie
 
         // Create NavigationViewController with v3 API and embed it into mapView
         Task { @MainActor in
-            let navigationOptions = NavigationOptions()
+            // 确保使用现有的 mapboxNavigation 实例，避免创建新的 provider
+            guard let mapboxNavigation = self.mapboxNavigation,
+                  let mapboxNavigationProvider = self.mapboxNavigationProvider else {
+                print("❌ Error: mapboxNavigation or mapboxNavigationProvider is nil")
+                result(false)
+                return
+            }
+            
+            let navigationOptions = NavigationOptions(
+                mapboxNavigation: mapboxNavigation,
+                voiceController: mapboxNavigationProvider.routeVoiceController,
+                eventsManager: mapboxNavigation.eventsManager()
+            )
             _navigationViewController = NavigationViewController(
                 navigationRoutes: navigationRoutes,
                 navigationOptions: navigationOptions
@@ -672,8 +688,10 @@ extension FlutterMapboxNavigationView : UIGestureRecognizerDelegate {
                                         if strongSelf.mapboxNavigation == nil {
                                             let locationSource: LocationSource = strongSelf._simulateRoute ? .simulation() : .live
                                             let coreConfig = CoreConfig(locationSource: locationSource)
-                                            let mapboxNavigationProvider = MapboxNavigationProvider(coreConfig: coreConfig)
+                                            // 使用全局单例管理器，避免重复实例化
+                                            let mapboxNavigationProvider = MapboxNavigationManager.shared.getOrCreateProvider(coreConfig: coreConfig)
                                             strongSelf.mapboxNavigation = mapboxNavigationProvider.mapboxNavigation
+                                            strongSelf.mapboxNavigationProvider = mapboxNavigationProvider
                                         }
 
                                         // Use RoutingProvider to get NavigationRoutes

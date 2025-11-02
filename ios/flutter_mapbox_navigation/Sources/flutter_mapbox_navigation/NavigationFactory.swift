@@ -107,6 +107,12 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
     
     func startFreeDrive(arguments: NSDictionary?, result: @escaping FlutterResult)
     {
+        // 在启动新功能前，先结束可能存在的导航会话
+        if _navigationViewController != nil {
+            print("⚠️ 检测到活动导航会话，先结束它")
+            endNavigation(result: nil)
+        }
+        
         let freeDriveViewController = FreeDriveViewController()
         let flutterViewController = UIApplication.shared.delegate?.window??.rootViewController as! FlutterViewController
         flutterViewController.present(freeDriveViewController, animated: true, completion: nil)
@@ -170,7 +176,7 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
         
         setNavigationOptions(wayPoints: wayPoints)
         
-        // Initialize MapboxNavigationProvider with v3 API only if not already initialized
+        // Initialize MapboxNavigationProvider with v3 API using singleton manager
         if mapboxNavigationProvider == nil {
             let locationSource: LocationSource = _simulateRoute ? .simulation(initialLocation: nil) : .live
 
@@ -184,7 +190,8 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
                 locationSource: locationSource,
                 historyRecordingConfig: historyRecordingConfig
             )
-            mapboxNavigationProvider = MapboxNavigationProvider(coreConfig: coreConfig)
+            // 使用全局单例管理器获取 provider，避免重复实例化
+            mapboxNavigationProvider = MapboxNavigationManager.shared.getOrCreateProvider(coreConfig: coreConfig)
         }
         
         Task { @MainActor in

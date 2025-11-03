@@ -10,7 +10,6 @@ import 'package:flutter_mapbox_navigation/src/models/voice_units.dart';
 /// 'do not change this configuration option'.
 ///
 class MapBoxOptions {
-
   MapBoxOptions({
     this.initialLatitude,
     this.initialLongitude,
@@ -36,6 +35,7 @@ class MapBoxOptions {
     this.showEndOfRouteFeedback = true,
     this.enableOnMapTapCallback = false,
     this.enableHistoryRecording = false,
+    this.autoBuildRoute = true,
   });
 
   MapBoxOptions.from(MapBoxOptions option) {
@@ -62,6 +62,7 @@ class MapBoxOptions {
     showReportFeedbackButton = option.showReportFeedbackButton;
     showEndOfRouteFeedback = option.showEndOfRouteFeedback;
     enableHistoryRecording = option.enableHistoryRecording;
+    autoBuildRoute = option.autoBuildRoute;
   }
 
   /// The initial Latitude of the Map View
@@ -174,6 +175,11 @@ class MapBoxOptions {
   /// 当设置为 true 时，导航过程中会自动记录历史数据
   bool? enableHistoryRecording;
 
+  /// 是否自动构建路线并开始导航
+  /// 当设置为 true 时，直接计算路线并开始导航（默认行为）
+  /// 当设置为 false 时，先显示路线选择界面，用户选择后再开始导航
+  bool? autoBuildRoute;
+
   Map<String, dynamic> toMap() {
     final optionsMap = <String, dynamic>{};
     void addIfNonNull(String fieldName, dynamic value) {
@@ -232,6 +238,7 @@ class MapBoxOptions {
     addIfNonNull('showEndOfRouteFeedback', showEndOfRouteFeedback);
     addIfNonNull('enableOnMapTapCallback', enableOnMapTapCallback);
     addIfNonNull('enableHistoryRecording', enableHistoryRecording);
+    addIfNonNull('autoBuildRoute', autoBuildRoute);
 
     return optionsMap;
   }

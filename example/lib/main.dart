@@ -6,6 +6,7 @@ import 'advanced_features_example.dart';
 import 'history_test_page.dart';
 import 'history_replay_example.dart';
 import 'map_search_example.dart';
+import 'route_selection_example.dart';
 
 void main() => runApp(const NavigationDemoApp());
 
@@ -120,6 +121,19 @@ class NavigationHomePage extends StatelessWidget {
                 context,
                 MaterialPageRoute(
                     builder: (context) => const MapSearchExamplePage()),
+              ),
+            ),
+            const SizedBox(height: 16),
+            _buildDemoCard(
+              context,
+              title: '路线选择功能',
+              description: '展示如何在导航前让用户选择路线',
+              icon: Icons.route,
+              color: Colors.deepOrange,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (context) => const RouteSelectionExample()),
               ),
             ),
             const SizedBox(height: 24), // 底部间距

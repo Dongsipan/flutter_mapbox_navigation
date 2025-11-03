@@ -29,6 +29,7 @@ class MapBoxNavigation {
     animateBuildRoute: true,
     longPressDestinationEnabled: true,
     language: 'en',
+    autoBuildRoute: true,
   );
 
   /// setter to set default options

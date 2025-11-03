@@ -71,6 +71,7 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
     var _isHistoryRecording = false
     var _currentHistoryId: String?
     var _historyStartTime: Date?
+    var _autoBuildRoute = true
     
     // Mapbox Navigation v3 components
     var mapboxNavigationProvider: MapboxNavigationProvider?
@@ -227,8 +228,16 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
                             flutterResult("failed to add stop - no active navigation")
                         }
                     } else {
-                        self.startNavigation(navigationRoutes: navigationRoutes, mapboxNavigation: mapboxNavigation)
-                        flutterResult("Navigation started successfully")
+                        // 检查是否需要显示路线选择界面
+                        if self._autoBuildRoute {
+                            // 直接开始导航（默认行为）
+                            self.startNavigation(navigationRoutes: navigationRoutes, mapboxNavigation: mapboxNavigation)
+                            flutterResult("Navigation started successfully")
+                        } else {
+                            // 显示路线选择界面
+                            self.showRouteSelectionView(navigationRoutes: navigationRoutes, mapboxNavigation: mapboxNavigation)
+                            flutterResult("Route selection view presented")
+                        }
                     }
                 }
             }
@@ -269,6 +278,31 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
                     self.startHistoryRecording()
                 })
             }
+        }
+    }
+    
+    /// 显示路线选择界面
+    /// 用户可以在地图上查看多条路线并选择其中一条
+    func showRouteSelectionView(navigationRoutes: NavigationRoutes, mapboxNavigation: MapboxNavigation) {
+        Task { @MainActor in
+            // 创建路线选择视图控制器
+            let routeSelectionVC = RouteSelectionViewController(
+                navigationRoutes: navigationRoutes,
+                mapboxNavigation: mapboxNavigation,
+                mapboxNavigationProvider: mapboxNavigationProvider!
+            )
+            
+            // 设置回调
+            routeSelectionVC.onRouteSelected = { [weak self] selectedRoute in
+                guard let self = self else { return }
+                // 用户选择路线后，开始导航
+                self.startNavigation(navigationRoutes: selectedRoute, mapboxNavigation: mapboxNavigation)
+            }
+            
+            routeSelectionVC.modalPresentationStyle = .fullScreen
+            
+            let flutterViewController = UIApplication.shared.delegate?.window??.rootViewController as! FlutterViewController
+            flutterViewController.present(routeSelectionVC, animated: true, completion: nil)
         }
     }
     
@@ -318,6 +352,7 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
         _animateBuildRoute = arguments?["animateBuildRoute"] as? Bool ?? _animateBuildRoute
         _longPressDestinationEnabled = arguments?["longPressDestinationEnabled"] as? Bool ?? _longPressDestinationEnabled
         _alternatives = arguments?["alternatives"] as? Bool ?? _alternatives
+        _autoBuildRoute = arguments?["autoBuildRoute"] as? Bool ?? _autoBuildRoute
     }
     
     

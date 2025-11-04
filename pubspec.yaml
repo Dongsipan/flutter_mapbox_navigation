@@ -5,7 +5,7 @@ description: >
   history recording, replay with visual trajectory, and automatic cover generation. 
   Supports iOS and Android with professional map styles, voice guidance in 20+ languages, 
   and seamless in-app navigation experience.
-version: 0.2.3
+version: 0.2.4
 homepage: "https://github.com/Dongsipan/flutter_mapbox_navigation"
 repository: "https://github.com/Dongsipan/flutter_mapbox_navigation"
 

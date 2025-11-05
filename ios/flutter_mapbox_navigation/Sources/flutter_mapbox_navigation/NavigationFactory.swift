@@ -387,35 +387,60 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
     {
         // 先停止历史记录
         stopHistoryRecording()
-        
+
+        // 尽快将会话置为 Idle，避免残留活跃状态
+        Task { @MainActor in
+            self.mapboxNavigation?.tripSession().setToIdle()
+        }
+
         sendEvent(eventType: MapBoxEventType.navigation_finished)
-        if(self._navigationViewController != nil)
-        {
+
+        if let navigationVC = self._navigationViewController {
             // In v3, navigation is ended by dismissing the NavigationViewController
-            // The MapboxNavigation instance handles the session cleanup
-            if(isEmbeddedNavigation)
-            {
-                self._navigationViewController?.view.removeFromSuperview()
-                self._navigationViewController?.removeFromParent()
+            if isEmbeddedNavigation {
+                navigationVC.view.removeFromSuperview()
+                navigationVC.removeFromParent()
                 self._navigationViewController = nil
-            }
-            else
-            {
+                // 嵌入式：移除后立刻清理核心
+                self.resetNavigationCore()
+                if let result = result { result(true) }
+            } else {
                 Task { @MainActor in
-                    self._navigationViewController?.dismiss(animated: true, completion: {
+                    navigationVC.dismiss(animated: true) {
                         self._navigationViewController = nil
-                        if(result != nil)
-                        {
-                            result!(true)
-                        }
-                    })
+                        // 全屏：关闭完成后清理核心
+                        self.resetNavigationCore()
+                        if let result = result { result(true) }
+                    }
                 }
             }
+        } else {
+            // 没有控制器也进行核心清理
+            self.resetNavigationCore()
+            if let result = result { result(true) }
         }
-        
-        // Clean up MapboxNavigation provider
-        mapboxNavigationProvider = nil
-        mapboxNavigation = nil
+    }
+
+    // 统一核心清理：会话、全局 Provider、缓存状态
+    private func resetNavigationCore() {
+        Task { @MainActor in
+            self.mapboxNavigation?.tripSession().setToIdle()
+        }
+
+        // 强制重置全局 Provider，释放内部订阅与状态
+        MapboxNavigationManager.shared.forceReset()
+
+        // 释放本地引用与缓存状态
+        self.mapboxNavigationProvider = nil
+        self.mapboxNavigation = nil
+        self._navigationRoutes = nil
+        self._wayPointOrder.removeAll()
+        self._wayPoints.removeAll()
+
+        // 重置历史记录相关标志
+        self._isHistoryRecording = false
+        self._currentHistoryId = nil
+        self._historyStartTime = nil
     }
     
     func getLocationsFromFlutterArgument(arguments: NSDictionary?) -> [FlutterLocation]? {
@@ -851,18 +876,24 @@ extension NavigationFactory : NavigationViewControllerDelegate {
     }
     
     
-    
-    public func navigationViewControllerDidDismiss(_ navigationViewController: NavigationViewController, byCanceling canceled: Bool) {
-        if(canceled)
-        {
+    public func navigationViewController(_ navigationViewController: NavigationViewController, shouldRerouteFrom location: CLLocation) -> Bool {
+        return _shouldReRoute
+    }
+
+    // 当用户手势关闭/系统关闭导航控制器时，兜底做核心清理（唯一实现）
+    public func navigationViewControllerDidDismiss(
+        _ navigationViewController: NavigationViewController,
+        byCanceling canceled: Bool
+    ) {
+        if canceled {
             stopHistoryRecording()
             sendEvent(eventType: MapBoxEventType.navigation_cancelled)
         }
-        endNavigation(result: nil)
-    }
-    
-    public func navigationViewController(_ navigationViewController: NavigationViewController, shouldRerouteFrom location: CLLocation) -> Bool {
-        return _shouldReRoute
+        Task { @MainActor in
+            self.mapboxNavigation?.tripSession().setToIdle()
+        }
+        self._navigationViewController = nil
+        self.resetNavigationCore()
     }
     
     // EndOfRouteFeedback has been removed in v3

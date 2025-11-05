@@ -17,6 +17,8 @@ class RouteSelectionViewController: UIViewController {
     
     private var startNavigationButton: UIButton!
     private var cancelButton: UIButton!
+    private var backButton: UIButton!
+    private var overviewButton: UIButton!
     
     /// 路线选择回调
     var onRouteSelected: ((NavigationRoutes) -> Void)?
@@ -41,6 +43,8 @@ class RouteSelectionViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         setupMapView()
+        setupTopBar()
+        setupOverviewButton()
         setupButtons()
         displayRoutes()
     }
@@ -64,10 +68,85 @@ class RouteSelectionViewController: UIViewController {
         navigationMapView.delegate = self
         navigationMapView.frame = view.bounds
         view.addSubview(navigationMapView)
+        
+        // 调整指南针位置，避免被顶部栏遮挡
+        let compassOptions = CompassViewOptions(
+            position: .topTrailing, // 右上角
+            margins: CGPoint(x: 16, y: 60) // 留出顶部栏的空间
+        )
+        navigationMapView.mapView.ornaments.options.compass = compassOptions
+    }
+    
+    private func setupTopBar() {
+        // 创建顶部栏
+        let topBar = UIView()
+        topBar.backgroundColor = .white.withAlphaComponent(0.95)
+        topBar.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(topBar)
+        
+        // 返回按钮
+        backButton = UIButton(type: .system)
+        backButton.setImage(UIImage(systemName: "chevron.left"), for: .normal)
+        backButton.setTitle(" 返回", for: .normal)
+        backButton.titleLabel?.font = .systemFont(ofSize: 17)
+        backButton.tintColor = .systemBlue
+        backButton.translatesAutoresizingMaskIntoConstraints = false
+        backButton.addTarget(self, action: #selector(backTapped), for: .touchUpInside)
+        topBar.addSubview(backButton)
+        
+        // 标题
+        let titleLabel = UILabel()
+        titleLabel.text = "选择路线"
+        titleLabel.font = .systemFont(ofSize: 17, weight: .semibold)
+        titleLabel.textAlignment = .center
+        titleLabel.translatesAutoresizingMaskIntoConstraints = false
+        topBar.addSubview(titleLabel)
+        
+        // 布局约束
+        NSLayoutConstraint.activate([
+            // 顶部栏
+            topBar.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            topBar.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            topBar.topAnchor.constraint(equalTo: view.topAnchor),
+            topBar.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 44),
+            
+            // 返回按钮
+            backButton.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 8),
+            backButton.centerYAnchor.constraint(equalTo: topBar.bottomAnchor, constant: -22),
+            backButton.heightAnchor.constraint(equalToConstant: 44),
+            
+            // 标题
+            titleLabel.centerXAnchor.constraint(equalTo: topBar.centerXAnchor),
+            titleLabel.centerYAnchor.constraint(equalTo: topBar.bottomAnchor, constant: -22),
+        ])
+    }
+    
+    private func setupOverviewButton() {
+        // 创建全览按钮（类似地图应用的全览按钮）
+        overviewButton = UIButton(type: .system)
+        overviewButton.setImage(UIImage(systemName: "arrow.up.left.and.arrow.down.right"), for: .normal)
+        overviewButton.backgroundColor = .white
+        overviewButton.tintColor = .systemBlue
+        overviewButton.layer.cornerRadius = 8
+        overviewButton.layer.shadowColor = UIColor.black.cgColor
+        overviewButton.layer.shadowOffset = CGSize(width: 0, height: 2)
+        overviewButton.layer.shadowOpacity = 0.1
+        overviewButton.layer.shadowRadius = 4
+        overviewButton.translatesAutoresizingMaskIntoConstraints = false
+        overviewButton.addTarget(self, action: #selector(overviewTapped), for: .touchUpInside)
+        view.addSubview(overviewButton)
+        
+        // 布局约束 - 放在右下角，避开指南针
+        NSLayoutConstraint.activate([
+            overviewButton.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -16),
+            overviewButton.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -100),
+            overviewButton.widthAnchor.constraint(equalToConstant: 44),
+            overviewButton.heightAnchor.constraint(equalToConstant: 44),
+        ])
     }
     
     private func setupButtons() {
-        // 创建底部按钮容器
+        // 创建底部按钮容器，扩展到屏幕底部（无间隙）
         let buttonContainer = UIView()
         buttonContainer.backgroundColor = .white
         buttonContainer.translatesAutoresizingMaskIntoConstraints = false
@@ -93,25 +172,27 @@ class RouteSelectionViewController: UIViewController {
         startNavigationButton.addTarget(self, action: #selector(startNavigationTapped), for: .touchUpInside)
         buttonContainer.addSubview(startNavigationButton)
         
-        // 布局约束
+        // 布局约束 - 扩展到屏幕底部
         NSLayoutConstraint.activate([
-            // 容器约束
+            // 容器约束 - 扩展到view底部
             buttonContainer.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             buttonContainer.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            buttonContainer.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
-            buttonContainer.heightAnchor.constraint(equalToConstant: 100),
+            buttonContainer.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             
             // 取消按钮
             cancelButton.leadingAnchor.constraint(equalTo: buttonContainer.leadingAnchor, constant: 20),
-            cancelButton.centerYAnchor.constraint(equalTo: buttonContainer.centerYAnchor),
+            cancelButton.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -16),
             cancelButton.widthAnchor.constraint(equalToConstant: 80),
             cancelButton.heightAnchor.constraint(equalToConstant: 50),
             
             // 开始导航按钮
             startNavigationButton.trailingAnchor.constraint(equalTo: buttonContainer.trailingAnchor, constant: -20),
-            startNavigationButton.centerYAnchor.constraint(equalTo: buttonContainer.centerYAnchor),
+            startNavigationButton.centerYAnchor.constraint(equalTo: cancelButton.centerYAnchor),
             startNavigationButton.leadingAnchor.constraint(equalTo: cancelButton.trailingAnchor, constant: 20),
             startNavigationButton.heightAnchor.constraint(equalToConstant: 50),
+            
+            // 容器顶部约束 - 给按钮留足够空间
+            buttonContainer.topAnchor.constraint(equalTo: cancelButton.topAnchor, constant: -16),
         ])
     }
     
@@ -137,8 +218,20 @@ class RouteSelectionViewController: UIViewController {
     
     // MARK: - Actions
     
+    @objc private func backTapped() {
+        dismiss(animated: true, completion: nil)
+    }
+    
     @objc private func cancelTapped() {
         dismiss(animated: true, completion: nil)
+    }
+    
+    @objc private func overviewTapped() {
+        // 显示完整路线全览
+        Task { @MainActor in
+            print("📍 用户点击全览按钮")
+            navigationMapView.showcase(navigationRoutes, animated: true)
+        }
     }
     
     @objc private func startNavigationTapped() {

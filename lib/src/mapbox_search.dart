@@ -3,7 +3,8 @@ import 'package:flutter_mapbox_navigation/src/models/search_models.dart';
 
 /// Mapbox搜索服务
 class MapboxSearch {
-  static const MethodChannel _channel = MethodChannel('flutter_mapbox_navigation/search');
+  static const MethodChannel _channel =
+      MethodChannel('flutter_mapbox_navigation/search');
 
   /// 显示地图搜索视图
   ///
@@ -14,11 +15,11 @@ class MapboxSearch {
       final result = await _channel.invokeMethod('showSearchView');
       if (result != null && result is List) {
         // 安全地转换每个元素为 Map<String, dynamic>
-        final List<Map<String, dynamic>> wayPoints = [];
+        final wayPoints = <Map<String, dynamic>>[];
         for (final item in result) {
           if (item is Map) {
             // 将 Map<Object?, Object?> 转换为 Map<String, dynamic>
-            final Map<String, dynamic> wayPoint = {};
+            final wayPoint = <String, dynamic>{};
             item.forEach((key, value) {
               if (key is String) {
                 wayPoint[key] = value;
@@ -36,48 +37,62 @@ class MapboxSearch {
   }
 
   /// 搜索地点
-  /// 
+  ///
   /// [options] 搜索选项
   /// 返回搜索结果列表
-  static Future<List<MapboxSearchResult>> searchPlaces(MapboxSearchOptions options) async {
+  static Future<List<MapboxSearchResult>> searchPlaces(
+      MapboxSearchOptions options) async {
     try {
-      final List<dynamic> results = await _channel.invokeMethod('searchPlaces', options.toMap()) as List<dynamic>;
-      return results.map((result) => MapboxSearchResult.fromMap(result as Map<String, dynamic>)).toList();
+      final results = await _channel.invokeMethod(
+          'searchPlaces', options.toMap()) as List<dynamic>;
+      return results
+          .map((result) =>
+              MapboxSearchResult.fromMap(result as Map<String, dynamic>))
+          .toList();
     } on PlatformException catch (e) {
       throw MapboxSearchException('搜索地点失败: ${e.message}', e.code);
     }
   }
 
   /// 搜索附近地点
-  /// 
+  ///
   /// [options] 附近搜索选项
   /// 返回附近地点列表
-  static Future<List<MapboxSearchResult>> searchNearby(MapboxNearbySearchOptions options) async {
+  static Future<List<MapboxSearchResult>> searchNearby(
+      MapboxNearbySearchOptions options) async {
     try {
-      final List<dynamic> results = await _channel.invokeMethod('searchNearby', options.toMap()) as List<dynamic>;
-      return results.map((result) => MapboxSearchResult.fromMap(result as Map<String, dynamic>)).toList();
+      final results = await _channel.invokeMethod(
+          'searchNearby', options.toMap()) as List<dynamic>;
+      return results
+          .map((result) =>
+              MapboxSearchResult.fromMap(result as Map<String, dynamic>))
+          .toList();
     } on PlatformException catch (e) {
       throw MapboxSearchException('搜索附近地点失败: ${e.message}', e.code);
     }
   }
 
   /// 反向地理编码
-  /// 
+  ///
   /// [coordinate] 要查询的坐标
   /// 返回该坐标的地址信息
-  static Future<List<MapboxSearchResult>> reverseGeocode(MapboxCoordinate coordinate) async {
+  static Future<List<MapboxSearchResult>> reverseGeocode(
+      MapboxCoordinate coordinate) async {
     try {
-      final List<dynamic> results = await _channel.invokeMethod('reverseGeocode', {
+      final results = await _channel.invokeMethod('reverseGeocode', {
         'coordinate': coordinate.toMap(),
       }) as List<dynamic>;
-      return results.map((result) => MapboxSearchResult.fromMap(result as Map<String, dynamic>)).toList();
+      return results
+          .map((result) =>
+              MapboxSearchResult.fromMap(result as Map<String, dynamic>))
+          .toList();
     } on PlatformException catch (e) {
       throw MapboxSearchException('反向地理编码失败: ${e.message}', e.code);
     }
   }
 
   /// 获取搜索建议
-  /// 
+  ///
   /// [query] 搜索查询字符串
   /// [proximity] 可选的搜索中心点
   /// [limit] 最大建议数量，默认为10
@@ -88,24 +103,28 @@ class MapboxSearch {
     int limit = 10,
   }) async {
     try {
-      final Map<String, dynamic> params = {
+      final params = <String, dynamic>{
         'query': query,
         'limit': limit,
       };
-      
+
       if (proximity != null) {
         params['proximity'] = proximity.toMap();
       }
-      
-      final List<dynamic> results = await _channel.invokeMethod('getSearchSuggestions', params) as List<dynamic>;
-      return results.map((result) => MapboxSearchSuggestion.fromMap(result as Map<String, dynamic>)).toList();
+
+      final results = await _channel.invokeMethod(
+          'getSearchSuggestions', params) as List<dynamic>;
+      return results
+          .map((result) =>
+              MapboxSearchSuggestion.fromMap(result as Map<String, dynamic>))
+          .toList();
     } on PlatformException catch (e) {
       throw MapboxSearchException('获取搜索建议失败: ${e.message}', e.code);
     }
   }
 
   /// 根据坐标搜索附近的兴趣点
-  /// 
+  ///
   /// [coordinate] 搜索中心坐标
   /// [radius] 搜索半径（米），默认1000米
   /// [categories] 可选的类别过滤器
@@ -126,7 +145,7 @@ class MapboxSearch {
   }
 
   /// 搜索特定类别的地点
-  /// 
+  ///
   /// [query] 搜索查询
   /// [category] 地点类别
   /// [proximity] 可选的搜索中心点
@@ -147,7 +166,7 @@ class MapboxSearch {
   }
 
   /// 在指定边界框内搜索
-  /// 
+  ///
   /// [query] 搜索查询
   /// [boundingBox] 搜索边界框
   /// [limit] 最大结果数量，默认为10
@@ -167,13 +186,13 @@ class MapboxSearch {
 
 /// Mapbox搜索异常
 class MapboxSearchException implements Exception {
+  const MapboxSearchException(this.message, [this.code]);
+
   /// 错误消息
   final String message;
-  
+
   /// 错误代码
   final String? code;
-
-  const MapboxSearchException(this.message, [this.code]);
 
   @override
   String toString() {

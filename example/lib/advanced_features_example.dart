@@ -946,7 +946,7 @@ class _AdvancedFeaturesExampleState extends State<AdvancedFeaturesExample> {
                           _simulateRoute = value;
                         });
                       },
-                      activeColor: Colors.green,
+                      activeThumbColor: Colors.green,
                     ),
                   ],
                 ),

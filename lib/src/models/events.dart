@@ -1,4 +1,4 @@
-// ignore_for_file: constant_identifier_names, public_member_api_docs
+// ignore_for_file: constant_identifier_names
 
 /// All possible events that could occur in the course of navigation
 enum MapBoxEvent {

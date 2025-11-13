@@ -234,11 +234,11 @@ class _SimpleHistoryReplayExampleState
     final remainingSeconds = seconds % 60;
 
     if (hours > 0) {
-      return '${hours}小时${minutes}分钟${remainingSeconds}秒';
+      return '$hours小时$minutes分钟$remainingSeconds秒';
     } else if (minutes > 0) {
-      return '${minutes}分钟${remainingSeconds}秒';
+      return '$minutes分钟$remainingSeconds秒';
     } else {
-      return '${remainingSeconds}秒';
+      return '$remainingSeconds秒';
     }
   }
 

@@ -4,11 +4,9 @@ import 'package:flutter_mapbox_navigation/flutter_mapbox_navigation.dart';
 
 void main() {
   group('MapboxSearch', () {
-    const MethodChannel channel = MethodChannel('flutter_mapbox_navigation/search');
+    const channel = MethodChannel('flutter_mapbox_navigation/search');
 
-    setUp(() {
-      TestWidgetsFlutterBinding.ensureInitialized();
-    });
+    setUp(TestWidgetsFlutterBinding.ensureInitialized);
 
     test('showSearchView should handle valid waypoint data', () async {
       // Mock the platform method call
@@ -22,14 +20,14 @@ void main() {
               'latitude': 39.9042,
               'longitude': 116.4074,
               'isSilent': false,
-              'address': '北京市东城区'
+              'address': '北京市东城区',
             },
             {
               'name': '天安门',
               'latitude': 39.9163,
               'longitude': 116.3972,
               'isSilent': false,
-              'address': '北京市东城区天安门广场'
+              'address': '北京市东城区天安门广场',
             }
           ];
         }
@@ -43,12 +41,12 @@ void main() {
       expect(result, isNotNull);
       expect(result, isA<List<Map<String, dynamic>>>());
       expect(result!.length, equals(2));
-      
+
       // Check first waypoint (origin)
       expect(result[0]['name'], equals('当前位置'));
       expect(result[0]['latitude'], equals(39.9042));
       expect(result[0]['longitude'], equals(116.4074));
-      
+
       // Check second waypoint (destination)
       expect(result[1]['name'], equals('天安门'));
       expect(result[1]['latitude'], equals(39.9163));
@@ -97,7 +95,6 @@ void main() {
           throw PlatformException(
             code: 'SEARCH_ERROR',
             message: 'Search failed',
-            details: null,
           );
         }
         return null;
@@ -105,7 +102,7 @@ void main() {
 
       // Call the method and expect an exception
       expect(
-        () async => await MapboxSearch.showSearchView(),
+        () async => MapboxSearch.showSearchView(),
         throwsA(isA<MapboxSearchException>()),
       );
     });

@@ -128,11 +128,10 @@ class MethodChannelFlutterMapboxNavigation
             log('Processing item: $item');
             try {
               // 安全地转换 Map<Object?, Object?> 到 Map<String, dynamic>
-              final Map<String, dynamic> itemMap =
-                  Map<String, dynamic>.from(item as Map);
+              final itemMap = Map<String, dynamic>.from(item as Map);
               log('Converted item map: $itemMap');
               final history = NavigationHistory.fromMap(itemMap);
-              log('Successfully created NavigationHistory: ${history.toString()}');
+              log('Successfully created NavigationHistory: ${history}');
               return history;
             } catch (e, stackTrace) {
               log('Error creating NavigationHistory from item: $item');
@@ -222,18 +221,16 @@ class MethodChannelFlutterMapboxNavigation
 
   /// Events Handling
   Stream<RouteEvent>? get routeEventsListener {
-    return eventChannel
-        .receiveBroadcastStream()
-        .map((dynamic event) {
-          if (event == null) {
-            // 如果事件为空，返回一个默认的事件
-            return RouteEvent(
-              eventType: MapBoxEvent.map_ready,
-              data: 'null event received',
-            );
-          }
-          return _parseRouteEvent(event as String);
-        });
+    return eventChannel.receiveBroadcastStream().map((dynamic event) {
+      if (event == null) {
+        // 如果事件为空，返回一个默认的事件
+        return RouteEvent(
+          eventType: MapBoxEvent.map_ready,
+          data: 'null event received',
+        );
+      }
+      return _parseRouteEvent(event as String);
+    });
   }
 
   void _onProgressData(RouteEvent event) {

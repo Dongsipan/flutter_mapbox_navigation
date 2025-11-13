@@ -41,7 +41,7 @@ class _SearchExamplePageState extends State<SearchExamplePage> {
       );
 
       final results = await MapboxSearch.searchPlaces(options);
-      
+
       setState(() {
         _searchResults = results;
         _isLoading = false;
@@ -68,7 +68,7 @@ class _SearchExamplePageState extends State<SearchExamplePage> {
         query: _searchController.text.trim(),
         limit: 5,
       );
-      
+
       setState(() {
         _suggestions = suggestions;
       });
@@ -87,15 +87,16 @@ class _SearchExamplePageState extends State<SearchExamplePage> {
 
     try {
       // 使用北京天安门的坐标作为示例
-      const coordinate = MapboxCoordinate(latitude: 39.9042, longitude: 116.4074);
-      
+      const coordinate =
+          MapboxCoordinate(latitude: 39.9042, longitude: 116.4074);
+
       final results = await MapboxSearch.searchPointsOfInterest(
         coordinate: coordinate,
         radius: 2000, // 2公里半径
         categories: [MapboxSearchCategories.restaurant],
         limit: 10,
       );
-      
+
       setState(() {
         _searchResults = results;
         _isLoading = false;
@@ -118,10 +119,11 @@ class _SearchExamplePageState extends State<SearchExamplePage> {
 
     try {
       // 使用北京天安门的坐标作为示例
-      const coordinate = MapboxCoordinate(latitude: 39.9042, longitude: 116.4074);
-      
+      const coordinate =
+          MapboxCoordinate(latitude: 39.9042, longitude: 116.4074);
+
       final results = await MapboxSearch.reverseGeocode(coordinate);
-      
+
       setState(() {
         _searchResults = results;
         _isLoading = false;
@@ -173,9 +175,9 @@ class _SearchExamplePageState extends State<SearchExamplePage> {
                 _searchPlaces();
               },
             ),
-            
+
             const SizedBox(height: 16),
-            
+
             // 功能按钮
             Wrap(
               spacing: 8.0,
@@ -194,9 +196,9 @@ class _SearchExamplePageState extends State<SearchExamplePage> {
                 ),
               ],
             ),
-            
+
             const SizedBox(height: 16),
-            
+
             // 搜索建议
             if (_suggestions.isNotEmpty) ...[
               const Align(
@@ -207,7 +209,7 @@ class _SearchExamplePageState extends State<SearchExamplePage> {
                 ),
               ),
               const SizedBox(height: 8),
-              Container(
+              SizedBox(
                 height: 100,
                 child: ListView.builder(
                   itemCount: _suggestions.length,
@@ -230,11 +232,10 @@ class _SearchExamplePageState extends State<SearchExamplePage> {
               ),
               const Divider(),
             ],
-            
+
             // 加载指示器
-            if (_isLoading)
-              const Center(child: CircularProgressIndicator()),
-            
+            if (_isLoading) const Center(child: CircularProgressIndicator()),
+
             // 错误消息
             if (_errorMessage != null)
               Container(
@@ -248,7 +249,7 @@ class _SearchExamplePageState extends State<SearchExamplePage> {
                   style: const TextStyle(color: Colors.red),
                 ),
               ),
-            
+
             // 搜索结果
             if (_searchResults.isNotEmpty) ...[
               const SizedBox(height: 16),
@@ -271,21 +272,24 @@ class _SearchExamplePageState extends State<SearchExamplePage> {
                         subtitle: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            if (result.address != null)
-                              Text(result.address!),
+                            if (result.address != null) Text(result.address!),
                             Text(
                               '坐标: ${result.coordinate.latitude.toStringAsFixed(4)}, ${result.coordinate.longitude.toStringAsFixed(4)}',
-                              style: const TextStyle(fontSize: 12, color: Colors.grey),
+                              style: const TextStyle(
+                                  fontSize: 12, color: Colors.grey),
                             ),
                             if (result.distance != null)
                               Text(
                                 '距离: ${(result.distance! / 1000).toStringAsFixed(2)} km',
-                                style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                style: const TextStyle(
+                                    fontSize: 12, color: Colors.grey),
                               ),
-                            if (result.categories != null && result.categories!.isNotEmpty)
+                            if (result.categories != null &&
+                                result.categories!.isNotEmpty)
                               Text(
                                 '类别: ${result.categories!.join(', ')}',
-                                style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                style: const TextStyle(
+                                    fontSize: 12, color: Colors.grey),
                               ),
                           ],
                         ),

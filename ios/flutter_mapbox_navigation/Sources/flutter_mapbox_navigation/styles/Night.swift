@@ -37,7 +37,7 @@ class CustomNightStyle: NightStyle {
         //BottomBannerView.appearance().backgroundColor = .orange
         
         // Apply lightPreset for standard style if specified
-        if let preset = lightPreset, mapStyleURL?.absoluteString.contains("standard") == true {
+        if let preset = lightPreset, mapStyleURL.absoluteString.contains("standard") {
             // Note: In production, you would apply the lightPreset to the mapView
             // This is a placeholder for the lightPreset application logic
             print("Applying lightPreset: \(preset) for night style")

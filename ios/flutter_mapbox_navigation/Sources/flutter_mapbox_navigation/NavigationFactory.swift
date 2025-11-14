@@ -1,5 +1,6 @@
 import Flutter
 import UIKit
+import MapboxMaps
 import MapboxNavigationCore
 import MapboxNavigationUIKit
 import MapboxDirections

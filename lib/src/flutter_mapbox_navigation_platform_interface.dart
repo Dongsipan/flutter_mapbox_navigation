@@ -146,4 +146,24 @@ abstract class FlutterMapboxNavigationPlatform extends PlatformInterface {
       'generateHistoryCover() has not been implemented.',
     );
   }
+
+  // MARK: - Map Style Methods
+
+  /// 设置地图样式
+  Future<bool?> setMapStyle({
+    required MapStyle mapStyle,
+    TimeOfDayPreset? timeOfDayPreset,
+    bool? enableTimeOfDaySwitch,
+  }) async {
+    throw UnimplementedError(
+      'setMapStyle() has not been implemented.',
+    );
+  }
+
+  /// 设置时间段光照预设
+  Future<bool?> setTimeOfDayPreset(TimeOfDayPreset preset) async {
+    throw UnimplementedError(
+      'setTimeOfDayPreset() has not been implemented.',
+    );
+  }
 }

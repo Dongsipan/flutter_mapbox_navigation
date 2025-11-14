@@ -152,4 +152,46 @@ class MapBoxNavigation {
       historyId: historyId,
     );
   }
+
+  // MARK: - Map Style Methods
+
+  /// 设置地图样式
+  /// 
+  /// [mapStyle] 地图样式类型
+  /// [timeOfDayPreset] 时间段光照预设（仅适用于MapStyle.standard）
+  /// [enableTimeOfDaySwitch] 是否启用时间段动态切换功能
+  Future<bool?> setMapStyle({
+    required MapStyle mapStyle,
+    TimeOfDayPreset? timeOfDayPreset,
+    bool? enableTimeOfDaySwitch,
+  }) async {
+    return FlutterMapboxNavigationPlatform.instance.setMapStyle(
+      mapStyle: mapStyle,
+      timeOfDayPreset: timeOfDayPreset,
+      enableTimeOfDaySwitch: enableTimeOfDaySwitch,
+    );
+  }
+
+  /// 设置时间段光照预设
+  /// 仅适用于MapStyle.standard样式
+  /// 
+  /// [preset] 时间段预设：dawn、day、dusk、night
+  Future<bool?> setTimeOfDayPreset(TimeOfDayPreset preset) async {
+    return FlutterMapboxNavigationPlatform.instance.setTimeOfDayPreset(preset);
+  }
+
+  /// 获取当前地图样式
+  MapStyle? getCurrentMapStyle() {
+    return _defaultOptions.mapStyle;
+  }
+
+  /// 获取当前时间段预设
+  TimeOfDayPreset? getCurrentTimeOfDayPreset() {
+    return _defaultOptions.timeOfDayPreset;
+  }
+
+  /// 判断当前样式是否支持时间段预设
+  bool supportsTimeOfDayPreset() {
+    return _defaultOptions.mapStyle?.supportsTimeOfDayPreset ?? false;
+  }
 }

@@ -429,13 +429,25 @@ public class FlutterMapboxNavigationView : NavigationFactory, FlutterPlatformVie
         }
 
         // In v3, NavigationViewController initialization is different
+        // 使用新的样式系统
         var dayStyle = CustomDayStyle()
-        if(_mapStyleUrlDay != nil){
-            dayStyle = CustomDayStyle(url: _mapStyleUrlDay)
-        }
         var nightStyle = CustomNightStyle()
-        if(_mapStyleUrlNight != nil){
-            nightStyle = CustomNightStyle(url: _mapStyleUrlNight)
+        
+        // 优先使用新的样式枚举系统
+        if let mapStyle = _mapStyle {
+            let styleUrl = getMapStyleUrl()
+            let lightPreset = supportsTimeOfDayPreset() ? getLightPreset() : nil
+            
+            dayStyle = CustomDayStyle(url: styleUrl, lightPreset: lightPreset)
+            nightStyle = CustomNightStyle(url: getNightMapStyleUrl(), lightPreset: lightPreset)
+        } else {
+            // 回退到旧的URL方式
+            if(_mapStyleUrlDay != nil){
+                dayStyle = CustomDayStyle(url: _mapStyleUrlDay)
+            }
+            if(_mapStyleUrlNight != nil){
+                nightStyle = CustomNightStyle(url: _mapStyleUrlNight)
+            }
         }
 
         // Create NavigationViewController with v3 API and embed it into mapView

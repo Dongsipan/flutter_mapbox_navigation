@@ -57,6 +57,9 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
     var _voiceUnits = "imperial"
     var _mapStyleUrlDay: String?
     var _mapStyleUrlNight: String?
+    var _mapStyle: String?
+    var _timeOfDayPreset: String?
+    var _enableTimeOfDaySwitch: Bool = false
     var _zoom: Double = 13.0
     var _tilt: Double = 0.0
     var _bearing: Double = 0.0
@@ -346,6 +349,9 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
         _enableHistoryRecording = arguments?["enableHistoryRecording"] as? Bool ?? _enableHistoryRecording
         _mapStyleUrlDay = arguments?["mapStyleUrlDay"] as? String
         _mapStyleUrlNight = arguments?["mapStyleUrlNight"] as? String
+        _mapStyle = arguments?["mapStyle"] as? String
+        _timeOfDayPreset = arguments?["timeOfDayPreset"] as? String
+        _enableTimeOfDaySwitch = arguments?["enableTimeOfDaySwitch"] as? Bool ?? _enableTimeOfDaySwitch
         _zoom = arguments?["zoom"] as? Double ?? _zoom
         _bearing = arguments?["bearing"] as? Double ?? _bearing
         _tilt = arguments?["tilt"] as? Double ?? _tilt
@@ -353,6 +359,60 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
         _longPressDestinationEnabled = arguments?["longPressDestinationEnabled"] as? Bool ?? _longPressDestinationEnabled
         _alternatives = arguments?["alternatives"] as? Bool ?? _alternatives
         _autoBuildRoute = arguments?["autoBuildRoute"] as? Bool ?? _autoBuildRoute
+    }
+    
+    // MARK: - Style Helper Methods
+    
+    /// 根据Flutter样式类型获取对应的Mapbox样式URL
+    func getMapStyleUrl() -> String {
+        // 优先使用新的样式枚举，然后是自定义URL，最后是默认样式
+        if let mapStyle = _mapStyle {
+            switch mapStyle.lowercased() {
+            case "standard":
+                return StyleURI.standard.rawValue
+            case "standardsatellite":
+                return StyleURI.standardSatellite.rawValue
+            case "streets":
+                return StyleURI.streets.rawValue
+            case "light":
+                return StyleURI.light.rawValue
+            case "dark":
+                return StyleURI.dark.rawValue
+            case "outdoors":
+                return StyleURI.outdoors.rawValue
+            default:
+                return StyleURI.standard.rawValue
+            }
+        } else if let customDayUrl = _mapStyleUrlDay {
+            return customDayUrl
+        } else {
+            return StyleURI.standard.rawValue
+        }
+    }
+    
+    /// 获取夜间样式URL
+    func getNightMapStyleUrl() -> String {
+        // 如果使用预设样式，夜间样式通常与白天样式相同（通过lightPreset控制）
+        if let mapStyle = _mapStyle {
+            return getMapStyleUrl() // 使用相同的样式URL
+        } else if let customNightUrl = _mapStyleUrlNight {
+            return customNightUrl
+        } else {
+            return StyleURI.dark.rawValue // 默认夜间样式
+        }
+    }
+    
+    /// 判断当前样式是否支持时间段预设
+    func supportsTimeOfDayPreset() -> Bool {
+        return _mapStyle?.lowercased() == "standard"
+    }
+    
+    /// 获取lightPreset值
+    func getLightPreset() -> String {
+        if let preset = _timeOfDayPreset {
+            return preset.lowercased()
+        }
+        return "day" // 默认为白天
     }
     
     
@@ -814,6 +874,132 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
         } catch {
             print("Error saving history record: \(error.localizedDescription)")
             sendEvent(eventType: MapBoxEventType.history_recording_error, data: "Failed to save history record: \(error.localizedDescription)")
+        }
+    }
+    
+    // MARK: - Map Style Methods
+    
+    /// 设置地图样式
+    func setMapStyle(arguments: NSDictionary?, result: @escaping FlutterResult) {
+        guard let args = arguments,
+              let mapStyle = args["mapStyle"] as? String else {
+            result(FlutterError(code: "INVALID_ARGUMENTS", message: "Missing mapStyle parameter", details: nil))
+            return
+        }
+        
+        print("Setting map style to: \(mapStyle)")
+        
+        // 更新样式设置
+        _mapStyle = mapStyle
+        if let timeOfDayPreset = args["timeOfDayPreset"] as? String {
+            _timeOfDayPreset = timeOfDayPreset
+        }
+        if let enableTimeOfDaySwitch = args["enableTimeOfDaySwitch"] as? Bool {
+            _enableTimeOfDaySwitch = enableTimeOfDaySwitch
+        }
+        
+        // 如果有活动的导航会话，立即应用样式
+        applyMapStyleToActiveNavigation()
+        
+        result(true)
+    }
+    
+    /// 设置时间段光照预设
+    func setTimeOfDayPreset(arguments: NSDictionary?, result: @escaping FlutterResult) {
+        guard let args = arguments,
+              let preset = args["preset"] as? String else {
+            result(FlutterError(code: "INVALID_ARGUMENTS", message: "Missing preset parameter", details: nil))
+            return
+        }
+        
+        print("Setting time of day preset to: \(preset)")
+        
+        // 检查当前样式是否支持时间段预设
+        if !supportsTimeOfDayPreset() {
+            result(FlutterError(code: "UNSUPPORTED_STYLE", message: "Current style does not support time of day preset", details: nil))
+            return
+        }
+        
+        _timeOfDayPreset = preset
+        
+        // 如果有活动的导航会话，立即应用预设
+        applyTimeOfDayPresetToActiveNavigation()
+        
+        result(true)
+    }
+    
+    /// 应用地图样式到活动的导航会话
+    private func applyMapStyleToActiveNavigation() {
+        guard let navigationViewController = _navigationViewController else {
+            print("No active navigation session to apply style to")
+            return
+        }
+        
+        Task { @MainActor in
+            let styleUrl = getMapStyleUrl()
+            
+            // 对于嵌入式导航视图
+            if isEmbeddedNavigation {
+                // 通过NavigationMapView设置样式
+                if let navigationMapView = navigationViewController.navigationMapView {
+                    navigationMapView.mapView.mapboxMap.style.uri = StyleURI(url: URL(string: styleUrl)!)
+                    
+                    // 如果是Standard样式且支持lightPreset，应用lightPreset
+                    if supportsTimeOfDayPreset() {
+                        applyLightPresetToMapView(navigationMapView.mapView)
+                    }
+                }
+            } else {
+                // 对于全屏导航，需要重新创建样式
+                // 这里可能需要更复杂的逻辑来更新样式
+                print("Applying style to fullscreen navigation: \(styleUrl)")
+                
+                // 在v3中，可以通过mapView直接设置样式
+                if let navigationMapView = navigationViewController.navigationMapView {
+                    navigationMapView.mapView.mapboxMap.style.uri = StyleURI(url: URL(string: styleUrl)!)
+                    
+                    if supportsTimeOfDayPreset() {
+                        applyLightPresetToMapView(navigationMapView.mapView)
+                    }
+                }
+            }
+        }
+    }
+    
+    /// 应用时间段预设到活动的导航会话
+    private func applyTimeOfDayPresetToActiveNavigation() {
+        guard let navigationViewController = _navigationViewController,
+              supportsTimeOfDayPreset() else {
+            print("Cannot apply time of day preset: no active navigation or unsupported style")
+            return
+        }
+        
+        Task { @MainActor in
+            if let navigationMapView = navigationViewController.navigationMapView {
+                applyLightPresetToMapView(navigationMapView.mapView)
+            }
+        }
+    }
+    
+    /// 应用lightPreset到MapView
+    private func applyLightPresetToMapView(_ mapView: MapView) {
+        let preset = getLightPreset()
+        
+        // 在Mapbox v3中，通过setStyleImportConfigProperty设置lightPreset
+        // 这是官方文档推荐的运行时切换方式
+        do {
+            try mapView.mapboxMap.setStyleImportConfigProperty(
+                for: "basemap",
+                config: "lightPreset",
+                value: preset
+            )
+            print("Successfully applied lightPreset: \(preset)")
+            
+            // 发送事件通知Flutter端
+            sendEvent(eventType: MapBoxEventType.on_map_tap, data: "lightPreset:\(preset)")
+            
+        } catch {
+            print("Failed to apply lightPreset: \(error)")
         }
     }
 }

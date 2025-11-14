@@ -3,23 +3,24 @@ import MapboxNavigationUIKit
 
 class CustomDayStyle: DayStyle {
 
+    private var lightPreset: String?
+    
     required init() {
         super.init()
         initStyle()
     }
 
-    init(url: String?){
+    init(url: String?, lightPreset: String? = nil) {
         super.init()
+        self.lightPreset = lightPreset
         initStyle()
-        if(url != nil)
-        {
-            mapStyleURL = URL(string: url!) ?? URL(string: StyleURI.standard.rawValue)!
+        if let url = url {
+            mapStyleURL = URL(string: url) ?? URL(string: StyleURI.standard.rawValue)!
             previewMapStyleURL = mapStyleURL
         }
     }
 
-    func initStyle()
-    {
+    func initStyle() {
         // Use a custom map style.
         mapStyleURL = URL(string: StyleURI.standard.rawValue)!
         previewMapStyleURL = mapStyleURL
@@ -32,5 +33,19 @@ class CustomDayStyle: DayStyle {
         super.apply()
         // Begin styling the UI
         //BottomBannerView.appearance().backgroundColor = .orange
+        
+        // Apply lightPreset for standard style if specified
+        if let preset = lightPreset, mapStyleURL?.absoluteString.contains("standard") == true {
+            // Note: In production, you would apply the lightPreset to the mapView
+            // This is a placeholder for the lightPreset application logic
+            print("Applying lightPreset: \(preset) for day style")
+        }
+    }
+    
+    /// 更新lightPreset
+    func updateLightPreset(_ preset: String) {
+        self.lightPreset = preset
+        // Reapply the style with new preset
+        apply()
     }
 }

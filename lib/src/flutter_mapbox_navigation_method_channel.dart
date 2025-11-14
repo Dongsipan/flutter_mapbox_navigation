@@ -299,4 +299,52 @@ class MethodChannelFlutterMapboxNavigation
     }
     return pointList;
   }
+
+  // MARK: - Map Style Methods
+
+  @override
+  Future<bool?> setMapStyle({
+    required MapStyle mapStyle,
+    TimeOfDayPreset? timeOfDayPreset,
+    bool? enableTimeOfDaySwitch,
+  }) async {
+    try {
+      final arguments = <String, dynamic>{
+        'mapStyle': mapStyle.toString().split('.').last,
+      };
+      
+      if (timeOfDayPreset != null) {
+        arguments['timeOfDayPreset'] = timeOfDayPreset.toString().split('.').last;
+      }
+      
+      if (enableTimeOfDaySwitch != null) {
+        arguments['enableTimeOfDaySwitch'] = enableTimeOfDaySwitch;
+      }
+
+      final result = await methodChannel.invokeMethod<bool>(
+        'setMapStyle',
+        arguments,
+      );
+      return result;
+    } catch (e) {
+      log('Error setting map style: $e');
+      return false;
+    }
+  }
+
+  @override
+  Future<bool?> setTimeOfDayPreset(TimeOfDayPreset preset) async {
+    try {
+      final result = await methodChannel.invokeMethod<bool>(
+        'setTimeOfDayPreset',
+        {
+          'preset': preset.toString().split('.').last,
+        },
+      );
+      return result;
+    } catch (e) {
+      log('Error setting time of day preset: $e');
+      return false;
+    }
+  }
 }

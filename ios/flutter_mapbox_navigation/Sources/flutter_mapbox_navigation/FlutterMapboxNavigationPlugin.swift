@@ -117,7 +117,14 @@ public class FlutterMapboxNavigationPlugin: NavigationFactory, FlutterPlugin {
                 }
             }
         }
-
+        else if(call.method == "setMapStyle")
+        {
+            setMapStyle(arguments: arguments, result: result)
+        }
+        else if(call.method == "setTimeOfDayPreset")
+        {
+            setTimeOfDayPreset(arguments: arguments, result: result)
+        }
         else
         {
             result("Method is Not Implemented");

@@ -1,6 +1,7 @@
 // ignore_for_file: public_member_api_docs
 
 import 'package:flutter/widgets.dart';
+import 'package:flutter_mapbox_navigation/src/models/map_style.dart';
 import 'package:flutter_mapbox_navigation/src/models/navmode.dart';
 import 'package:flutter_mapbox_navigation/src/models/voice_units.dart';
 
@@ -29,6 +30,9 @@ class MapBoxOptions {
     this.isOptimized,
     this.mapStyleUrlDay,
     this.mapStyleUrlNight,
+    this.mapStyle,
+    this.timeOfDayPreset,
+    this.enableTimeOfDaySwitch = false,
     this.padding,
     this.animateBuildRoute,
     this.showReportFeedbackButton = true,
@@ -57,6 +61,9 @@ class MapBoxOptions {
     isOptimized = option.isOptimized;
     mapStyleUrlDay = option.mapStyleUrlDay;
     mapStyleUrlNight = option.mapStyleUrlNight;
+    mapStyle = option.mapStyle;
+    timeOfDayPreset = option.timeOfDayPreset;
+    enableTimeOfDaySwitch = option.enableTimeOfDaySwitch;
     padding = option.padding;
     animateBuildRoute = option.animateBuildRoute;
     showReportFeedbackButton = option.showReportFeedbackButton;
@@ -146,6 +153,18 @@ class MapBoxOptions {
   /// The Url of the style the Navigation MapView should use at night
   String? mapStyleUrlNight;
 
+  /// 地图样式类型，使用预设样式替代自定义URL
+  /// 当设置此选项时，将优先使用预设样式而非mapStyleUrlDay/Night
+  MapStyle? mapStyle;
+
+  /// 时间段光照预设，仅适用于MapStyle.standard样式
+  /// 支持dawn、day、dusk、night四种状态
+  TimeOfDayPreset? timeOfDayPreset;
+
+  /// 是否启用时间段动态切换功能
+  /// 当为true时，可以在运行时动态切换dawn、day、dusk、night状态
+  bool? enableTimeOfDaySwitch;
+
   /// if true, will reorder the routes to optimize navigation for time and
   /// shortest distance using the Travelling Salesman Algorithm.
   /// Always false for now
@@ -226,6 +245,15 @@ class MapBoxOptions {
       optionsMap['simulateRoute'] = simulateRoute;
     }
     if (isOptimized != null) optionsMap['isOptimized'] = isOptimized;
+    
+    // 添加新的地图样式相关选项
+    if (mapStyle != null) {
+      optionsMap['mapStyle'] = mapStyle?.toString().split('.').last;
+    }
+    if (timeOfDayPreset != null) {
+      optionsMap['timeOfDayPreset'] = timeOfDayPreset?.toString().split('.').last;
+    }
+    addIfNonNull('enableTimeOfDaySwitch', enableTimeOfDaySwitch);
 
     addIfNonNull('padding', <double?>[
       padding?.top,

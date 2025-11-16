@@ -7,6 +7,7 @@ import 'history_test_page.dart';
 import 'history_replay_example.dart';
 import 'map_search_example.dart';
 import 'route_selection_example.dart';
+import 'style_picker_example.dart';
 
 void main() => runApp(const NavigationDemoApp());
 
@@ -134,6 +135,19 @@ class NavigationHomePage extends StatelessWidget {
                 context,
                 MaterialPageRoute(
                     builder: (context) => const RouteSelectionExample()),
+              ),
+            ),
+            const SizedBox(height: 16),
+            _buildDemoCard(
+              context,
+              title: '地图样式设置',
+              description: '一键设置，自动存储，后续导航自动应用 ✨',
+              icon: Icons.palette,
+              color: Colors.deepPurple,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (context) => const StylePickerExample()),
               ),
             ),
             const SizedBox(height: 24), // 底部间距

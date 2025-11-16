@@ -1,6 +1,7 @@
 export 'event_data.dart';
 export 'events.dart';
 export 'feedback.dart';
+export 'map_style.dart';
 export 'navigation_history.dart';
 export 'navmode.dart';
 export 'options.dart';

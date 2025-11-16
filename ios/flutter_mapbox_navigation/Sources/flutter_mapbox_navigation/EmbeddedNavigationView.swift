@@ -157,8 +157,27 @@ public class FlutterMapboxNavigationView : NavigationFactory, FlutterPlatformVie
 
             parseFlutterArguments(arguments: arguments)
 
-            if(_mapStyleUrlDay != nil)
-            {
+            // 应用地图样式
+            if let mapStyle = _mapStyle {
+                // 如果设置了 mapStyle，使用对应的 StyleURI
+                // 注意: faded 和 monochrome 会映射到 standard + theme
+                navigationMapView?.mapView.mapboxMap.style.uri = getCurrentStyleURI()
+                
+                // 应用 light preset 和 theme
+                // 支持的样式: standard, standardSatellite, faded, monochrome
+                // 等待样式加载完成后再应用配置
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    if let preset = self._lightPreset {
+                        self.applyLightPreset(preset, to: self.navigationMapView?.mapView)
+                    }
+                    
+                    // 如果启用了动态切换，启动定时器
+                    if self._enableDynamicLightPreset {
+                        self.startDynamicLightPresetSwitch(mapView: self.navigationMapView?.mapView)
+                    }
+                }
+            } else if(_mapStyleUrlDay != nil) {
+                // 否则使用原有的 URL 设置方式
                 navigationMapView?.mapView.mapboxMap.style.uri = StyleURI.init(url: URL(string: _mapStyleUrlDay!)!)
             }
 

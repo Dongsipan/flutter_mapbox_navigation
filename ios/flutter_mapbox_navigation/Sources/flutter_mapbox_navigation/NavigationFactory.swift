@@ -1,5 +1,6 @@
 import Flutter
 import UIKit
+import MapboxMaps
 import MapboxNavigationCore
 import MapboxNavigationUIKit
 import MapboxDirections
@@ -57,6 +58,11 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
     var _voiceUnits = "imperial"
     var _mapStyleUrlDay: String?
     var _mapStyleUrlNight: String?
+    var _mapStyle: String?  // MapStyle 枚举值
+    var _lightPreset: String?  // LightPreset 枚举值
+    var _enableDynamicLightPreset: Bool = false  // 是否启用动态 light preset 切换
+    var _currentLightPresetIndex: Int = 1  // 当前 light preset 索引（0=dawn, 1=day, 2=dusk, 3=night）
+    var _lightPresetTimer: Timer?  // 用于动态切换的定时器
     var _zoom: Double = 13.0
     var _tilt: Double = 0.0
     var _bearing: Double = 0.0
@@ -83,6 +89,34 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
     private var replayNavigationProvider: MapboxNavigationProvider?
     private var replayMapboxNavigation: MapboxNavigation?
     private var isHistoryReplaying: Bool = false
+    
+    // MARK: - Initialization
+    
+    override init() {
+        super.init()
+        // 自动加载存储的样式设置
+        loadStoredStyleSettings()
+    }
+    
+    /// 从 UserDefaults 加载存储的样式设置
+    private func loadStoredStyleSettings() {
+        let settings = StylePickerHandler.loadStoredStyleSettings()
+        
+        if let mapStyle = settings.mapStyle {
+            _mapStyle = mapStyle
+            print("✅ NavigationFactory: 已加载存储的地图样式: \(mapStyle)")
+        }
+        
+        if let lightPreset = settings.lightPreset {
+            _lightPreset = lightPreset
+            print("✅ NavigationFactory: 已加载存储的 Light Preset: \(lightPreset)")
+        }
+        
+        _enableDynamicLightPreset = settings.enableDynamic
+        if settings.enableDynamic {
+            print("✅ NavigationFactory: 已启用动态 Light Preset 切换")
+        }
+    }
     
     func addWayPoints(arguments: NSDictionary?, result: @escaping FlutterResult)
     {
@@ -346,6 +380,30 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
         _enableHistoryRecording = arguments?["enableHistoryRecording"] as? Bool ?? _enableHistoryRecording
         _mapStyleUrlDay = arguments?["mapStyleUrlDay"] as? String
         _mapStyleUrlNight = arguments?["mapStyleUrlNight"] as? String
+        
+        // ⚠️ 重要：只有当 Flutter 端明确传入参数时才覆盖
+        // 否则使用从 UserDefaults 加载的存储值（在 init() 中加载）
+        if let mapStyle = arguments?["mapStyle"] as? String {
+            _mapStyle = mapStyle
+            print("⚙️ 使用 Flutter 传入的样式: \(mapStyle)")
+        } else {
+            print("⚙️ 使用存储的样式: \(_mapStyle ?? "nil")")
+        }
+        
+        if let lightPreset = arguments?["lightPreset"] as? String {
+            _lightPreset = lightPreset
+            print("⚙️ 使用 Flutter 传入的 Light Preset: \(lightPreset)")
+        } else {
+            print("⚙️ 使用存储的 Light Preset: \(_lightPreset ?? "nil")")
+        }
+        
+        if let enableDynamic = arguments?["enableDynamicLightPreset"] as? Bool {
+            _enableDynamicLightPreset = enableDynamic
+            print("⚙️ 使用 Flutter 传入的动态切换: \(enableDynamic)")
+        } else {
+            print("⚙️ 使用存储的动态切换: \(_enableDynamicLightPreset)")
+        }
+        
         _zoom = arguments?["zoom"] as? Double ?? _zoom
         _bearing = arguments?["bearing"] as? Double ?? _bearing
         _tilt = arguments?["tilt"] as? Double ?? _tilt
@@ -387,6 +445,9 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
     {
         // 先停止历史记录
         stopHistoryRecording()
+        
+        // 停止 light preset 定时器
+        stopDynamicLightPresetSwitch()
 
         // 尽快将会话置为 Idle，避免残留活跃状态
         Task { @MainActor in
@@ -1333,5 +1394,135 @@ struct HistoryRecord: Codable {
         // 5. 文件确实不存在，返回原路径
         print("⚠️ 文件不存在: \(fileName)")
         return storedPath
+    }
+}
+
+// MARK: - NavigationFactory Light Preset Extension
+extension NavigationFactory {
+    
+    /**
+     * 获取当前应该使用的 StyleURI
+     * 根据 mapStyle 参数返回对应的 StyleURI
+     */
+    func getCurrentStyleURI() -> MapboxMaps.StyleURI {
+        guard let mapStyle = _mapStyle else {
+            return MapboxMaps.StyleURI.standard
+        }
+        
+        switch mapStyle {
+        case "standard", "faded", "monochrome":
+            // faded 和 monochrome 是 standard 的主题变体
+            return MapboxMaps.StyleURI.standard
+        case "standardSatellite":
+            return MapboxMaps.StyleURI.standardSatellite
+        case "light":
+            return MapboxMaps.StyleURI.light
+        case "dark":
+            return MapboxMaps.StyleURI.dark
+        case "outdoors":
+            return MapboxMaps.StyleURI.outdoors
+        default:
+            return MapboxMaps.StyleURI.standard
+        }
+    }
+    
+    /**
+     * 应用 light preset 和 theme 到地图
+     * 支持的样式: standard, standardSatellite, faded, monochrome
+     * 其他样式: light, dark, outdoors 不支持 Light Preset
+     */
+    func applyLightPreset(_ preset: String, to mapView: MapboxMaps.MapView?) {
+        guard let mapView = mapView else { return }
+        
+        // 检查当前样式是否支持 Light Preset
+        let supportedStyles = ["standard", "standardSatellite", "faded", "monochrome"]
+        if let currentStyle = _mapStyle, !supportedStyles.contains(currentStyle) {
+            print("ℹ️ 样式 '\(currentStyle)' 不支持 Light Preset，已跳过")
+            return
+        }
+        
+        do {
+            // 1. 应用 Light Preset
+            try mapView.mapboxMap.setStyleImportConfigProperty(
+                for: "basemap",
+                config: "lightPreset",
+                value: preset
+            )
+            print("✅ Light preset 已应用: \(preset)")
+            
+            // 2. 如果是 faded 或 monochrome，应用对应的 theme
+            if let currentStyle = _mapStyle {
+                if currentStyle == "faded" {
+                    try mapView.mapboxMap.setStyleImportConfigProperty(
+                        for: "basemap",
+                        config: "theme",
+                        value: "faded"
+                    )
+                    print("✅ Theme 已应用: faded")
+                } else if currentStyle == "monochrome" {
+                    try mapView.mapboxMap.setStyleImportConfigProperty(
+                        for: "basemap",
+                        config: "theme",
+                        value: "monochrome"
+                    )
+                    print("✅ Theme 已应用: monochrome")
+                } else if currentStyle == "standard" {
+                    // 确保使用默认 theme
+                    try mapView.mapboxMap.setStyleImportConfigProperty(
+                        for: "basemap",
+                        config: "theme",
+                        value: "default"
+                    )
+                    print("✅ Theme 已重置: default")
+                }
+            }
+        } catch {
+            print("⚠️ 应用样式配置失败: \(error)")
+        }
+    }
+    
+    /**
+     * 启动动态 light preset 切换
+     * 每隔一定时间自动切换到下一个 preset
+     * 支持的样式: standard, standardSatellite, faded, monochrome
+     */
+    func startDynamicLightPresetSwitch(mapView: MapboxMaps.MapView?) {
+        // 先停止已有的定时器
+        stopDynamicLightPresetSwitch()
+        
+        guard _enableDynamicLightPreset else { return }
+        
+        let presets = ["dawn", "day", "dusk", "night"]
+        
+        // 如果设置了初始 lightPreset，找到对应的索引
+        if let initialPreset = _lightPreset,
+           let index = presets.firstIndex(of: initialPreset) {
+            _currentLightPresetIndex = index
+        }
+        
+        // 应用初始 preset
+        applyLightPreset(presets[_currentLightPresetIndex], to: mapView)
+        
+        // 创建定时器，每 5 秒切换一次
+        _lightPresetTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
+            guard let self = self else { return }
+            
+            // 切换到下一个 preset
+            self._currentLightPresetIndex = (self._currentLightPresetIndex + 1) % presets.count
+            let nextPreset = presets[self._currentLightPresetIndex]
+            
+            self.applyLightPreset(nextPreset, to: mapView)
+            
+            // 发送事件通知 Flutter 层
+            self.sendEvent(eventType: .light_preset_changed, data: nextPreset)
+        }
+    }
+    
+    /**
+     * 停止动态 light preset 切换
+     */
+    func stopDynamicLightPresetSwitch() {
+        _lightPresetTimer?.invalidate()
+        _lightPresetTimer = nil
     }
 }

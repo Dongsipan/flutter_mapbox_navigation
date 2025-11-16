@@ -22,4 +22,5 @@ enum MapBoxEventType: String, Codable
     case history_recording_started
     case history_recording_stopped
     case history_recording_error
+    case light_preset_changed
 }

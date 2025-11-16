@@ -214,12 +214,15 @@ class MapBoxOptions {
     addIfNonNull('voiceInstructionsEnabled', voiceInstructionsEnabled);
     addIfNonNull('bannerInstructionsEnabled', bannerInstructionsEnabled);
 
+    // 样式设置现在通过 StylePickerViewController 管理，存储在 UserDefaults 中
+    // 不再通过 MapBoxOptions 传递
     if (mapStyleUrlDay != null) {
       optionsMap['mapStyleUrlDay'] = mapStyleUrlDay;
     }
     if (mapStyleUrlNight != null) {
       optionsMap['mapStyleUrlNight'] = mapStyleUrlNight;
     }
+
     if (simulateRoute != null) {
       optionsMap['simulateRoute'] = simulateRoute;
     }

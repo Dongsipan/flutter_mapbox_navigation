@@ -10,6 +10,7 @@ import MapboxSearchUI
 public class FlutterMapboxNavigationPlugin: NavigationFactory, FlutterPlugin {
 
   private var searchController: SearchViewController?
+  private var stylePickerHandler: StylePickerHandler?
 
   public static func register(with registrar: FlutterPluginRegistrar) {
     let channel = FlutterMethodChannel(name: "flutter_mapbox_navigation", binaryMessenger: registrar.messenger())
@@ -18,9 +19,12 @@ public class FlutterMapboxNavigationPlugin: NavigationFactory, FlutterPlugin {
 
     let instance = FlutterMapboxNavigationPlugin()
     instance.searchController = SearchViewController(methodChannel: searchChannel)
+    // StylePickerHandler 内部创建自己的 channel 并处理方法调用
+    instance.stylePickerHandler = StylePickerHandler(messenger: registrar.messenger())
 
     registrar.addMethodCallDelegate(instance, channel: channel)
     registrar.addMethodCallDelegate(instance.searchController!, channel: searchChannel)
+    // StylePickerHandler 内部已经设置了 method call handler，不需要在这里注册
 
     eventChannel.setStreamHandler(instance)
 

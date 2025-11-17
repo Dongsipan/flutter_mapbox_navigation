@@ -9,7 +9,7 @@ class StylePickerHandler: NSObject {
     // UserDefaults keys
     private static let keyMapStyle = "mapbox_map_style"
     private static let keyLightPreset = "mapbox_light_preset"
-    private static let keyEnableDynamic = "mapbox_enable_dynamic_light_preset"
+    private static let keyLightPresetMode = "mapbox_light_preset_mode"  // 新：模式 (manual/realTime/demo)
     
     init(messenger: FlutterBinaryMessenger) {
         self.channel = FlutterMethodChannel(
@@ -42,13 +42,18 @@ class StylePickerHandler: NSObject {
         let defaults = UserDefaults.standard
         let currentStyle = defaults.string(forKey: Self.keyMapStyle) ?? "standard"
         let currentLightPreset = defaults.string(forKey: Self.keyLightPreset) ?? "day"
-        let enableDynamicLightPreset = defaults.bool(forKey: Self.keyEnableDynamic)
+        var lightPresetMode = defaults.string(forKey: Self.keyLightPresetMode) ?? "manual"
+        
+        // 兼容旧值：将 realTime 和 demo 映射为 automatic
+        if lightPresetMode == "realTime" || lightPresetMode == "demo" {
+            lightPresetMode = "automatic"
+        }
         
         DispatchQueue.main.async {
             self.presentStylePicker(
                 currentStyle: currentStyle,
                 currentLightPreset: currentLightPreset,
-                enableDynamicLightPreset: enableDynamicLightPreset,
+                lightPresetMode: lightPresetMode,
                 completion: { pickerResult in
                     if let pickerResult = pickerResult {
                         // 自动保存到 UserDefaults
@@ -70,12 +75,12 @@ class StylePickerHandler: NSObject {
         let defaults = UserDefaults.standard
         let mapStyle = defaults.string(forKey: Self.keyMapStyle) ?? "standard"
         let lightPreset = defaults.string(forKey: Self.keyLightPreset) ?? "day"
-        let enableDynamic = defaults.bool(forKey: Self.keyEnableDynamic)
+        let lightPresetMode = defaults.string(forKey: Self.keyLightPresetMode) ?? "manual"
         
         result([
             "mapStyle": mapStyle,
             "lightPreset": lightPreset,
-            "enableDynamicLightPreset": enableDynamic
+            "lightPresetMode": lightPresetMode
         ])
     }
     
@@ -84,7 +89,7 @@ class StylePickerHandler: NSObject {
         let defaults = UserDefaults.standard
         defaults.removeObject(forKey: Self.keyMapStyle)
         defaults.removeObject(forKey: Self.keyLightPreset)
-        defaults.removeObject(forKey: Self.keyEnableDynamic)
+        defaults.removeObject(forKey: Self.keyLightPresetMode)
         defaults.synchronize()
         
         result(true)
@@ -99,27 +104,27 @@ class StylePickerHandler: NSObject {
             defaults.set(preset, forKey: Self.keyLightPreset)
         }
         
-        defaults.set(pickerResult.enableDynamicLightPreset, forKey: Self.keyEnableDynamic)
+        defaults.set(pickerResult.lightPresetMode, forKey: Self.keyLightPresetMode)
         defaults.synchronize()
         
-        print("✅ 样式设置已保存: \(pickerResult.mapStyle), \(pickerResult.lightPreset ?? "nil"), dynamic: \(pickerResult.enableDynamicLightPreset)")
+        print("✅ 样式设置已保存: \(pickerResult.mapStyle), \(pickerResult.lightPreset ?? "nil"), mode: \(pickerResult.lightPresetMode)")
     }
     
     /// 静态方法：供 NavigationFactory 读取存储的样式
-    static func loadStoredStyleSettings() -> (mapStyle: String?, lightPreset: String?, enableDynamic: Bool) {
+    static func loadStoredStyleSettings() -> (mapStyle: String?, lightPreset: String?, lightPresetMode: String?) {
         let defaults = UserDefaults.standard
         let mapStyle = defaults.string(forKey: keyMapStyle)
         let lightPreset = defaults.string(forKey: keyLightPreset)
-        let enableDynamic = defaults.bool(forKey: keyEnableDynamic)
+        let lightPresetMode = defaults.string(forKey: keyLightPresetMode)
         
-        return (mapStyle, lightPreset, enableDynamic)
+        return (mapStyle, lightPreset, lightPresetMode)
     }
     
     /// 弹出样式选择器
     private func presentStylePicker(
         currentStyle: String,
         currentLightPreset: String,
-        enableDynamicLightPreset: Bool,
+        lightPresetMode: String,
         completion: @escaping (StylePickerResult?) -> Void
     ) {
         guard let rootVC = getRootViewController() else {
@@ -130,7 +135,7 @@ class StylePickerHandler: NSObject {
         let picker = StylePickerViewController(
             currentStyle: currentStyle,
             currentLightPreset: currentLightPreset,
-            enableDynamicLightPreset: enableDynamicLightPreset,
+            lightPresetMode: lightPresetMode,
             completion: completion
         )
         

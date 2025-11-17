@@ -9,7 +9,7 @@ class StylePickerViewController: UIViewController {
     
     private var selectedStyle: String = "standard"
     private var selectedLightPreset: String = "day"
-    private var enableDynamicLightPreset: Bool = false
+    private var lightPresetMode: String = "manual"  // manual, automatic
     
     private var completion: ((StylePickerResult?) -> Void)?
     
@@ -24,8 +24,7 @@ class StylePickerViewController: UIViewController {
     private let styleStackView = UIStackView()
     private let lightPresetSection = UIView()
     private let lightPresetStackView = UIStackView()
-    private let dynamicSwitch = UISwitch()
-    private let autoTimeSwitch = UISwitch()
+    private let automaticModeSwitch = UISwitch()  // 自动模式开关
     
     // 底部按钮容器（固定在底部）
     private let bottomButtonContainer = UIView()
@@ -36,12 +35,17 @@ class StylePickerViewController: UIViewController {
     
     init(currentStyle: String? = nil, 
          currentLightPreset: String? = nil,
-         enableDynamicLightPreset: Bool = false,
+         lightPresetMode: String = "manual",
          completion: @escaping (StylePickerResult?) -> Void) {
         
         self.selectedStyle = currentStyle ?? "standard"
         self.selectedLightPreset = currentLightPreset ?? "day"
-        self.enableDynamicLightPreset = enableDynamicLightPreset
+        // 兼容旧的 realTime 和 demo，统一映射为 automatic
+        if lightPresetMode == "realTime" || lightPresetMode == "demo" {
+            self.lightPresetMode = "automatic"
+        } else {
+            self.lightPresetMode = lightPresetMode
+        }
         self.completion = completion
         
         super.init(nibName: nil, bundle: nil)
@@ -543,27 +547,56 @@ class StylePickerViewController: UIViewController {
         container.backgroundColor = .secondarySystemGroupedBackground
         container.layer.cornerRadius = 12
         
-        let label = UILabel()
-        label.text = "启用动态切换（每5秒自动循环）"
-        label.font = .systemFont(ofSize: 15)
-        label.translatesAutoresizingMaskIntoConstraints = false
-        container.addSubview(label)
+        // 主标题和开关
+        let topRow = UIView()
+        topRow.translatesAutoresizingMaskIntoConstraints = false
+        container.addSubview(topRow)
         
-        dynamicSwitch.isOn = enableDynamicLightPreset
-        dynamicSwitch.translatesAutoresizingMaskIntoConstraints = false
-        container.addSubview(dynamicSwitch)
+        let titleLabel = UILabel()
+        titleLabel.text = "根据日出日落自动调整"
+        titleLabel.font = .systemFont(ofSize: 15, weight: .medium)
+        titleLabel.translatesAutoresizingMaskIntoConstraints = false
+        topRow.addSubview(titleLabel)
+        
+        automaticModeSwitch.isOn = (lightPresetMode == "automatic")
+        automaticModeSwitch.translatesAutoresizingMaskIntoConstraints = false
+        automaticModeSwitch.addTarget(self, action: #selector(automaticModeSwitchChanged), for: .valueChanged)
+        topRow.addSubview(automaticModeSwitch)
+        
+        // 说明文字
+        let descLabel = UILabel()
+        descLabel.numberOfLines = 0
+        descLabel.font = .systemFont(ofSize: 12)
+        descLabel.textColor = .secondaryLabel
+        descLabel.text = "开启后，地图样式将根据当前位置的真实日出日落时间自动调整 Light Preset（黎明/白天/黄昏/夜晚）"
+        descLabel.translatesAutoresizingMaskIntoConstraints = false
+        container.addSubview(descLabel)
         
         NSLayoutConstraint.activate([
-            label.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 16),
-            label.centerYAnchor.constraint(equalTo: container.centerYAnchor),
+            topRow.topAnchor.constraint(equalTo: container.topAnchor, constant: 12),
+            topRow.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 16),
+            topRow.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -16),
+            topRow.heightAnchor.constraint(equalToConstant: 30),
             
-            dynamicSwitch.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -16),
-            dynamicSwitch.centerYAnchor.constraint(equalTo: container.centerYAnchor),
+            titleLabel.leadingAnchor.constraint(equalTo: topRow.leadingAnchor),
+            titleLabel.centerYAnchor.constraint(equalTo: topRow.centerYAnchor),
             
-            container.heightAnchor.constraint(equalToConstant: 50)
+            automaticModeSwitch.trailingAnchor.constraint(equalTo: topRow.trailingAnchor),
+            automaticModeSwitch.centerYAnchor.constraint(equalTo: topRow.centerYAnchor),
+            
+            descLabel.topAnchor.constraint(equalTo: topRow.bottomAnchor, constant: 8),
+            descLabel.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 16),
+            descLabel.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -16),
+            descLabel.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -12)
         ])
         
         return container
+    }
+    
+    /// 自动模式开关切换事件
+    @objc private func automaticModeSwitchChanged() {
+        lightPresetMode = automaticModeSwitch.isOn ? "automatic" : "manual"
+        print("Light Preset 模式切换为: \(lightPresetMode)")
     }
     
     // MARK: - Action Buttons Setup
@@ -597,7 +630,7 @@ class StylePickerViewController: UIViewController {
         let result = StylePickerResult(
             mapStyle: selectedStyle,
             lightPreset: lightPreset,
-            enableDynamicLightPreset: dynamicSwitch.isOn
+            lightPresetMode: lightPresetMode
         )
         completion?(result)
         dismiss(animated: true)
@@ -646,5 +679,5 @@ class StylePickerViewController: UIViewController {
 struct StylePickerResult {
     let mapStyle: String
     let lightPreset: String?
-    let enableDynamicLightPreset: Bool
+    let lightPresetMode: String  // "manual", "realTime", "demo"
 }

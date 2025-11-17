@@ -10,6 +10,23 @@ import Foundation
 // Type alias to avoid conflicts with Mapbox's Location type
 typealias FlutterLocation = flutter_mapbox_navigation.Location
 
+// MARK: - Light Preset Mode Enum
+/// Light Preset 模式枚举
+enum LightPresetMode: String {
+    case manual = "manual"          // 手动模式：使用用户选择的固定 preset
+    case automatic = "automatic"    // 自动模式：根据真实日出日落自动调整（使用 SDK 内置功能）
+    
+    /// 从字符串解析，默认为手动模式
+    static func from(_ string: String?) -> LightPresetMode {
+        guard let string = string else { return .manual }
+        // 兼容旧的 "realTime" 和 "demo"，统一映射为 automatic
+        if string == "realTime" || string == "demo" {
+            return .automatic
+        }
+        return LightPresetMode(rawValue: string) ?? .manual
+    }
+}
+
 // MARK: - History Directory Helper (following official example pattern)
 func defaultHistoryDirectoryURL() -> URL {
     let basePath: String = if let applicationSupportPath =
@@ -59,10 +76,8 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
     var _mapStyleUrlDay: String?
     var _mapStyleUrlNight: String?
     var _mapStyle: String?  // MapStyle 枚举值
-    var _lightPreset: String?  // LightPreset 枚举值
-    var _enableDynamicLightPreset: Bool = false  // 是否启用动态 light preset 切换
-    var _currentLightPresetIndex: Int = 1  // 当前 light preset 索引（0=dawn, 1=day, 2=dusk, 3=night）
-    var _lightPresetTimer: Timer?  // 用于动态切换的定时器
+    var _lightPreset: String?  // LightPreset 枚举值（仅手动模式使用）
+    var _lightPresetMode: LightPresetMode = .manual  // Light Preset 模式（手动/自动）
     var _zoom: Double = 13.0
     var _tilt: Double = 0.0
     var _bearing: Double = 0.0
@@ -112,10 +127,8 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
             print("✅ NavigationFactory: 已加载存储的 Light Preset: \(lightPreset)")
         }
         
-        _enableDynamicLightPreset = settings.enableDynamic
-        if settings.enableDynamic {
-            print("✅ NavigationFactory: 已启用动态 Light Preset 切换")
-        }
+        _lightPresetMode = LightPresetMode.from(settings.lightPresetMode)
+        print("✅ NavigationFactory: Light Preset 模式: \(_lightPresetMode.rawValue)")
     }
     
     func addWayPoints(arguments: NSDictionary?, result: @escaping FlutterResult)
@@ -404,11 +417,12 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
             print("⚙️ 使用存储的 Light Preset: \(_lightPreset ?? "nil")")
         }
         
-        if let enableDynamic = arguments?["enableDynamicLightPreset"] as? Bool {
-            _enableDynamicLightPreset = enableDynamic
-            print("⚙️ 使用 Flutter 传入的动态切换: \(enableDynamic)")
+        // 支持新的 lightPresetMode 参数
+        if let modeString = arguments?["lightPresetMode"] as? String {
+            _lightPresetMode = LightPresetMode.from(modeString)
+            print("⚙️ 使用 Flutter 传入的 Light Preset 模式: \(_lightPresetMode.rawValue)")
         } else {
-            print("⚙️ 使用存储的动态切换: \(_enableDynamicLightPreset)")
+            print("⚙️ 使用存储的 Light Preset 模式: \(_lightPresetMode.rawValue)")
         }
         
         _zoom = arguments?["zoom"] as? Double ?? _zoom
@@ -452,9 +466,6 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
     {
         // 先停止历史记录
         stopHistoryRecording()
-        
-        // 停止 light preset 定时器
-        stopDynamicLightPresetSwitch()
 
         // 尽快将会话置为 Idle，避免残留活跃状态
         Task { @MainActor in
@@ -1435,6 +1446,7 @@ extension NavigationFactory {
     
     /**
      * 应用存储的地图样式到 NavigationViewController
+     * 根据官方文档，使用 automaticallyAdjustsStyleForTimeOfDay 实现基于日出日落的自动调整
      */
     func applyStoredMapStyle(to navigationViewController: NavigationViewController) {
         Task { @MainActor in
@@ -1451,18 +1463,24 @@ extension NavigationFactory {
                 mapView.mapboxMap.style.uri = getCurrentStyleURI()
                 print("✅ 已应用地图样式: \(_mapStyle ?? "standard")")
                 
-                // 2. 等待样式加载完成后应用 Light Preset 和 Theme
-                // 延迟 0.5 秒等待样式加载
+                // 2. 等待样式加载完成
                 try? await Task.sleep(nanoseconds: 500_000_000)
                 
-                // 应用 Light Preset（如果有）
-                if let preset = self._lightPreset {
-                    self.applyLightPreset(preset, to: mapView)
-                }
-                
-                // 如果启用了动态切换，启动定时器
-                if self._enableDynamicLightPreset {
-                    self.startDynamicLightPresetSwitch(mapView: mapView)
+                // 3. 根据模式设置 Light Preset
+                switch self._lightPresetMode {
+                case .manual:
+                    // 手动模式：禁用自动调整，使用用户选择的固定 preset
+                    navigationViewController.automaticallyAdjustsStyleForTimeOfDay = false
+                    if let preset = self._lightPreset {
+                        self.applyLightPreset(preset, to: mapView)
+                        print("✅ Light Preset 模式：手动 (\(preset))")
+                    }
+                    
+                case .automatic:
+                    // 自动模式：启用 SDK 的内置日出日落自动调整功能
+                    navigationViewController.automaticallyAdjustsStyleForTimeOfDay = true
+                    print("✅ Light Preset 模式：自动（基于真实日出日落时间）")
+                    print("ℹ️  SDK 将根据当前位置的日出日落自动调整地图样式")
                 }
             } else if _mapStyleUrlDay != nil {
                 // 兼容旧的 URL 方式
@@ -1551,50 +1569,5 @@ extension NavigationFactory {
         } catch {
             print("⚠️ 应用样式配置失败: \(error)")
         }
-    }
-    
-    /**
-     * 启动动态 light preset 切换
-     * 每隔一定时间自动切换到下一个 preset
-     * 支持的样式: standard, standardSatellite, faded, monochrome
-     */
-    func startDynamicLightPresetSwitch(mapView: MapboxMaps.MapView?) {
-        // 先停止已有的定时器
-        stopDynamicLightPresetSwitch()
-        
-        guard _enableDynamicLightPreset else { return }
-        
-        let presets = ["dawn", "day", "dusk", "night"]
-        
-        // 如果设置了初始 lightPreset，找到对应的索引
-        if let initialPreset = _lightPreset,
-           let index = presets.firstIndex(of: initialPreset) {
-            _currentLightPresetIndex = index
-        }
-        
-        // 应用初始 preset
-        applyLightPreset(presets[_currentLightPresetIndex], to: mapView)
-        
-        // 创建定时器，每 5 秒切换一次
-        _lightPresetTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
-            guard let self = self else { return }
-            
-            // 切换到下一个 preset
-            self._currentLightPresetIndex = (self._currentLightPresetIndex + 1) % presets.count
-            let nextPreset = presets[self._currentLightPresetIndex]
-            
-            self.applyLightPreset(nextPreset, to: mapView)
-            
-            // 发送事件通知 Flutter 层
-            self.sendEvent(eventType: .light_preset_changed, data: nextPreset)
-        }
-    }
-    
-    /**
-     * 停止动态 light preset 切换
-     */
-    func stopDynamicLightPresetSwitch() {
-        _lightPresetTimer?.invalidate()
-        _lightPresetTimer = nil
     }
 }

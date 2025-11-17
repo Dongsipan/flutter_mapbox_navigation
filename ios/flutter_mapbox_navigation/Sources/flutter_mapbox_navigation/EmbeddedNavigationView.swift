@@ -167,13 +167,13 @@ public class FlutterMapboxNavigationView : NavigationFactory, FlutterPlatformVie
                 // 支持的样式: standard, standardSatellite, faded, monochrome
                 // 等待样式加载完成后再应用配置
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    if let preset = self._lightPreset {
+                    // 嵌入式导航视图仅支持手动模式
+                    // 自动模式（automaticallyAdjustsStyleForTimeOfDay）仅适用于 NavigationViewController
+                    if self._lightPresetMode == .manual, let preset = self._lightPreset {
                         self.applyLightPreset(preset, to: self.navigationMapView?.mapView)
-                    }
-                    
-                    // 如果启用了动态切换，启动定时器
-                    if self._enableDynamicLightPreset {
-                        self.startDynamicLightPresetSwitch(mapView: self.navigationMapView?.mapView)
+                        print("✅ EmbeddedNavigationView - Light Preset 模式：手动 (\(preset))")
+                    } else if self._lightPresetMode == .automatic {
+                        print("ℹ️  EmbeddedNavigationView 不支持自动模式，请使用 NavigationViewController")
                     }
                 }
             } else if(_mapStyleUrlDay != nil) {

@@ -306,6 +306,13 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
                 // self._navigationViewController!.showsReportFeedback = _showReportFeedbackButton
                 // self._navigationViewController!.showsEndOfRouteFeedback = _showEndOfRouteFeedback
                 
+                // 确保关闭按钮可见（Mapbox v3 默认应该显示）
+                // 如果有 showsCancelButton 属性，可以显式设置
+                // self._navigationViewController!.showsCancelButton = true
+                
+                // 应用存储的地图样式
+                self.applyStoredMapStyle(to: self._navigationViewController!)
+                
                 let flutterViewController = UIApplication.shared.delegate?.window??.rootViewController as! FlutterViewController
                 flutterViewController.present(self._navigationViewController!, animated: true, completion: {
                     // 导航界面显示后启动历史记录
@@ -941,20 +948,46 @@ extension NavigationFactory : NavigationViewControllerDelegate {
         return _shouldReRoute
     }
 
-    // 当用户手势关闭/系统关闭导航控制器时，兜底做核心清理（唯一实现）
+    // 询问是否可以关闭导航控制器（允许用户点击关闭按钮）
+    public func navigationViewControllerShouldDismiss(
+        _ navigationViewController: NavigationViewController
+    ) -> Bool {
+        // 返回 true 允许用户关闭导航
+        return true
+    }
+    
+    // 当用户手势关闭/系统关闭导航控制器时，执行清理和关闭操作
+    // 参照 Mapbox 官方示例的"带清理逻辑的实现"模式
     public func navigationViewControllerDidDismiss(
         _ navigationViewController: NavigationViewController,
         byCanceling canceled: Bool
     ) {
+        print("📍 navigationViewControllerDidDismiss called, canceled: \(canceled)")
+        
+        // 停止历史记录（如果用户取消）
         if canceled {
             stopHistoryRecording()
             sendEvent(eventType: MapBoxEventType.navigation_cancelled)
         }
+        
+        // 在主线程上关闭导航视图控制器，并在 completion 中执行清理操作
         Task { @MainActor in
-            self.mapboxNavigation?.tripSession().setToIdle()
+            navigationViewController.dismiss(animated: true) { [weak self] in
+                guard let self = self else { return }
+                
+                // 在 dismiss 完成后执行清理操作（符合官方示例模式）
+                print("✅ 导航视图控制器已关闭")
+                
+                // 清理导航会话
+                Task { @MainActor in
+                    self.mapboxNavigation?.tripSession().setToIdle()
+                }
+                
+                // 清理引用
+                self._navigationViewController = nil
+                self.resetNavigationCore()
+            }
         }
-        self._navigationViewController = nil
-        self.resetNavigationCore()
     }
     
     // EndOfRouteFeedback has been removed in v3
@@ -1399,6 +1432,45 @@ struct HistoryRecord: Codable {
 
 // MARK: - NavigationFactory Light Preset Extension
 extension NavigationFactory {
+    
+    /**
+     * 应用存储的地图样式到 NavigationViewController
+     */
+    func applyStoredMapStyle(to navigationViewController: NavigationViewController) {
+        Task { @MainActor in
+            // 获取 navigationMapView
+            guard let navigationMapView = navigationViewController.navigationMapView else {
+                print("⚠️ 无法获取 navigationMapView")
+                return
+            }
+            
+            let mapView = navigationMapView.mapView
+            
+            // 1. 应用地图样式 URI
+            if _mapStyle != nil {
+                mapView.mapboxMap.style.uri = getCurrentStyleURI()
+                print("✅ 已应用地图样式: \(_mapStyle ?? "standard")")
+                
+                // 2. 等待样式加载完成后应用 Light Preset 和 Theme
+                // 延迟 0.5 秒等待样式加载
+                try? await Task.sleep(nanoseconds: 500_000_000)
+                
+                // 应用 Light Preset（如果有）
+                if let preset = self._lightPreset {
+                    self.applyLightPreset(preset, to: mapView)
+                }
+                
+                // 如果启用了动态切换，启动定时器
+                if self._enableDynamicLightPreset {
+                    self.startDynamicLightPresetSwitch(mapView: mapView)
+                }
+            } else if _mapStyleUrlDay != nil {
+                // 兼容旧的 URL 方式
+                mapView.mapboxMap.style.uri = StyleURI.init(url: URL(string: _mapStyleUrlDay!)!)
+                print("✅ 已应用地图样式URL: \(_mapStyleUrlDay!)")
+            }
+        }
+    }
     
     /**
      * 获取当前应该使用的 StyleURI

@@ -46,14 +46,14 @@ class MapboxStylePicker {
   /// 返回存储在插件中的样式配置
   ///
   /// 返回值：
-  /// - Map 包含 mapStyle, lightPreset, enableDynamicLightPreset
+  /// - Map 包含 mapStyle, lightPreset, lightPresetMode
   ///
   /// 示例：
   /// ```dart
   /// final settings = await MapboxStylePicker.getStoredStyle();
   /// print('当前样式: ${settings['mapStyle']}');
   /// print('Light Preset: ${settings['lightPreset']}');
-  /// print('动态切换: ${settings['enableDynamicLightPreset']}');
+  /// print('自动调整模式: ${settings['lightPresetMode']}'); // manual 或 automatic
   /// ```
   static Future<Map<String, dynamic>> getStoredStyle() async {
     try {
@@ -66,14 +66,14 @@ class MapboxStylePicker {
       return {
         'mapStyle': 'standard',
         'lightPreset': 'day',
-        'enableDynamicLightPreset': false,
+        'lightPresetMode': 'manual',
       };
     } catch (e) {
       print('❌ 获取存储样式失败: $e');
       return {
         'mapStyle': 'standard',
         'lightPreset': 'day',
-        'enableDynamicLightPreset': false,
+        'lightPresetMode': 'manual',
       };
     }
   }

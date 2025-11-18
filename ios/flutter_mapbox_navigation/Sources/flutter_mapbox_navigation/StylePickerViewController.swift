@@ -66,6 +66,9 @@ class StylePickerViewController: UIViewController {
         setupNavigationBar()
         setupUI()
         setupMapView()
+        
+        // 初始化 Light Preset 区域的可见性
+        updateLightPresetSectionVisibility()
     }
     
     /// 根据当前时间获取合适的 Light Preset
@@ -399,6 +402,9 @@ class StylePickerViewController: UIViewController {
         styleStackView.arrangedSubviews.forEach { $0.removeFromSuperview() }
         setupStyleButtons()
         
+        // 根据样式更新 Light Preset 区域的显示
+        updateLightPresetSectionVisibility()
+        
         // 更新地图
         updateMapStyle()
     }
@@ -413,8 +419,9 @@ class StylePickerViewController: UIViewController {
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
         lightPresetSection.addSubview(titleLabel)
         
+        // 动态提示标签（支持/不支持）
         let subtitleLabel = UILabel()
-        subtitleLabel.text = "仅标有 ✨ 的样式支持，已根据时间自动选择"
+        subtitleLabel.tag = 9999 // 用于后续更新
         subtitleLabel.font = .systemFont(ofSize: 13)
         subtitleLabel.textColor = .secondaryLabel
         subtitleLabel.numberOfLines = 0
@@ -469,14 +476,43 @@ class StylePickerViewController: UIViewController {
         container.backgroundColor = .secondarySystemGroupedBackground
         container.layer.cornerRadius = 12
         
-        if value == selectedLightPreset {
+        // 判断当前样式是否支持 Light Preset
+        let supportedStyles = ["standard", "standardSatellite", "faded", "monochrome"]
+        let isStyleSupported = supportedStyles.contains(selectedStyle)
+        
+        // 判断是否为自动模式
+        let isAutoMode = (lightPresetMode == "automatic")
+        let isSelected = (value == selectedLightPreset)
+        
+        // 判断是否禁用：样式不支持或自动模式
+        let isDisabled = !isStyleSupported
+        let isInteractionDisabled = isDisabled || isAutoMode
+        
+        // 选中状态的边框
+        if isSelected && isStyleSupported {
             container.layer.borderWidth = 2
-            container.layer.borderColor = UIColor.systemBlue.cgColor
+            container.layer.borderColor = isAutoMode ? UIColor.systemGreen.cgColor : UIColor.systemBlue.cgColor
+        }
+        
+        // 视觉状态
+        if isDisabled {
+            // 样式不支持：完全禁用外观
+            container.alpha = 0.4
+        } else if isAutoMode {
+            // 自动模式：半透明
+            container.alpha = 0.7
         }
         
         let titleLabel = UILabel()
         titleLabel.text = title
         titleLabel.font = .systemFont(ofSize: 17, weight: .medium)
+        if isDisabled {
+            titleLabel.textColor = .tertiaryLabel
+        } else if isAutoMode {
+            titleLabel.textColor = .secondaryLabel
+        } else {
+            titleLabel.textColor = .label
+        }
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
         container.addSubview(titleLabel)
         
@@ -487,9 +523,10 @@ class StylePickerViewController: UIViewController {
         timeLabel.translatesAutoresizingMaskIntoConstraints = false
         container.addSubview(timeLabel)
         
-        if value == selectedLightPreset {
-            let checkmark = UIImageView(image: UIImage(systemName: "checkmark.circle.fill"))
-            checkmark.tintColor = .systemBlue
+        if isSelected && isStyleSupported {
+            let iconName = isAutoMode ? "clock.fill" : "checkmark.circle.fill"
+            let checkmark = UIImageView(image: UIImage(systemName: iconName))
+            checkmark.tintColor = isAutoMode ? .systemGreen : .systemBlue
             checkmark.translatesAutoresizingMaskIntoConstraints = false
             container.addSubview(checkmark)
             
@@ -515,7 +552,8 @@ class StylePickerViewController: UIViewController {
         let tapGesture = UITapGestureRecognizer(target: self, action: #selector(lightPresetTapped(_:)))
         container.addGestureRecognizer(tapGesture)
         container.tag = ["dawn", "day", "dusk", "night"].firstIndex(of: value) ?? 0
-        container.isUserInteractionEnabled = true
+        // 只有当样式支持且非自动模式时才允许交互
+        container.isUserInteractionEnabled = !isInteractionDisabled
         
         return container
     }
@@ -526,18 +564,9 @@ class StylePickerViewController: UIViewController {
         selectedLightPreset = presets[container.tag]
         
         // 重新生成按钮
-        lightPresetStackView.arrangedSubviews.forEach { $0.removeFromSuperview() }
-        let presetData = [
-            ("dawn", "🌅 Dawn", "黎明 5:00-7:00"),
-            ("day", "☀️ Day", "白天 7:00-17:00"),
-            ("dusk", "🌇 Dusk", "黄昏 17:00-19:00"),
-            ("night", "🌙 Night", "夜晚 19:00-5:00")
-        ]
-        for (value, title, time) in presetData {
-            let button = createLightPresetButton(value: value, title: title, time: time)
-            lightPresetStackView.addArrangedSubview(button)
-        }
+        refreshLightPresetButtons()
         
+        // 更新地图
         applyLightPresetToMap()
     }
     
@@ -555,6 +584,7 @@ class StylePickerViewController: UIViewController {
         let titleLabel = UILabel()
         titleLabel.text = "根据日出日落自动调整"
         titleLabel.font = .systemFont(ofSize: 15, weight: .medium)
+        titleLabel.tag = 8888 // 用于后续更新颜色
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
         topRow.addSubview(titleLabel)
         
@@ -569,6 +599,7 @@ class StylePickerViewController: UIViewController {
         descLabel.font = .systemFont(ofSize: 12)
         descLabel.textColor = .secondaryLabel
         descLabel.text = "开启后，地图样式将根据当前位置的真实日出日落时间自动调整 Light Preset（黎明/白天/黄昏/夜晚）"
+        descLabel.tag = 7777 // 用于后续更新颜色
         descLabel.translatesAutoresizingMaskIntoConstraints = false
         container.addSubview(descLabel)
         
@@ -597,6 +628,18 @@ class StylePickerViewController: UIViewController {
     @objc private func automaticModeSwitchChanged() {
         lightPresetMode = automaticModeSwitch.isOn ? "automatic" : "manual"
         print("Light Preset 模式切换为: \(lightPresetMode)")
+        
+        if lightPresetMode == "automatic" {
+            // 开启自动模式：自动选中当前时间对应的 preset
+            selectedLightPreset = getCurrentTimeBasedLightPreset()
+            print("✅ 自动选中当前光照模式: \(selectedLightPreset)")
+        }
+        
+        // 刷新 Light Preset 按钮（更新禁用状态和选中状态）
+        refreshLightPresetButtons()
+        
+        // 更新地图预览
+        applyLightPresetToMap()
     }
     
     // MARK: - Action Buttons Setup
@@ -639,6 +682,59 @@ class StylePickerViewController: UIViewController {
     @objc private func cancelTapped() {
         completion?(nil)
         dismiss(animated: true)
+    }
+    
+    // MARK: - Helper Methods
+    
+    /// 根据样式更新 Light Preset 区域的状态
+    private func updateLightPresetSectionVisibility() {
+        let supportedStyles = ["standard", "standardSatellite", "faded", "monochrome"]
+        let isSupported = supportedStyles.contains(selectedStyle)
+        
+        // 更新提示文本
+        if let subtitleLabel = lightPresetSection.viewWithTag(9999) as? UILabel {
+            if isSupported {
+                subtitleLabel.text = "仅标有 ✨ 的样式支持，已根据时间自动选择"
+                subtitleLabel.textColor = .secondaryLabel
+            } else {
+                subtitleLabel.text = "⚠️ 当前样式不支持 Light Preset，请选择标有 ✨ 的样式"
+                subtitleLabel.textColor = .systemOrange
+            }
+        }
+        
+        // 更新自动调整开关的状态
+        automaticModeSwitch.isEnabled = isSupported
+        
+        // 更新开关标题的颜色
+        if let titleLabel = lightPresetSection.viewWithTag(8888) as? UILabel {
+            titleLabel.textColor = isSupported ? .label : .tertiaryLabel
+        }
+        
+        // 更新开关说明文字的颜色
+        if let descLabel = lightPresetSection.viewWithTag(7777) as? UILabel {
+            descLabel.textColor = isSupported ? .secondaryLabel : .tertiaryLabel
+        }
+        
+        // 刷新按钮状态（禁用或启用）
+        refreshLightPresetButtons()
+        
+        print("🔄 样式 '\(selectedStyle)' \(isSupported ? "支持" : "不支持") Light Preset")
+        print("🔄 自动调整开关已\(isSupported ? "启用" : "禁用")")
+    }
+    
+    /// 刷新 Light Preset 按钮（更新选中状态和禁用状态）
+    private func refreshLightPresetButtons() {
+        lightPresetStackView.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        let presetData = [
+            ("dawn", "🌅 Dawn", "黎明 5:00-7:00"),
+            ("day", "☀️ Day", "白天 7:00-17:00"),
+            ("dusk", "🌇 Dusk", "黄昏 17:00-19:00"),
+            ("night", "🌙 Night", "夜晚 19:00-5:00")
+        ]
+        for (value, title, time) in presetData {
+            let button = createLightPresetButton(value: value, title: title, time: time)
+            lightPresetStackView.addArrangedSubview(button)
+        }
     }
     
     private func updateMapStyle() {

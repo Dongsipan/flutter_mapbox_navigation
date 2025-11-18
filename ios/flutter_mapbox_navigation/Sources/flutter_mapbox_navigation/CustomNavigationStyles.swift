@@ -81,8 +81,10 @@ extension NavigationViewController {
                         self.applyLightPreset(preset, mapStyle: mapStyle, to: mapView)
                         
                     case .automatic:
+                        // 自动模式：先应用初始配置（包括 theme），然后启用自动调整
+                        self.applyLightPreset(preset, mapStyle: mapStyle, to: mapView)
                         self.automaticallyAdjustsStyleForTimeOfDay = true
-                        print("🟣 已启用自动调整")
+                        print("🟣 已启用自动调整（已应用初始配置）")
                     }
                 }
             }
@@ -168,10 +170,11 @@ extension NavigationViewController {
                     print("✅ Light Preset 模式：手动 (\(lightPreset))")
                     
                 case .automatic:
-                    // 自动模式：启用 SDK 的日出日落自动调整
+                    // 自动模式：先应用初始配置（包括 theme），然后启用自动调整
+                    self.applyLightPreset(lightPreset, mapStyle: mapStyle, to: mapView)
                     self.automaticallyAdjustsStyleForTimeOfDay = true
                     print("🟡 NavigationViewController: 已启用自动调整 (automaticallyAdjustsStyleForTimeOfDay = true)")
-                    print("✅ Light Preset 模式：自动（基于真实日出日落）")
+                    print("✅ Light Preset 模式：自动（基于真实日出日落，已应用初始配置）")
                 }
             }
         }

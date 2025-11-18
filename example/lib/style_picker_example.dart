@@ -14,7 +14,7 @@ class StylePickerExample extends StatefulWidget {
 class _StylePickerExampleState extends State<StylePickerExample> {
   String _currentStyle = 'standard';
   String _currentLightPreset = 'day';
-  bool _enableDynamic = false;
+  String _lightPresetMode = 'manual'; // manual 或 automatic
   bool _isLoading = false;
 
   @override
@@ -26,13 +26,13 @@ class _StylePickerExampleState extends State<StylePickerExample> {
   /// 加载存储的样式设置
   Future<void> _loadStoredStyle() async {
     setState(() => _isLoading = true);
-    
+
     try {
       final settings = await MapboxStylePicker.getStoredStyle();
       setState(() {
         _currentStyle = settings['mapStyle'] ?? 'standard';
         _currentLightPreset = settings['lightPreset'] ?? 'day';
-        _enableDynamic = settings['enableDynamicLightPreset'] ?? false;
+        _lightPresetMode = settings['lightPresetMode'] ?? 'manual';
         _isLoading = false;
       });
     } catch (e) {
@@ -44,11 +44,11 @@ class _StylePickerExampleState extends State<StylePickerExample> {
   /// 打开样式选择器
   Future<void> _openStylePicker() async {
     final saved = await MapboxStylePicker.show();
-    
+
     if (saved) {
       // 重新加载显示最新设置
       _loadStoredStyle();
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -63,10 +63,10 @@ class _StylePickerExampleState extends State<StylePickerExample> {
   /// 清除样式设置
   Future<void> _clearStyle() async {
     final cleared = await MapboxStylePicker.clearStoredStyle();
-    
+
     if (cleared) {
       _loadStoredStyle();
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -93,15 +93,15 @@ class _StylePickerExampleState extends State<StylePickerExample> {
                   // 说明卡片
                   _buildInfoCard(),
                   const SizedBox(height: 24),
-                  
+
                   // 当前配置
                   _buildCurrentSettings(),
                   const SizedBox(height: 24),
-                  
+
                   // 操作按钮
                   _buildActionButtons(),
                   const SizedBox(height: 32),
-                  
+
                   // 使用说明
                   _buildUsageInstructions(),
                 ],
@@ -174,8 +174,8 @@ class _StylePickerExampleState extends State<StylePickerExample> {
             const SizedBox(height: 12),
             _buildSettingRow(
               icon: Icons.autorenew,
-              label: '动态切换',
-              value: _enableDynamic ? '已启用' : '已禁用',
+              label: '根据日出日落自动调整',
+              value: _lightPresetMode == 'automatic' ? '已启用' : '已禁用',
             ),
           ],
         ),

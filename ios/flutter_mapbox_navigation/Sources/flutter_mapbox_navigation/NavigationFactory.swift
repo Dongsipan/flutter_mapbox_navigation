@@ -294,17 +294,21 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
     func startNavigation(navigationRoutes: NavigationRoutes, mapboxNavigation: MapboxNavigation)
     {
         isEmbeddedNavigation = false
+        
+        // 重新加载样式设置，确保使用最新的用户配置
+        print("🔄 重新加载样式设置...")
+        loadStoredStyleSettings()
+        
         if(self._navigationViewController == nil)
         {
             Task { @MainActor in
-                // Create NavigationOptions for v3
+                // 创建 NavigationViewController（不带自定义样式）
                 let navigationOptions = NavigationOptions(
                     mapboxNavigation: mapboxNavigation,
                     voiceController: mapboxNavigationProvider!.routeVoiceController,
                     eventsManager: mapboxNavigation.eventsManager()
                 )
                 
-                // Create NavigationViewController with v3 API
                 self._navigationViewController = NavigationViewController(
                     navigationRoutes: navigationRoutes,
                     navigationOptions: navigationOptions
@@ -314,17 +318,18 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
                 self._navigationViewController!.delegate = self
                 self._navigationViewController!.routeLineTracksTraversal = true
                 
+                // 先设置监听器，然后再应用样式（关键！）
+                print("🔴 准备设置监听器和应用样式")
+                self._navigationViewController!.setupLightPresetAndStyle(
+                    mapStyle: _mapStyle,
+                    lightPreset: _lightPreset,
+                    lightPresetMode: _lightPresetMode
+                )
+                
                 // Configure feedback options
                 // Note: v3 API may have different properties for feedback
                 // self._navigationViewController!.showsReportFeedback = _showReportFeedbackButton
                 // self._navigationViewController!.showsEndOfRouteFeedback = _showEndOfRouteFeedback
-                
-                // 确保关闭按钮可见（Mapbox v3 默认应该显示）
-                // 如果有 showsCancelButton 属性，可以显式设置
-                // self._navigationViewController!.showsCancelButton = true
-                
-                // 应用存储的地图样式
-                self.applyStoredMapStyle(to: self._navigationViewController!)
                 
                 let flutterViewController = UIApplication.shared.delegate?.window??.rootViewController as! FlutterViewController
                 flutterViewController.present(self._navigationViewController!, animated: true, completion: {
@@ -338,12 +343,19 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
     /// 显示路线选择界面
     /// 用户可以在地图上查看多条路线并选择其中一条
     func showRouteSelectionView(navigationRoutes: NavigationRoutes, mapboxNavigation: MapboxNavigation) {
+        // 重新加载样式设置
+        print("🔄 路线选择: 重新加载样式设置...")
+        loadStoredStyleSettings()
+        
         Task { @MainActor in
             // 创建路线选择视图控制器
             let routeSelectionVC = RouteSelectionViewController(
                 navigationRoutes: navigationRoutes,
                 mapboxNavigation: mapboxNavigation,
-                mapboxNavigationProvider: mapboxNavigationProvider!
+                mapboxNavigationProvider: mapboxNavigationProvider!,
+                mapStyle: _mapStyle,
+                lightPreset: _lightPreset,
+                lightPresetMode: _lightPresetMode
             )
             
             // 设置回调

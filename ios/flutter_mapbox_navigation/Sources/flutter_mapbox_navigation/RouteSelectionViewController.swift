@@ -15,6 +15,11 @@ class RouteSelectionViewController: UIViewController {
     private let mapboxNavigation: MapboxNavigation
     private let mapboxNavigationProvider: MapboxNavigationProvider
     
+    // 样式设置
+    private let mapStyle: String?
+    private let lightPreset: String?
+    private let lightPresetMode: LightPresetMode
+    
     private var startNavigationButton: UIButton!
     private var cancelButton: UIButton!
     private var backButton: UIButton!
@@ -27,10 +32,16 @@ class RouteSelectionViewController: UIViewController {
     
     init(navigationRoutes: NavigationRoutes,
          mapboxNavigation: MapboxNavigation,
-         mapboxNavigationProvider: MapboxNavigationProvider) {
+         mapboxNavigationProvider: MapboxNavigationProvider,
+         mapStyle: String? = nil,
+         lightPreset: String? = nil,
+         lightPresetMode: LightPresetMode = .manual) {
         self.navigationRoutes = navigationRoutes
         self.mapboxNavigation = mapboxNavigation
         self.mapboxNavigationProvider = mapboxNavigationProvider
+        self.mapStyle = mapStyle
+        self.lightPreset = lightPreset
+        self.lightPresetMode = lightPresetMode
         super.init(nibName: nil, bundle: nil)
     }
     
@@ -75,6 +86,9 @@ class RouteSelectionViewController: UIViewController {
             margins: CGPoint(x: 16, y: 60) // 留出顶部栏的空间
         )
         navigationMapView.mapView.ornaments.options.compass = compassOptions
+        
+        // 应用样式设置
+        applyMapStyle()
     }
     
     private func setupTopBar() {
@@ -239,6 +253,104 @@ class RouteSelectionViewController: UIViewController {
         onRouteSelected?(navigationRoutes)
         // 关闭当前视图
         dismiss(animated: true, completion: nil)
+    }
+    
+    // MARK: - Style Management
+    
+    /// 应用地图样式
+    private func applyMapStyle() {
+        guard let mapStyle = mapStyle else {
+            print("⚙️ RouteSelection: 未设置地图样式，使用默认样式")
+            return
+        }
+        
+        print("⚙️ RouteSelection: 应用地图样式: \(mapStyle), lightPreset: \(lightPreset ?? "nil"), mode: \(lightPresetMode)")
+        
+        let mapView = navigationMapView.mapView
+        
+        Task { @MainActor in
+            // 等待地图初始化
+            try? await Task.sleep(nanoseconds: 200_000_000) // 200ms
+            
+            // 1. 设置地图样式 URI
+            let styleURI = getStyleURI(for: mapStyle)
+            mapView.mapboxMap.style.uri = styleURI
+            print("⚙️ RouteSelection: 已设置地图样式: \(styleURI.rawValue)")
+            
+            // 等待样式加载
+            try? await Task.sleep(nanoseconds: 500_000_000) // 500ms
+            
+            // 2. 应用 Light Preset 和 Theme（如果有）
+            if let preset = lightPreset {
+                applyLightPreset(preset, mapStyle: mapStyle, to: mapView)
+            }
+        }
+    }
+    
+    /// 获取 StyleURI
+    private func getStyleURI(for mapStyle: String) -> MapboxMaps.StyleURI {
+        switch mapStyle {
+        case "standard", "faded", "monochrome":
+            return .standard
+        case "standardSatellite":
+            return .standardSatellite
+        case "light":
+            return .light
+        case "dark":
+            return .dark
+        case "outdoors":
+            return .outdoors
+        default:
+            return .standard
+        }
+    }
+    
+    /// 应用 light preset 和 theme
+    private func applyLightPreset(_ preset: String, mapStyle: String, to mapView: MapView) {
+        // 检查是否支持 light preset
+        let supportedStyles = ["standard", "standardSatellite", "faded", "monochrome"]
+        guard supportedStyles.contains(mapStyle) else {
+            print("⚙️ RouteSelection: 样式 '\(mapStyle)' 不支持 Light Preset")
+            return
+        }
+        
+        do {
+            // 1. 应用 light preset
+            try mapView.mapboxMap.setStyleImportConfigProperty(
+                for: "basemap",
+                config: "lightPreset",
+                value: preset
+            )
+            print("✅ RouteSelection: Light preset 已应用: \(preset)")
+            
+            // 2. 应用 theme（如果是 faded 或 monochrome）
+            if mapStyle == "faded" {
+                try mapView.mapboxMap.setStyleImportConfigProperty(
+                    for: "basemap",
+                    config: "theme",
+                    value: "faded"
+                )
+                print("✅ RouteSelection: Theme 已应用: faded")
+            } else if mapStyle == "monochrome" {
+                try mapView.mapboxMap.setStyleImportConfigProperty(
+                    for: "basemap",
+                    config: "theme",
+                    value: "monochrome"
+                )
+                print("✅ RouteSelection: Theme 已应用: monochrome")
+            } else if mapStyle == "standard" {
+                try mapView.mapboxMap.setStyleImportConfigProperty(
+                    for: "basemap",
+                    config: "theme",
+                    value: "default"
+                )
+                print("✅ RouteSelection: Theme 已重置: default")
+            }
+            
+            print("✅ RouteSelection: Light Preset 模式：\(lightPresetMode == .manual ? "手动" : "自动") (\(preset))")
+        } catch {
+            print("❌ RouteSelection: 应用样式配置失败: \(error)")
+        }
     }
 }
 

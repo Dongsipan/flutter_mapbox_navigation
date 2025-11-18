@@ -94,7 +94,15 @@ public class FlutterMapboxNavigationPlugin: NavigationFactory, FlutterPlugin {
                 return
             }
             
-            HistoryCoverGenerator.shared.generateHistoryCover(filePath: historyFilePath, historyId: historyId) { [weak self] coverPath in
+            // 读取当前存储的样式设置
+            let styleSettings = StylePickerHandler.loadStoredStyleSettings()
+            
+            HistoryCoverGenerator.shared.generateHistoryCover(
+                filePath: historyFilePath, 
+                historyId: historyId,
+                mapStyle: styleSettings.mapStyle,       // 使用当前存储的样式
+                lightPreset: styleSettings.lightPreset  // 使用当前存储的 light preset
+            ) { [weak self] coverPath in
                 guard let self = self else {
                     result(nil)
                     return

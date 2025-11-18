@@ -29,7 +29,13 @@ final class HistoryCoverGenerator {
     }
 
     /// 根据历史文件生成封面，完成后返回图片路径
-    func generateHistoryCover(filePath: String, historyId: String, completion: @escaping (String?) -> Void) {
+    func generateHistoryCover(
+        filePath: String, 
+        historyId: String, 
+        mapStyle: String? = nil,
+        lightPreset: String? = nil,
+        completion: @escaping (String?) -> Void
+    ) {
         Task {
             // Smart path resolution for iOS sandbox changes
             let currentHistoryDir = defaultHistoryDirectoryURL()
@@ -144,6 +150,8 @@ final class HistoryCoverGenerator {
                         center: center,
                         zoom: zoom,
                         historyId: historyId,
+                        mapStyle: mapStyle,
+                        lightPreset: lightPreset,
                         completion: completion
                     )
                 }
@@ -161,6 +169,8 @@ final class HistoryCoverGenerator {
         center: CLLocationCoordinate2D,
         zoom: Double,
         historyId: String,
+        mapStyle: String?,
+        lightPreset: String?,
         completion: @escaping (String?) -> Void
     ) {
         // 清理之前的资源
@@ -177,18 +187,33 @@ final class HistoryCoverGenerator {
         // 持有 snapshotter 引用，防止过早释放
         self.currentSnapshotter = snapshotter
 
-        snapshotter.styleURI = .streets
-                snapshotter.setCamera(to: CameraOptions(center: center, zoom: zoom))
+        // 使用用户选择的样式或默认 streets 样式
+        let styleURI = getStyleURI(for: mapStyle)
+        snapshotter.styleURI = styleURI
+        snapshotter.setCamera(to: CameraOptions(center: center, zoom: zoom))
+        
+        print("📸 封面生成: 使用样式 \(mapStyle ?? "streets"), lightPreset: \(lightPreset ?? "nil")")
 
         // 等待样式加载完成再开始生成快照
         snapshotter.onStyleLoaded.observeNext { [weak self] _ in
             guard let self = self else { return }
-            self.performSnapshot(
-                snapshotter: snapshotter,
-                coordsWithSpeed: coordsWithSpeed,
-                historyId: historyId,
-                completion: completion
-            )
+            
+            // 应用 light preset 和 theme（如果适用）
+            if let mapStyle = mapStyle, let preset = lightPreset {
+                self.applyStyleConfig(to: snapshotter, mapStyle: mapStyle, lightPreset: preset)
+            }
+            
+            // 等待样式配置应用后再生成快照
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 300_000_000) // 300ms
+                
+                self.performSnapshot(
+                    snapshotter: snapshotter,
+                    coordsWithSpeed: coordsWithSpeed,
+                    historyId: historyId,
+                    completion: completion
+                )
+            }
         }.store(in: &cancelables)
     }
 
@@ -338,6 +363,74 @@ final class HistoryCoverGenerator {
         } catch {
             print("❌ 封面保存失败: \(error)")
             completion(nil)
+        }
+    }
+    
+    // MARK: - Style Helpers
+    
+    /// 获取 StyleURI
+    private func getStyleURI(for mapStyle: String?) -> MapboxMaps.StyleURI {
+        guard let mapStyle = mapStyle else { return .streets }
+        
+        switch mapStyle {
+        case "standard", "faded", "monochrome":
+            return .standard
+        case "standardSatellite":
+            return .standardSatellite
+        case "light":
+            return .light
+        case "dark":
+            return .dark
+        case "outdoors":
+            return .outdoors
+        default:
+            return .streets
+        }
+    }
+    
+    /// 应用样式配置（light preset 和 theme）
+    @MainActor
+    private func applyStyleConfig(to snapshotter: Snapshotter, mapStyle: String, lightPreset: String) {
+        let supportedStyles = ["standard", "standardSatellite", "faded", "monochrome"]
+        guard supportedStyles.contains(mapStyle) else {
+            print("📸 封面: 样式 '\(mapStyle)' 不支持 Light Preset")
+            return
+        }
+        
+        do {
+            // 1. 应用 light preset
+            try snapshotter.setStyleImportConfigProperty(
+                for: "basemap",
+                config: "lightPreset",
+                value: lightPreset
+            )
+            print("📸 封面: Light preset 已应用: \(lightPreset)")
+            
+            // 2. 应用 theme
+            if mapStyle == "faded" {
+                try snapshotter.setStyleImportConfigProperty(
+                    for: "basemap",
+                    config: "theme",
+                    value: "faded"
+                )
+                print("📸 封面: Theme 已应用: faded")
+            } else if mapStyle == "monochrome" {
+                try snapshotter.setStyleImportConfigProperty(
+                    for: "basemap",
+                    config: "theme",
+                    value: "monochrome"
+                )
+                print("📸 封面: Theme 已应用: monochrome")
+            } else if mapStyle == "standard" {
+                try snapshotter.setStyleImportConfigProperty(
+                    for: "basemap",
+                    config: "theme",
+                    value: "default"
+                )
+                print("📸 封面: Theme 已重置: default")
+            }
+        } catch {
+            print("📸 封面: 应用样式配置失败: \(error)")
         }
     }
 }

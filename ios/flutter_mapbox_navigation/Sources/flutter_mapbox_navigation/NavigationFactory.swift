@@ -803,7 +803,12 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
 
                 // 先生成封面，再保存历史记录信息
                 let historyId = self._currentHistoryId ?? UUID().uuidString
-                HistoryCoverGenerator.shared.generateHistoryCover(filePath: historyFileUrl.path, historyId: historyId) { coverPath in
+                HistoryCoverGenerator.shared.generateHistoryCover(
+                    filePath: historyFileUrl.path, 
+                    historyId: historyId,
+                    mapStyle: self._mapStyle,       // 传递当前样式
+                    lightPreset: self._lightPreset  // 传递 light preset
+                ) { coverPath in
                     self.saveHistoryRecord(filePath: historyFileUrl.path, coverPath: coverPath)
                 }
             }

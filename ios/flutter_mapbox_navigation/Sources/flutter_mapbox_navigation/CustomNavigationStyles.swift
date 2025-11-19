@@ -2,6 +2,7 @@ import UIKit
 import MapboxMaps
 import MapboxNavigationUIKit
 import MapboxNavigationCore
+import Combine
 
 // MARK: - CustomStyleFactory
 
@@ -33,7 +34,25 @@ class CustomStyleFactory {
 
 // MARK: - NavigationViewController Extension for Light Preset
 
+// Associated object key for storing cancelables
+private var cancelablesKey: UInt8 = 0
+
 extension NavigationViewController {
+    
+    // Associated object for storing style loading subscriptions
+    private var styleCancelables: Set<AnyCancellable> {
+        get {
+            if let cancelables = objc_getAssociatedObject(self, &cancelablesKey) as? Set<AnyCancellable> {
+                return cancelables
+            }
+            let cancelables = Set<AnyCancellable>()
+            objc_setAssociatedObject(self, &cancelablesKey, cancelables, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+            return cancelables
+        }
+        set {
+            objc_setAssociatedObject(self, &cancelablesKey, newValue, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+        }
+    }
     
     /// 设置 Light Preset 和样式（同步方式，避免时序问题）
     func setupLightPresetAndStyle(
@@ -69,24 +88,28 @@ extension NavigationViewController {
                 mapView.mapboxMap.style.uri = styleURI
                 print("🟣 已设置地图样式: \(styleURI.rawValue)")
                 
-                // 等待样式加载
-                try? await Task.sleep(nanoseconds: 500_000_000) // 500ms
-                
-                // 2. 应用 Light Preset 和 Theme
-                if let preset = lightPreset {
-                    switch lightPresetMode {
-                    case .manual:
-                        self.automaticallyAdjustsStyleForTimeOfDay = false
-                        print("🟣 已禁用自动调整")
-                        self.applyLightPreset(preset, mapStyle: mapStyle, to: mapView)
-                        
-                    case .automatic:
-                        // 自动模式：先应用初始配置（包括 theme），然后启用自动调整
-                        self.applyLightPreset(preset, mapStyle: mapStyle, to: mapView)
-                        self.automaticallyAdjustsStyleForTimeOfDay = true
-                        print("🟣 已启用自动调整（已应用初始配置）")
+                // 2. 监听样式加载完成事件（替代固定延时）
+                mapView.mapboxMap.onStyleLoaded.observeNext { [weak self] _ in
+                    guard let self = self else { return }
+                    
+                    Task { @MainActor in
+                        // 3. 应用 Light Preset 和 Theme
+                        if let preset = lightPreset {
+                            switch lightPresetMode {
+                            case .manual:
+                                self.automaticallyAdjustsStyleForTimeOfDay = false
+                                print("🟣 已禁用自动调整")
+                                self.applyLightPreset(preset, mapStyle: mapStyle, to: mapView)
+                                
+                            case .automatic:
+                                // 自动模式：先应用初始配置（包括 theme），然后启用自动调整
+                                self.applyLightPreset(preset, mapStyle: mapStyle, to: mapView)
+                                self.automaticallyAdjustsStyleForTimeOfDay = true
+                                print("🟣 已启用自动调整（已应用初始配置）")
+                            }
+                        }
                     }
-                }
+                }.store(in: &self.styleCancelables)
             }
             
             print("🟣 setupLightPresetAndStyle() 完成")
@@ -144,39 +167,43 @@ extension NavigationViewController {
             
             let lightPresetMode = LightPresetMode.from(lightPresetModeString)
             
-            // 延迟应用 light preset，确保地图样式已加载
-            Task { @MainActor in
-                print("🟡 NavigationViewController: 开始延迟 300ms...")
-                try? await Task.sleep(nanoseconds: 300_000_000) // 300ms
-                
-                guard let navigationMapView = self.navigationMapView else {
-                    print("❌ navigationMapView 未初始化")
-                    return
-                }
-                
-                print("🟡 NavigationViewController: navigationMapView 已就绪")
-                
-                let mapView = navigationMapView.mapView
-                
-                // 根据模式应用 light preset
-                print("🟡 NavigationViewController: 开始应用 Light Preset, 模式=\(lightPresetMode)")
-                
-                switch lightPresetMode {
-                case .manual:
-                    // 手动模式：禁用自动调整，使用固定 preset
-                    self.automaticallyAdjustsStyleForTimeOfDay = false
-                    print("🟡 NavigationViewController: 已禁用自动调整 (automaticallyAdjustsStyleForTimeOfDay = false)")
-                    self.applyLightPreset(lightPreset, mapStyle: mapStyle, to: mapView)
-                    print("✅ Light Preset 模式：手动 (\(lightPreset))")
-                    
-                case .automatic:
-                    // 自动模式：先应用初始配置（包括 theme），然后启用自动调整
-                    self.applyLightPreset(lightPreset, mapStyle: mapStyle, to: mapView)
-                    self.automaticallyAdjustsStyleForTimeOfDay = true
-                    print("🟡 NavigationViewController: 已启用自动调整 (automaticallyAdjustsStyleForTimeOfDay = true)")
-                    print("✅ Light Preset 模式：自动（基于真实日出日落，已应用初始配置）")
-                }
+            // 监听样式加载完成后应用 light preset
+            guard let navigationMapView = self.navigationMapView else {
+                print("❌ navigationMapView 未初始化")
+                return
             }
+            
+            print("🟡 NavigationViewController: navigationMapView 已就绪")
+            
+            let mapView = navigationMapView.mapView
+            
+            // 监听样式加载事件（替代固定延时）
+            mapView.mapboxMap.onStyleLoaded.observeNext { [weak self] _ in
+                guard let self = self else { return }
+                
+                Task { @MainActor in
+                    print("🟡 NavigationViewController: 样式已加载，开始应用 Light Preset")
+                    
+                    // 根据模式应用 light preset
+                    print("🟡 NavigationViewController: 开始应用 Light Preset, 模式=\(lightPresetMode)")
+                    
+                    switch lightPresetMode {
+                    case .manual:
+                        // 手动模式：禁用自动调整，使用固定 preset
+                        self.automaticallyAdjustsStyleForTimeOfDay = false
+                        print("🟡 NavigationViewController: 已禁用自动调整 (automaticallyAdjustsStyleForTimeOfDay = false)")
+                        self.applyLightPreset(lightPreset, mapStyle: mapStyle, to: mapView)
+                        print("✅ Light Preset 模式：手动 (\(lightPreset))")
+                        
+                    case .automatic:
+                        // 自动模式：先应用初始配置（包括 theme），然后启用自动调整
+                        self.applyLightPreset(lightPreset, mapStyle: mapStyle, to: mapView)
+                        self.automaticallyAdjustsStyleForTimeOfDay = true
+                        print("🟡 NavigationViewController: 已启用自动调整 (automaticallyAdjustsStyleForTimeOfDay = true)")
+                        print("✅ Light Preset 模式：自动（基于真实日出日落，已应用初始配置）")
+                    }
+                }
+            }.store(in: &self.styleCancelables)
         }
     }
     

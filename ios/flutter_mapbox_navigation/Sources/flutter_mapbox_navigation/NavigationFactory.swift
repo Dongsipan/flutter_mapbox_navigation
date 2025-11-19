@@ -6,6 +6,7 @@ import MapboxNavigationUIKit
 import MapboxDirections
 import CoreLocation
 import Foundation
+import Combine
 
 // Type alias to avoid conflicts with Mapbox's Location type
 typealias FlutterLocation = flutter_mapbox_navigation.Location
@@ -104,6 +105,9 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
     private var replayNavigationProvider: MapboxNavigationProvider?
     private var replayMapboxNavigation: MapboxNavigation?
     private var isHistoryReplaying: Bool = false
+    
+    // Style loading event subscriptions (internal for subclass access)
+    var cancelables = Set<AnyCancellable>()
     
     // MARK: - Initialization
     
@@ -1464,6 +1468,7 @@ extension NavigationFactory {
     /**
      * 应用存储的地图样式到 NavigationViewController
      * 根据官方文档，使用 automaticallyAdjustsStyleForTimeOfDay 实现基于日出日落的自动调整
+     * 使用 onStyleLoaded 事件确保样式完全加载后再应用配置
      */
     func applyStoredMapStyle(to navigationViewController: NavigationViewController) {
         Task { @MainActor in
@@ -1480,25 +1485,29 @@ extension NavigationFactory {
                 mapView.mapboxMap.style.uri = getCurrentStyleURI()
                 print("✅ 已应用地图样式: \(_mapStyle ?? "standard")")
                 
-                // 2. 等待样式加载完成
-                try? await Task.sleep(nanoseconds: 500_000_000)
-                
-                // 3. 根据模式设置 Light Preset
-                switch self._lightPresetMode {
-                case .manual:
-                    // 手动模式：禁用自动调整，使用用户选择的固定 preset
-                    navigationViewController.automaticallyAdjustsStyleForTimeOfDay = false
-                    if let preset = self._lightPreset {
-                        self.applyLightPreset(preset, to: mapView)
-                        print("✅ Light Preset 模式：手动 (\(preset))")
-                    }
+                // 2. 监听样式加载完成事件（替代 Task.sleep）
+                mapView.mapboxMap.onStyleLoaded.observeNext { [weak self, weak navigationViewController] _ in
+                    guard let self = self, let navigationViewController = navigationViewController else { return }
                     
-                case .automatic:
-                    // 自动模式：启用 SDK 的内置日出日落自动调整功能
-                    navigationViewController.automaticallyAdjustsStyleForTimeOfDay = true
-                    print("✅ Light Preset 模式：自动（基于真实日出日落时间）")
-                    print("ℹ️  SDK 将根据当前位置的日出日落自动调整地图样式")
-                }
+                    Task { @MainActor in
+                        // 3. 根据模式设置 Light Preset
+                        switch self._lightPresetMode {
+                        case .manual:
+                            // 手动模式：禁用自动调整，使用用户选择的固定 preset
+                            navigationViewController.automaticallyAdjustsStyleForTimeOfDay = false
+                            if let preset = self._lightPreset {
+                                self.applyLightPreset(preset, to: mapView)
+                                print("✅ Light Preset 模式：手动 (\(preset))")
+                            }
+                            
+                        case .automatic:
+                            // 自动模式：启用 SDK 的内置日出日落自动调整功能
+                            navigationViewController.automaticallyAdjustsStyleForTimeOfDay = true
+                            print("✅ Light Preset 模式：自动（基于真实日出日落时间）")
+                            print("ℹ️  SDK 将根据当前位置的日出日落自动调整地图样式")
+                        }
+                    }
+                }.store(in: &self.cancelables)
             } else if _mapStyleUrlDay != nil {
                 // 兼容旧的 URL 方式
                 mapView.mapboxMap.style.uri = StyleURI.init(url: URL(string: _mapStyleUrlDay!)!)

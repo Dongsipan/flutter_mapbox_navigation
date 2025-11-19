@@ -151,34 +151,67 @@ public class FlutterMapboxNavigationView : NavigationFactory, FlutterPlatformVie
     @MainActor
     private func setupMapViewAsync() async {
         setupMapView()
+        
+        print("🔵 EmbeddedNavigationView: setupMapViewAsync 开始")
+        print("🔵   当前样式设置 - mapStyle: \(_mapStyle ?? "nil"), lightPreset: \(_lightPreset ?? "nil"), mode: \(_lightPresetMode.rawValue)")
 
         if(self.arguments != nil)
         {
 
             parseFlutterArguments(arguments: arguments)
+            print("🔵   解析参数后 - mapStyle: \(_mapStyle ?? "nil"), lightPreset: \(_lightPreset ?? "nil"), mode: \(_lightPresetMode.rawValue)")
+
+            // 等待 mapView 初始化（NavigationMapView 的内部视图可能需要一些时间）
+            var retryCount = 0
+            while navigationMapView?.mapView == nil && retryCount < 10 {
+                print("🔵 EmbeddedNavigationView: 等待 mapView 初始化... (\(retryCount + 1)/10)")
+                try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
+                retryCount += 1
+            }
+            
+            guard let mapView = navigationMapView?.mapView else {
+                print("❌ EmbeddedNavigationView: mapView 初始化超时")
+                return
+            }
+            
+            print("✅ EmbeddedNavigationView: mapView 已初始化")
 
             // 应用地图样式
             if let mapStyle = _mapStyle {
                 // 如果设置了 mapStyle，使用对应的 StyleURI
                 // 注意: faded 和 monochrome 会映射到 standard + theme
-                navigationMapView?.mapView.mapboxMap.style.uri = getCurrentStyleURI()
+                print("🔵 EmbeddedNavigationView: 开始设置地图样式 \(mapStyle)")
                 
-                // 应用 light preset 和 theme
-                // 支持的样式: standard, standardSatellite, faded, monochrome
-                // 等待样式加载完成后再应用配置
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    // 嵌入式导航视图仅支持手动模式
-                    // 自动模式（automaticallyAdjustsStyleForTimeOfDay）仅适用于 NavigationViewController
-                    if self._lightPresetMode == .manual, let preset = self._lightPreset {
-                        self.applyLightPreset(preset, to: self.navigationMapView?.mapView)
-                        print("✅ EmbeddedNavigationView - Light Preset 模式：手动 (\(preset))")
-                    } else if self._lightPresetMode == .automatic {
-                        print("ℹ️  EmbeddedNavigationView 不支持自动模式，请使用 NavigationViewController")
+                let styleURI = getCurrentStyleURI()
+                
+                // 先监听样式加载事件，再设置样式 URI（避免错过事件）
+                mapView.mapboxMap.onStyleLoaded.observeNext { [weak self] _ in
+                    guard let self = self else { return }
+                    
+                    print("🔵 EmbeddedNavigationView: 样式已加载，准备应用配置")
+                    
+                    Task { @MainActor in
+                        // 嵌入式导航视图仅支持手动模式
+                        // 如果用户设置了自动模式，降级为手动模式并应用 lightPreset
+                        if let preset = self._lightPreset {
+                            if self._lightPresetMode == .automatic {
+                                print("⚠️  EmbeddedNavigationView 不支持自动模式，已降级为手动模式")
+                            }
+                            self.applyLightPreset(preset, to: self.navigationMapView?.mapView)
+                            print("✅ EmbeddedNavigationView - Light Preset 已应用: \(preset)")
+                        } else {
+                            print("ℹ️  EmbeddedNavigationView: 未设置 Light Preset")
+                        }
                     }
-                }
+                }.store(in: &self.cancelables)
+                
+                // 设置样式 URI（这会触发新的样式加载）
+                mapView.mapboxMap.style.uri = styleURI
+                print("🔵 EmbeddedNavigationView: 已设置样式 URI: \(styleURI.rawValue)")
             } else if(_mapStyleUrlDay != nil) {
                 // 否则使用原有的 URL 设置方式
-                navigationMapView?.mapView.mapboxMap.style.uri = StyleURI.init(url: URL(string: _mapStyleUrlDay!)!)
+                mapView.mapboxMap.style.uri = StyleURI.init(url: URL(string: _mapStyleUrlDay!)!)
+                print("🔵 EmbeddedNavigationView: 已设置样式 URL: \(_mapStyleUrlDay!)")
             }
 
             var currentLocation: CLLocation!

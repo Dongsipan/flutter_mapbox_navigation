@@ -28,6 +28,9 @@ class RouteSelectionViewController: UIViewController {
     /// 路线选择回调
     var onRouteSelected: ((NavigationRoutes) -> Void)?
     
+    // Style loading event subscriptions
+    private var cancelables = Set<AnyCancellable>()
+    
     // MARK: - Initialization
     
     init(navigationRoutes: NavigationRoutes,
@@ -268,23 +271,22 @@ class RouteSelectionViewController: UIViewController {
         
         let mapView = navigationMapView.mapView
         
-        Task { @MainActor in
-            // 等待地图初始化
-            try? await Task.sleep(nanoseconds: 200_000_000) // 200ms
+        // 1. 设置地图样式 URI
+        let styleURI = getStyleURI(for: mapStyle)
+        mapView.mapboxMap.style.uri = styleURI
+        print("⚙️ RouteSelection: 已设置地图样式: \(styleURI.rawValue)")
+        
+        // 2. 监听样式加载完成事件（替代固定延时）
+        mapView.mapboxMap.onStyleLoaded.observeNext { [weak self] _ in
+            guard let self = self else { return }
             
-            // 1. 设置地图样式 URI
-            let styleURI = getStyleURI(for: mapStyle)
-            mapView.mapboxMap.style.uri = styleURI
-            print("⚙️ RouteSelection: 已设置地图样式: \(styleURI.rawValue)")
-            
-            // 等待样式加载
-            try? await Task.sleep(nanoseconds: 500_000_000) // 500ms
-            
-            // 2. 应用 Light Preset 和 Theme（如果有）
-            if let preset = lightPreset {
-                applyLightPreset(preset, mapStyle: mapStyle, to: mapView)
+            Task { @MainActor in
+                // 3. 应用 Light Preset 和 Theme（如果有）
+                if let preset = self.lightPreset {
+                    self.applyLightPreset(preset, mapStyle: mapStyle, to: mapView)
+                }
             }
-        }
+        }.store(in: &cancelables)
     }
     
     /// 获取 StyleURI

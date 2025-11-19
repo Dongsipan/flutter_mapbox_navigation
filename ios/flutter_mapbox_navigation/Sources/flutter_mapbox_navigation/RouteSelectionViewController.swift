@@ -60,7 +60,7 @@ class RouteSelectionViewController: UIViewController {
         setupTopBar()
         setupOverviewButton()
         setupButtons()
-        displayRoutes()
+        // displayRoutes() 移到样式加载完成后调用
     }
     
     // MARK: - Setup
@@ -216,13 +216,18 @@ class RouteSelectionViewController: UIViewController {
     private func displayRoutes() {
         // 在地图上显示所有路线
         Task { @MainActor in
-            // 使用 showcase 方法展示路线
-            navigationMapView.showcase(navigationRoutes)
+            print("📍 RouteSelection: 开始展示路线到最佳视野")
+            print("📍   备选路线数量: \(navigationRoutes.alternativeRoutes.count)")
+            
+            // 使用 showcase 方法展示路线，带动画效果
+            navigationMapView.showcase(navigationRoutes, animated: true)
             
             // 如果有多条路线，更新界面提示
             if navigationRoutes.alternativeRoutes.count > 0 {
                 updateRouteSelectionUI()
             }
+            
+            print("✅ RouteSelection: 路线展示完成")
         }
     }
     
@@ -262,14 +267,22 @@ class RouteSelectionViewController: UIViewController {
     
     /// 应用地图样式
     private func applyMapStyle() {
+        let mapView = navigationMapView.mapView
+        
         guard let mapStyle = mapStyle else {
             print("⚙️ RouteSelection: 未设置地图样式，使用默认样式")
+            // 没有自定义样式，等待默认样式加载完成后展示路线
+            mapView.mapboxMap.onStyleLoaded.observeNext { [weak self] _ in
+                guard let self = self else { return }
+                Task { @MainActor in
+                    print("⚙️ RouteSelection: 默认样式加载完成，开始展示路线")
+                    self.displayRoutes()
+                }
+            }.store(in: &cancelables)
             return
         }
         
         print("⚙️ RouteSelection: 应用地图样式: \(mapStyle), lightPreset: \(lightPreset ?? "nil"), mode: \(lightPresetMode)")
-        
-        let mapView = navigationMapView.mapView
         
         // 1. 设置地图样式 URI
         let styleURI = getStyleURI(for: mapStyle)
@@ -285,6 +298,10 @@ class RouteSelectionViewController: UIViewController {
                 if let preset = self.lightPreset {
                     self.applyLightPreset(preset, mapStyle: mapStyle, to: mapView)
                 }
+                
+                // 4. 样式加载完成后，展示路线到最佳视野
+                print("⚙️ RouteSelection: 样式加载完成，开始展示路线")
+                self.displayRoutes()
             }
         }.store(in: &cancelables)
     }

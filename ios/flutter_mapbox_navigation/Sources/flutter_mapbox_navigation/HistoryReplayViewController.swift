@@ -123,6 +123,8 @@ final class HistoryReplayViewController: UIViewController {
     // MARK: - Properties (following official example pattern)
 
     private let historyFilePath: String
+    private let mapStyle: String?
+    private let lightPreset: String?
 
     // Combine 订阅管理
     private var cancellables = Set<AnyCancellable>()
@@ -176,6 +178,7 @@ final class HistoryReplayViewController: UIViewController {
     private var historyLocations: [CLLocation] = []
     private let historyRouteSourceId = "history-route-source"
     private let historyRouteLayerId = "history-route-layer"
+    private let historyRouteOutlineLayerId = "history-route-outline-layer"  // 轨迹轮廓层
     private let startPointSourceId = "start-point-source"
     private let endPointSourceId = "end-point-source"
     private let startPointLayerId = "start-point-layer"
@@ -195,9 +198,16 @@ final class HistoryReplayViewController: UIViewController {
 
     // MARK: - Initialization
 
-    init(historyFilePath: String) {
+    init(historyFilePath: String, mapStyle: String? = nil, lightPreset: String? = nil) {
         self.historyFilePath = historyFilePath
+        self.mapStyle = mapStyle
+        self.lightPreset = lightPreset
         super.init(nibName: nil, bundle: nil)
+        
+        print("🎬🎬🎬 历史回放: 初始化")
+        print("🎬 mapStyle = \(mapStyle ?? "nil")")
+        print("🎬 lightPreset = \(lightPreset ?? "nil")")
+        print("🎬 historyFilePath = \(historyFilePath)")
     }
 
     required init?(coder: NSCoder) {
@@ -233,8 +243,23 @@ final class HistoryReplayViewController: UIViewController {
 
     private func loadMapViewIfNeeded() {
         if mapView == nil {
-            // 按照官方最新建议：使用普通的 MapView，不使用 NavigationMapView
+            // 创建地图视图
             mapView = MapView(frame: view.bounds)
+            mapView?.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+            
+            // 按照官方文档设置样式
+            if let mapStyle = mapStyle, let preset = lightPreset {
+                applyMapStyleWithPreset(mapStyle: mapStyle, lightPreset: preset)
+            } else if let mapStyle = mapStyle {
+                // 只有样式没有 preset
+                let styleURI = getStyleURI(for: mapStyle)
+                mapView?.mapboxMap.style.uri = styleURI
+                print("🎬 历史回放: 设置样式 URI: \(styleURI.rawValue)")
+            } else {
+                // 使用默认样式
+                mapView?.mapboxMap.mapStyle = .standard()
+                print("🎬 历史回放: 使用默认样式")
+            }
 
             // 启用位置显示 - 使用带箭头的默认配置
             let configuration = Puck2DConfiguration.makeDefault(showBearing: true)
@@ -244,12 +269,16 @@ final class HistoryReplayViewController: UIViewController {
             // 关键：在 v11 中需要手动启用 puck 方向旋转（默认为 false）
             mapView.location.options.puckBearingEnabled = true
 
-            // 设置地图加载完成后的回调
-            mapView.mapboxMap.onMapLoaded.observeNext { [weak self] _ in
-                self?.setupTrajectoryLayers()
+            // 设置样式加载完成后的回调
+            mapView.mapboxMap.onStyleLoaded.observeNext { [weak self] _ in
+                guard let self = self else { return }
+                
+                print("🎬 历史回放: 样式已加载完成，开始绘制轨迹")
+                
+                self.setupTrajectoryLayers()
                 
                 // 如果历史数据已准备好，立即绘制路线
-                if let self = self, !self.historyLocations.isEmpty {
+                if !self.historyLocations.isEmpty {
                     self.drawCompleteHistoryRoute()
                 }
             }.store(in: &cancelables)
@@ -430,8 +459,11 @@ final class HistoryReplayViewController: UIViewController {
         // 起点
         stops.append((0.0, UIColor.colorForSpeed(locationSpeeds.first ?? 0.0)))
 
-        // 中间节点（每隔几个点采样，避免节点过多影响性能）
-        let step = max(1, locationSpeeds.count / 20)
+        // 中间节点（增加采样密度，使渐变更平滑、颜色更鲜亮）
+        // 根据轨迹长度动态调整采样数量：短轨迹用所有点，长轨迹采样至少50个点
+        let maxSamples = 50  // 最大采样点数（从20增加到50）
+        let step = locationSpeeds.count <= maxSamples ? 1 : max(1, locationSpeeds.count / maxSamples)
+        
         for i in stride(from: step, to: locationSpeeds.count, by: step) {
             let progress = cumulativeDistances[i] / totalDistance
             let color = UIColor.colorForSpeed(locationSpeeds[i])
@@ -503,7 +535,7 @@ final class HistoryReplayViewController: UIViewController {
     private func cleanupExistingLayers() {
         guard let mapView = mapView else { return }
         
-        let layersToRemove = [historyRouteLayerId, startPointLayerId, endPointLayerId]
+        let layersToRemove = [historyRouteLayerId, historyRouteOutlineLayerId, startPointLayerId, endPointLayerId]
         let sourcesToRemove = [historyRouteSourceId, startPointSourceId, endPointSourceId]
         
         for layerId in layersToRemove {
@@ -546,7 +578,21 @@ final class HistoryReplayViewController: UIViewController {
             return
         }
 
-        // 创建并添加线条图层
+        // 1. 先添加轨迹外层描边（白色半透明）
+        var outlineLayer = LineLayer(id: historyRouteOutlineLayerId, source: historyRouteSourceId)
+        outlineLayer.lineColor = .constant(StyleColor(UIColor.white))
+        outlineLayer.lineWidth = .constant(10.0)  // 比主线条稍宽
+        outlineLayer.lineCap = .constant(.round)
+        outlineLayer.lineJoin = .constant(.round)
+        outlineLayer.lineOpacity = .constant(0.4)  // 半透明描边
+        
+        do {
+            try mapView.mapboxMap.addLayer(outlineLayer)
+        } catch {
+            print("⚠️ 轨迹描边层添加失败: \(error)")
+        }
+
+        // 2. 再添加主轨迹线条图层（带渐变颜色）
         var lineLayer = LineLayer(id: historyRouteLayerId, source: historyRouteSourceId)
 
         // 使用速度渐变功能
@@ -560,6 +606,9 @@ final class HistoryReplayViewController: UIViewController {
         lineLayer.lineWidth = .constant(8.0)
         lineLayer.lineCap = .constant(.round)
         lineLayer.lineJoin = .constant(.round)
+        
+        // 增加线条不透明度，使颜色更鲜明
+        lineLayer.lineOpacity = .constant(0.95)
 
         do {
             // 优先使用 addLayer
@@ -879,6 +928,120 @@ final class HistoryReplayViewController: UIViewController {
         // 清理地图视图
         mapView?.removeFromSuperview()
         mapView = nil
+    }
+    
+    // MARK: - Style Management
+    
+    /// 按照官方文档设置样式和 light preset
+    private func applyMapStyleWithPreset(mapStyle: String, lightPreset: String) {
+        guard let mapView = mapView else { return }
+        
+        print("🎬🎬🎬 applyMapStyleWithPreset 被调用")
+        print("🎬 mapStyle = \(mapStyle)")
+        print("🎬 lightPreset = \(lightPreset)")
+        
+        // 对于 standard 系列样式，使用官方推荐的 .standard(theme:lightPreset:) 方式
+        if mapStyle == "standard" || mapStyle == "faded" || mapStyle == "monochrome" {
+            // 转换 lightPreset 字符串为枚举
+            switch lightPreset {
+            case "dawn":
+                if mapStyle == "faded" {
+                    mapView.mapboxMap.mapStyle = .standard(theme: .faded, lightPreset: .dawn)
+                    print("✅ 已设置: .standard(theme: .faded, lightPreset: .dawn)")
+                } else if mapStyle == "monochrome" {
+                    mapView.mapboxMap.mapStyle = .standard(theme: .monochrome, lightPreset: .dawn)
+                    print("✅ 已设置: .standard(theme: .monochrome, lightPreset: .dawn)")
+                } else {
+                    mapView.mapboxMap.mapStyle = .standard(theme: .default, lightPreset: .dawn)
+                    print("✅ 已设置: .standard(theme: .default, lightPreset: .dawn)")
+                }
+            case "day":
+                if mapStyle == "faded" {
+                    mapView.mapboxMap.mapStyle = .standard(theme: .faded, lightPreset: .day)
+                    print("✅ 已设置: .standard(theme: .faded, lightPreset: .day)")
+                } else if mapStyle == "monochrome" {
+                    mapView.mapboxMap.mapStyle = .standard(theme: .monochrome, lightPreset: .day)
+                    print("✅ 已设置: .standard(theme: .monochrome, lightPreset: .day)")
+                } else {
+                    mapView.mapboxMap.mapStyle = .standard(theme: .default, lightPreset: .day)
+                    print("✅ 已设置: .standard(theme: .default, lightPreset: .day)")
+                }
+            case "dusk":
+                if mapStyle == "faded" {
+                    mapView.mapboxMap.mapStyle = .standard(theme: .faded, lightPreset: .dusk)
+                    print("✅ 已设置: .standard(theme: .faded, lightPreset: .dusk)")
+                } else if mapStyle == "monochrome" {
+                    mapView.mapboxMap.mapStyle = .standard(theme: .monochrome, lightPreset: .dusk)
+                    print("✅ 已设置: .standard(theme: .monochrome, lightPreset: .dusk)")
+                } else {
+                    mapView.mapboxMap.mapStyle = .standard(theme: .default, lightPreset: .dusk)
+                    print("✅ 已设置: .standard(theme: .default, lightPreset: .dusk)")
+                }
+            case "night":
+                print("🎬🎬🎬 lightPreset 匹配到 'night'")
+                if mapStyle == "faded" {
+                    print("🎬 设置: .standard(theme: .faded, lightPreset: .night)")
+                    mapView.mapboxMap.mapStyle = .standard(theme: .faded, lightPreset: .night)
+                    print("✅✅✅ 已成功设置: .standard(theme: .faded, lightPreset: .night)")
+                } else if mapStyle == "monochrome" {
+                    print("🎬 设置: .standard(theme: .monochrome, lightPreset: .night)")
+                    mapView.mapboxMap.mapStyle = .standard(theme: .monochrome, lightPreset: .night)
+                    print("✅✅✅ 已成功设置: .standard(theme: .monochrome, lightPreset: .night)")
+                } else {
+                    print("🎬 设置: .standard(theme: .default, lightPreset: .night)")
+                    mapView.mapboxMap.mapStyle = .standard(theme: .default, lightPreset: .night)
+                    print("✅✅✅ 已成功设置: .standard(theme: .default, lightPreset: .night)")
+                }
+            default:
+                // 默认使用 day
+                if mapStyle == "faded" {
+                    mapView.mapboxMap.mapStyle = .standard(theme: .faded, lightPreset: .day)
+                } else if mapStyle == "monochrome" {
+                    mapView.mapboxMap.mapStyle = .standard(theme: .monochrome, lightPreset: .day)
+                } else {
+                    mapView.mapboxMap.mapStyle = .standard(theme: .default, lightPreset: .day)
+                }
+                print("⚠️ 未知 lightPreset '\(lightPreset)'，使用默认 .day")
+            }
+        } else if mapStyle == "standardSatellite" {
+            // standardSatellite 也支持 lightPreset
+            switch lightPreset {
+            case "dawn":
+                mapView.mapboxMap.mapStyle = .standardSatellite(lightPreset: .dawn)
+            case "day":
+                mapView.mapboxMap.mapStyle = .standardSatellite(lightPreset: .day)
+            case "dusk":
+                mapView.mapboxMap.mapStyle = .standardSatellite(lightPreset: .dusk)
+            case "night":
+                mapView.mapboxMap.mapStyle = .standardSatellite(lightPreset: .night)
+            default:
+                mapView.mapboxMap.mapStyle = .standardSatellite(lightPreset: .day)
+            }
+            print("✅ 已设置: .standardSatellite(lightPreset: \(lightPreset))")
+        } else {
+            // 其他样式不支持 theme 和 lightPreset
+            let styleURI = getStyleURI(for: mapStyle)
+            mapView.mapboxMap.style.uri = styleURI
+            print("✅ 已设置: StyleURI \(styleURI.rawValue)")
+        }
+    }
+    
+    /// 获取 StyleURI
+    private func getStyleURI(for mapStyle: String) -> MapboxMaps.StyleURI {
+        switch mapStyle {
+        case "standard", "faded", "monochrome":
+            return .standard
+        case "standardSatellite":
+            return .standardSatellite
+        case "light":
+            return .light
+        case "dark":
+            return .dark
+        case "outdoors":
+            return .outdoors
+        default:
+            return .standard
+        }
     }
 }
 

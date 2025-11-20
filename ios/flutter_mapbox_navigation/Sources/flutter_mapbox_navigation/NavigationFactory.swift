@@ -831,10 +831,44 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
             return
         }
         print("开始历史记录回放，文件路径: \(historyFilePath)")
+        
+        // 从历史记录数据中读取样式信息
+        var mapStyle: String?
+        var lightPreset: String?
+        
+        if historyManager == nil {
+            historyManager = HistoryManager()
+        }
+        
+        let historyList = historyManager!.getHistoryList()
+        print("🔍 历史记录总数: \(historyList.count)")
+        print("🔍 查找的 historyFilePath: \(historyFilePath)")
+        
+        // 使用 resolveCurrentPath 解析路径（处理沙箱路径变化）
+        let resolvedPath = resolveCurrentPath(historyFilePath)
+        print("🔍 解析后的路径: \(resolvedPath)")
+        
+        // 通过文件名匹配历史记录（因为沙箱路径会变化）
+        let fileName = URL(fileURLWithPath: historyFilePath).lastPathComponent
+        print("🔍 文件名: \(fileName)")
+        
+        if let historyRecord = historyList.first(where: { 
+            URL(fileURLWithPath: $0.historyFilePath).lastPathComponent == fileName 
+        }) {
+            mapStyle = historyRecord.mapStyle
+            lightPreset = historyRecord.lightPreset
+            print("✅ 读取历史记录样式: mapStyle=\(mapStyle ?? "nil"), lightPreset=\(lightPreset ?? "nil")")
+        } else {
+            print("⚠️ 未找到历史记录数据，使用默认样式")
+        }
 
         Task { @MainActor in
-            // 使用简化的历史回放控制器
-            let historyReplayViewController = HistoryReplayViewController(historyFilePath: historyFilePath)
+            // 使用简化的历史回放控制器，传递样式参数
+            let historyReplayViewController = HistoryReplayViewController(
+                historyFilePath: historyFilePath,
+                mapStyle: mapStyle,
+                lightPreset: lightPreset
+            )
 
             // 创建导航控制器包装
             let navigationController = UINavigationController(rootViewController: historyReplayViewController)
@@ -886,7 +920,9 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
                     "fileSize": fileSize,
                     "startPointName": _wayPoints.first?.name ?? "未知起点",
                     "endPointName": _wayPoints.last?.name ?? "未知终点",
-                    "navigationMode": _navigationMode ?? "driving"
+                    "navigationMode": _navigationMode ?? "driving",
+                    "mapStyle": _mapStyle ?? "standard",           // 保存样式
+                    "lightPreset": _lightPreset ?? "day"            // 保存 light preset
                 ]
 
                 if let coverPath = coverPath {
@@ -1182,7 +1218,9 @@ class HistoryManager {
                 startPointName: historyData["startPointName"] as? String,
                 endPointName: historyData["endPointName"] as? String,
                 navigationMode: historyData["navigationMode"] as? String,
-                cover: historyData["cover"] as? String
+                cover: historyData["cover"] as? String,
+                mapStyle: historyData["mapStyle"] as? String,
+                lightPreset: historyData["lightPreset"] as? String
             )
 
             print("Created history record: \(historyRecord)")
@@ -1304,7 +1342,9 @@ class HistoryManager {
                 startPointName: oldRecord.startPointName,
                 endPointName: oldRecord.endPointName,
                 navigationMode: oldRecord.navigationMode,
-                cover: coverPath
+                cover: coverPath,
+                mapStyle: oldRecord.mapStyle,
+                lightPreset: oldRecord.lightPreset
             )
             
             print("🔍 新记录创建完成，cover = \(newRecord.cover ?? "nil")")
@@ -1377,6 +1417,53 @@ class HistoryManager {
 }
 
 /**
+ * 将存储的路径解析为当前沙箱的实际路径
+ * iOS 最佳实践：处理沙箱路径变化问题
+ *
+ * 策略：
+ * 1. 如果路径已经在当前沙箱中，直接返回
+ * 2. 如果路径在旧沙箱中，提取文件名并重建当前路径
+ * 3. 如果文件不存在，返回原路径（让调用方处理）
+ */
+fileprivate func resolveCurrentPath(_ storedPath: String) -> String {
+    // 1. 检查存储的路径是否仍然有效
+    if FileManager.default.fileExists(atPath: storedPath) {
+        return storedPath
+    }
+    
+    // 2. 路径失效，尝试在当前沙箱中重建路径
+    let fileURL = URL(fileURLWithPath: storedPath)
+    let fileName = fileURL.lastPathComponent
+    
+    // 3. 判断文件类型，构建正确的目标目录
+    let currentPath: String
+    if storedPath.contains("NavigationHistory") {
+        // 历史文件和封面文件都在 NavigationHistory 目录
+        currentPath = defaultHistoryDirectoryURL().appendingPathComponent(fileName).path
+    } else if storedPath.contains("Documents/navigation_history") {
+        // 兼容旧版本可能的路径
+        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+        currentPath = documentsPath.appendingPathComponent("navigation_history")
+            .appendingPathComponent(fileName).path
+    } else {
+        // 未知路径模式，返回原路径
+        return storedPath
+    }
+    
+    // 4. 验证重建的路径是否存在
+    if FileManager.default.fileExists(atPath: currentPath) {
+        print("✅ 路径已更新: \(fileName)")
+        print("   旧路径: \(storedPath)")
+        print("   新路径: \(currentPath)")
+        return currentPath
+    }
+    
+    // 5. 文件确实不存在，返回原路径
+    print("⚠️ 文件不存在: \(fileName)")
+    return storedPath
+}
+
+/**
  * 历史记录数据类
  */
 struct HistoryRecord: Codable {
@@ -1388,6 +1475,8 @@ struct HistoryRecord: Codable {
     let endPointName: String?
     let navigationMode: String?
     let cover: String?
+    let mapStyle: String?        // 新增：地图样式
+    let lightPreset: String?     // 新增：light preset
     
     /**
      * 转换为 Flutter 可用的 Map 格式
@@ -1410,55 +1499,14 @@ struct HistoryRecord: Codable {
         if let cover = cover {
             map["cover"] = resolveCurrentPath(cover)  // 🆕 动态解析封面路径
         }
+        if let mapStyle = mapStyle {
+            map["mapStyle"] = mapStyle
+        }
+        if let lightPreset = lightPreset {
+            map["lightPreset"] = lightPreset
+        }
         
         return map
-    }
-    
-    /**
-     * 将存储的路径解析为当前沙箱的实际路径
-     * iOS 最佳实践：处理沙箱路径变化问题
-     *
-     * 策略：
-     * 1. 如果路径已经在当前沙箱中，直接返回
-     * 2. 如果路径在旧沙箱中，提取文件名并重建当前路径
-     * 3. 如果文件不存在，返回原路径（让调用方处理）
-     */
-    private func resolveCurrentPath(_ storedPath: String) -> String {
-        // 1. 检查存储的路径是否仍然有效
-        if FileManager.default.fileExists(atPath: storedPath) {
-            return storedPath
-        }
-        
-        // 2. 路径失效，尝试在当前沙箱中重建路径
-        let fileURL = URL(fileURLWithPath: storedPath)
-        let fileName = fileURL.lastPathComponent
-        
-        // 3. 判断文件类型，构建正确的目标目录
-        let currentPath: String
-        if storedPath.contains("NavigationHistory") {
-            // 历史文件和封面文件都在 NavigationHistory 目录
-            currentPath = defaultHistoryDirectoryURL().appendingPathComponent(fileName).path
-        } else if storedPath.contains("Documents/navigation_history") {
-            // 兼容旧版本可能的路径
-            let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-            currentPath = documentsPath.appendingPathComponent("navigation_history")
-                .appendingPathComponent(fileName).path
-        } else {
-            // 未知路径模式，返回原路径
-            return storedPath
-        }
-        
-        // 4. 验证重建的路径是否存在
-        if FileManager.default.fileExists(atPath: currentPath) {
-            print("✅ 路径已更新: \(fileName)")
-            print("   旧路径: \(storedPath)")
-            print("   新路径: \(currentPath)")
-            return currentPath
-        }
-        
-        // 5. 文件确实不存在，返回原路径
-        print("⚠️ 文件不存在: \(fileName)")
-        return storedPath
     }
 }
 

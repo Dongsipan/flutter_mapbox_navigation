@@ -578,13 +578,13 @@ final class HistoryReplayViewController: UIViewController {
             return
         }
 
-        // 1. 先添加轨迹外层描边（白色半透明）
+        // 1. 先添加轨迹外层描边（增强对比度）
         var outlineLayer = LineLayer(id: historyRouteOutlineLayerId, source: historyRouteSourceId)
         outlineLayer.lineColor = .constant(StyleColor(UIColor.white))
-        outlineLayer.lineWidth = .constant(10.0)  // 比主线条稍宽
+        outlineLayer.lineWidth = .constant(12.0)  // 增加描边宽度
         outlineLayer.lineCap = .constant(.round)
         outlineLayer.lineJoin = .constant(.round)
-        outlineLayer.lineOpacity = .constant(0.4)  // 半透明描边
+        outlineLayer.lineOpacity = .constant(0.6)  // 提高不透明度
         
         do {
             try mapView.mapboxMap.addLayer(outlineLayer)
@@ -607,8 +607,14 @@ final class HistoryReplayViewController: UIViewController {
         lineLayer.lineCap = .constant(.round)
         lineLayer.lineJoin = .constant(.round)
         
-        // 增加线条不透明度，使颜色更鲜明
-        lineLayer.lineOpacity = .constant(0.95)
+        // 使用完全不透明，确保颜色不受 light preset 影响
+        lineLayer.lineOpacity = .constant(1.0)
+        
+        // 添加轻微发光效果，增强在暗色地图上的可见性
+        lineLayer.lineBlur = .constant(0.5)
+        
+        // 🔑 关键：设置自发光强度，让轨迹完全不受地图光照影响
+        lineLayer.lineEmissiveStrength = .constant(1.0)
 
         do {
             // 优先使用 addLayer

@@ -771,6 +771,15 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
             return
         }
         
+        // ✅ 关键修复：立即保存这些值，防止异步回调时被重置
+        let capturedHistoryId = _currentHistoryId ?? UUID().uuidString
+        let capturedStartTime = _historyStartTime
+        let capturedWayPoints = _wayPoints
+        let capturedNavigationRoutes = _navigationRoutes
+        let capturedNavigationMode = _navigationMode
+        let capturedMapStyle = _mapStyle
+        let capturedLightPreset = _lightPreset
+        
         // 立即设置为false，防止重复调用
         _isHistoryRecording = false
         
@@ -806,14 +815,23 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
                 }
 
                 // 先生成封面，再保存历史记录信息
-                let historyId = self._currentHistoryId ?? UUID().uuidString
                 HistoryCoverGenerator.shared.generateHistoryCover(
                     filePath: historyFileUrl.path, 
-                    historyId: historyId,
-                    mapStyle: self._mapStyle,       // 传递当前样式
-                    lightPreset: self._lightPreset  // 传递 light preset
+                    historyId: capturedHistoryId,
+                    mapStyle: capturedMapStyle,
+                    lightPreset: capturedLightPreset
                 ) { coverPath in
-                    self.saveHistoryRecord(filePath: historyFileUrl.path, coverPath: coverPath)
+                    self.saveHistoryRecord(
+                        filePath: historyFileUrl.path,
+                        coverPath: coverPath,
+                        historyId: capturedHistoryId,
+                        startTime: capturedStartTime,
+                        wayPoints: capturedWayPoints,
+                        navigationRoutes: capturedNavigationRoutes,
+                        navigationMode: capturedNavigationMode,
+                        mapStyle: capturedMapStyle,
+                        lightPreset: capturedLightPreset
+                    )
                 }
             }
         }
@@ -898,10 +916,63 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
     // 现在使用HistoryReplayViewController来处理所有历史回放功能
 
     /**
+     * 反地理编码：将坐标转换为地名
+     */
+    private func reverseGeocode(coordinate: CLLocationCoordinate2D, completion: @escaping (String?) -> Void) {
+        let geocoder = CLGeocoder()
+        let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+        
+        geocoder.reverseGeocodeLocation(location) { placemarks, error in
+            if let error = error {
+                print("⚠️ 反地理编码失败: \(error.localizedDescription)")
+                completion(nil)
+                return
+            }
+            
+            guard let placemark = placemarks?.first else {
+                completion(nil)
+                return
+            }
+            
+            // 构造地名（优先级：地标 > 街道 > 城市）
+            var nameComponents: [String] = []
+            
+            if let name = placemark.name {
+                nameComponents.append(name)
+            } else {
+                if let thoroughfare = placemark.thoroughfare {
+                    nameComponents.append(thoroughfare)
+                }
+                if let subThoroughfare = placemark.subThoroughfare {
+                    nameComponents.append(subThoroughfare)
+                }
+                if nameComponents.isEmpty, let locality = placemark.locality {
+                    nameComponents.append(locality)
+                }
+            }
+            
+            let placeName = nameComponents.isEmpty ? nil : nameComponents.joined(separator: " ")
+            print("✅ 反地理编码成功: \(placeName ?? "nil")")
+            completion(placeName)
+        }
+    }
+    
+    /**
      * 保存历史记录信息
      */
-    private func saveHistoryRecord(filePath: String, coverPath: String? = nil) {
+    private func saveHistoryRecord(
+        filePath: String,
+        coverPath: String? = nil,
+        historyId: String,
+        startTime: Date?,
+        wayPoints: [Waypoint],
+        navigationRoutes: NavigationRoutes?,
+        navigationMode: String?,
+        mapStyle: String?,
+        lightPreset: String?
+    ) {
         print("saveHistoryRecord called with filePath: \(filePath)")
+        print("✅ Captured values - historyId: \(historyId), startTime: \(startTime?.description ?? "nil")")
         do {
             let fileManager = FileManager.default
             print("Checking if file exists at path: \(filePath)")
@@ -910,39 +981,117 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
                 let fileAttributes = try fileManager.attributesOfItem(atPath: filePath)
                 let fileSize = fileAttributes[.size] as? Int64 ?? 0
                 
-                let duration = _historyStartTime != nil ? Date().timeIntervalSince(_historyStartTime!) : 0
+                let duration = startTime != nil ? Date().timeIntervalSince(startTime!) : 0
+                print("✅ Calculated duration: \(duration) seconds")
+                
+                // 调试：检查 wayPoints 状态
+                print("📍 wayPoints count: \(wayPoints.count)")
+                if let first = wayPoints.first {
+                    print("📍 First wayPoint - name: \(first.name ?? "nil"), coord: \(first.coordinate.latitude), \(first.coordinate.longitude)")
+                }
+                if let last = wayPoints.last {
+                    print("📍 Last wayPoint - name: \(last.name ?? "nil"), coord: \(last.coordinate.latitude), \(last.coordinate.longitude)")
+                }
+                
+                // 获取起点和终点名称
+                var startPointName = "未知起点"
+                var endPointName = "未知终点"
+                
+                // 检查 wayPoint 的名称是否有效（不是占位符）
+                let placeholderNames = ["起点", "终点", "未知起点", "未知终点", "Start", "End", "Destination"]
+                
+                if let firstName = wayPoints.first?.name, 
+                   !firstName.isEmpty,
+                   !placeholderNames.contains(firstName) {
+                    startPointName = firstName
+                    print("✅ Got start point name from wayPoints: \(startPointName)")
+                } else {
+                    print("⚠️ Start point name is placeholder or empty: \(wayPoints.first?.name ?? "nil")")
+                }
+                
+                if let lastName = wayPoints.last?.name,
+                   !lastName.isEmpty,
+                   !placeholderNames.contains(lastName) {
+                    endPointName = lastName
+                    print("✅ Got end point name from wayPoints: \(endPointName)")
+                } else {
+                    print("⚠️ End point name is placeholder or empty: \(wayPoints.last?.name ?? "nil")")
+                }
                 
                 var historyData: [String: Any] = [
-                    "id": _currentHistoryId ?? UUID().uuidString,
+                    "id": historyId,
                     "filePath": filePath,
-                    "startTime": _historyStartTime?.timeIntervalSince1970 ?? 0,
+                    "startTime": startTime?.timeIntervalSince1970 ?? 0,
                     "duration": Int(duration),
                     "fileSize": fileSize,
-                    "startPointName": _wayPoints.first?.name ?? "未知起点",
-                    "endPointName": _wayPoints.last?.name ?? "未知终点",
-                    "navigationMode": _navigationMode ?? "driving",
-                    "mapStyle": _mapStyle ?? "standard",           // 保存样式
-                    "lightPreset": _lightPreset ?? "day"            // 保存 light preset
+                    "startPointName": startPointName,
+                    "endPointName": endPointName,
+                    "navigationMode": navigationMode ?? "driving",
+                    "mapStyle": mapStyle ?? "standard",
+                    "lightPreset": lightPreset ?? "day"
                 ]
 
                 if let coverPath = coverPath {
                     historyData["cover"] = coverPath
                 }
                 
-                // 使用历史记录管理器保存
-                if historyManager == nil {
-                    historyManager = HistoryManager()
+                // 如果起终点名称是默认值，直接使用 wayPoints 的坐标进行反地理编码
+                if startPointName == "未知起点" || endPointName == "未知终点" {
+                    print("🔍 需要反地理编码 - startPointName: \(startPointName), endPointName: \(endPointName)")
+                    
+                    if wayPoints.isEmpty {
+                        print("⚠️ wayPoints 为空，无法进行反地理编码！")
+                    } else {
+                        let startCoord = wayPoints.first?.coordinate
+                        let endCoord = wayPoints.last?.coordinate
+                        
+                        // 使用 DispatchGroup 等待所有反地理编码完成
+                        let group = DispatchGroup()
+                        var needsReverseGeocode = false
+                        
+                        if startPointName == "未知起点", let coord = startCoord {
+                            needsReverseGeocode = true
+                            group.enter()
+                            print("📍 正在反地理编码起点: \(coord.latitude), \(coord.longitude)")
+                            reverseGeocode(coordinate: coord) { placeName in
+                                if let name = placeName {
+                                    historyData["startPointName"] = name
+                                    print("✅ 起点反地理编码成功: \(name)")
+                                } else {
+                                    print("⚠️ 起点反地理编码失败")
+                                }
+                                group.leave()
+                            }
+                        }
+                        
+                        if endPointName == "未知终点", let coord = endCoord {
+                            needsReverseGeocode = true
+                            group.enter()
+                            print("📍 正在反地理编码终点: \(coord.latitude), \(coord.longitude)")
+                            reverseGeocode(coordinate: coord) { placeName in
+                                if let name = placeName {
+                                    historyData["endPointName"] = name
+                                    print("✅ 终点反地理编码成功: \(name)")
+                                } else {
+                                    print("⚠️ 终点反地理编码失败")
+                                }
+                                group.leave()
+                            }
+                        }
+                        
+                        // 如果需要反地理编码，等待完成后保存
+                        if needsReverseGeocode {
+                            group.notify(queue: .main) { [weak self] in
+                                print("✅ 反地理编码完成，开始保存历史记录")
+                                self?.performSaveHistoryRecord(historyData: historyData, filePath: filePath)
+                            }
+                            return
+                        }
+                    }
                 }
                 
-                print("Attempting to save history record: \(historyData)")
-                let success = historyManager!.saveHistoryRecord(historyData: historyData)
-                if !success {
-                    print("Failed to save history record to database")
-                    sendEvent(eventType: MapBoxEventType.history_recording_error, data: "Failed to save history record to database")
-                } else {
-                    print("History record saved successfully: \(historyData)")
-                    sendEvent(eventType: MapBoxEventType.history_recording_stopped, data: filePath)
-                }
+                // 直接保存（不需要反地理编码）
+                performSaveHistoryRecord(historyData: historyData, filePath: filePath)
             } else {
                 print("History file does not exist at path: \(filePath)")
                 sendEvent(eventType: MapBoxEventType.history_recording_error, data: "History file does not exist")
@@ -950,6 +1099,26 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
         } catch {
             print("Error saving history record: \(error.localizedDescription)")
             sendEvent(eventType: MapBoxEventType.history_recording_error, data: "Failed to save history record: \(error.localizedDescription)")
+        }
+    }
+    
+    /**
+     * 执行保存历史记录操作
+     */
+    private func performSaveHistoryRecord(historyData: [String: Any], filePath: String) {
+        // 使用历史记录管理器保存
+        if historyManager == nil {
+            historyManager = HistoryManager()
+        }
+        
+        print("Attempting to save history record: \(historyData)")
+        let success = historyManager!.saveHistoryRecord(historyData: historyData)
+        if !success {
+            print("Failed to save history record to database")
+            sendEvent(eventType: MapBoxEventType.history_recording_error, data: "Failed to save history record to database")
+        } else {
+            print("History record saved successfully: \(historyData)")
+            sendEvent(eventType: MapBoxEventType.history_recording_stopped, data: filePath)
         }
     }
 }
@@ -1226,7 +1395,7 @@ class HistoryManager {
             print("Created history record: \(historyRecord)")
             historyList.append(historyRecord)
             print("History list count after adding: \(historyList.count)")
-
+            
             let success = saveHistoryList(historyList)
             print("saveHistoryList result: \(success)")
             return success

@@ -71,28 +71,134 @@ import Combine
 
 
 /// 自定义位置提供者，将历史回放位置流提供给地图的内置 puck
+/// 实现位置插值，在两个位置点之间生成多个中间点，确保高倍速下转弯平滑
 class ReplayLocationProvider: LocationProvider {
     private var observers = NSHashTable<AnyObject>.weakObjects()
     private var lastLocation: MapboxCommon.Location?
     private var cancellable: AnyCancellable?
+    private var previousCLLocation: CLLocation?  // 上一个原始位置
+    private var interpolationTimer: Timer?
+    private var interpolationQueue: [MapboxCommon.Location] = []  // 插值位置队列
+    private let maxQueueSize = 100  // 队列最大长度，防止内存无限增长
 
     func startReplay(with publisher: AnyPublisher<CLLocation, Never>) {
-        cancellable = publisher.sink { [weak self] clLocation in
+        cancellable = publisher.sink { [weak self] newLocation in
             guard let self = self else { return }
-            let location = MapboxCommon.Location(
-                coordinate: clLocation.coordinate,
-                timestamp: clLocation.timestamp,
-                altitude: clLocation.altitude,
-                horizontalAccuracy: clLocation.horizontalAccuracy,
-                verticalAccuracy: clLocation.verticalAccuracy,
-                speed: clLocation.speed >= 0 ? clLocation.speed : nil,
-                bearing: clLocation.course >= 0 ? clLocation.course : nil
+            
+            // 如果有上一个位置，则在两点之间插值
+            if let previousLocation = self.previousCLLocation {
+                self.interpolateLocations(from: previousLocation, to: newLocation)
+            } else {
+                // 第一个位置，直接发送
+                self.publishLocation(newLocation)
+            }
+            
+            self.previousCLLocation = newLocation
+        }
+        
+        // 启动定时器，以固定频率发送插值位置
+        startInterpolationTimer()
+    }
+    
+    /// 在两个位置之间插值生成多个中间点
+    private func interpolateLocations(from start: CLLocation, to end: CLLocation) {
+        // 如果队列已满，跳过插值（防止内存无限增长）
+        guard interpolationQueue.count < maxQueueSize else {
+            print("⚠️ 插值队列已满，跳过插值")
+            return
+        }
+        
+        let steps = 5  // 在两点之间生成5个中间点
+        
+        for i in 0...steps {
+            let ratio = Double(i) / Double(steps)
+            
+            // 位置插值（线性插值）
+            let lat = start.coordinate.latitude + (end.coordinate.latitude - start.coordinate.latitude) * ratio
+            let lon = start.coordinate.longitude + (end.coordinate.longitude - start.coordinate.longitude) * ratio
+            
+            // 方向插值（考虑角度跨越0/360度）
+            var bearing: Double?
+            if start.course >= 0 && end.course >= 0 {
+                var delta = end.course - start.course
+                if delta > 180 {
+                    delta -= 360
+                } else if delta < -180 {
+                    delta += 360
+                }
+                bearing = start.course + delta * ratio
+                if bearing! < 0 {
+                    bearing! += 360
+                } else if bearing! >= 360 {
+                    bearing! -= 360
+                }
+            } else if end.course >= 0 {
+                bearing = end.course
+            }
+            
+            // 速度插值
+            let speed = start.speed >= 0 && end.speed >= 0 
+                ? start.speed + (end.speed - start.speed) * ratio
+                : (end.speed >= 0 ? end.speed : nil)
+            
+            // 时间戳插值
+            let timestamp = start.timestamp.addingTimeInterval(
+                end.timestamp.timeIntervalSince(start.timestamp) * ratio
             )
-            self.lastLocation = location
-            for observer in self.observers.allObjects {
+            
+            let location = MapboxCommon.Location(
+                coordinate: CLLocationCoordinate2D(latitude: lat, longitude: lon),
+                timestamp: timestamp,
+                altitude: start.altitude + (end.altitude - start.altitude) * ratio,
+                horizontalAccuracy: end.horizontalAccuracy,
+                verticalAccuracy: end.verticalAccuracy,
+                speed: speed,
+                bearing: bearing
+            )
+            
+            interpolationQueue.append(location)
+        }
+    }
+    
+    /// 启动定时器，以固定频率发送插值位置
+    private func startInterpolationTimer() {
+        interpolationTimer?.invalidate()
+        // 60 FPS = 16.67ms per frame
+        interpolationTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
+            self?.sendNextInterpolatedLocation()
+        }
+    }
+    
+    /// 发送队列中的下一个插值位置
+    private func sendNextInterpolatedLocation() {
+        guard !interpolationQueue.isEmpty else { return }
+        
+        // 如果队列过长，一次发送多个以快速消费（性能优化）
+        let batchSize = min(interpolationQueue.count > 50 ? 2 : 1, interpolationQueue.count)
+        
+        for _ in 0..<batchSize {
+            guard !interpolationQueue.isEmpty else { break }
+            let location = interpolationQueue.removeFirst()
+            
+            lastLocation = location
+            for observer in observers.allObjects {
                 (observer as? LocationObserver)?.onLocationUpdateReceived(for: [location])
             }
         }
+    }
+    
+    /// 直接发送位置（用于第一个位置）
+    private func publishLocation(_ clLocation: CLLocation) {
+        let location = MapboxCommon.Location(
+            coordinate: clLocation.coordinate,
+            timestamp: clLocation.timestamp,
+            altitude: clLocation.altitude,
+            horizontalAccuracy: clLocation.horizontalAccuracy,
+            verticalAccuracy: clLocation.verticalAccuracy,
+            speed: clLocation.speed >= 0 ? clLocation.speed : nil,
+            bearing: clLocation.course >= 0 ? clLocation.course : nil
+        )
+        interpolationQueue.append(location)
     }
 
     func getLastObservedLocation() -> MapboxCommon.Location? {
@@ -112,6 +218,8 @@ class ReplayLocationProvider: LocationProvider {
 
     deinit {
         cancellable?.cancel()
+        interpolationTimer?.invalidate()
+        interpolationQueue.removeAll()
     }
 }
 
@@ -193,7 +301,7 @@ final class HistoryReplayViewController: UIViewController {
     private var overviewButton: UIButton?
     
     // 回放控制
-    private var recommendedSpeed: Double = 16.0
+    private var recommendedSpeed: Double = 8.0  // 降低回放速度，避免转弯时图标飞跃
 
 
     // MARK: - Initialization
@@ -343,7 +451,7 @@ final class HistoryReplayViewController: UIViewController {
             await preParseCompleteRoute(reader: reader)
             
             // 设置固定回放速度
-            recommendedSpeed = 16.0
+            recommendedSpeed = 8.0  // 使用适中的回放速度，确保转弯平滑
 
             // 在主线程创建按钮，但不立即绘制路线
             await MainActor.run {

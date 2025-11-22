@@ -880,12 +880,16 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
             print("⚠️ 未找到历史记录数据，使用默认样式")
         }
 
+        // 捕获变量为常量，避免并发访问错误
+        let capturedMapStyle = mapStyle
+        let capturedLightPreset = lightPreset
+
         Task { @MainActor in
             // 使用简化的历史回放控制器，传递样式参数
             let historyReplayViewController = HistoryReplayViewController(
                 historyFilePath: historyFilePath,
-                mapStyle: mapStyle,
-                lightPreset: lightPreset
+                mapStyle: capturedMapStyle,
+                lightPreset: capturedLightPreset
             )
 
             // 创建导航控制器包装

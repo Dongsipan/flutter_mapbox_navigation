@@ -24,6 +24,9 @@ A comprehensive Flutter plugin for Mapbox Navigation SDK that brings professiona
 * **🔍 Integrated Search** - Powerful place search and geocoding capabilities powered by Mapbox Search API
 * **🌈 Speed Gradient Visualization** - Color-coded trajectory lines based on speed during history replay
 * **🎛️ Simulation Controls** - Easy-to-use simulation mode toggle for development and testing
+* **🎨 Map Style Picker** - Interactive UI for selecting map styles with automatic persistence and Light Preset support
+* **🌓 Light Preset Control** - Dynamic time-of-day lighting (dawn, day, dusk, night) for supported map styles
+* **🔄 Automatic Light Adjustment** - Optional automatic light preset switching based on time of day
 
 ## IOS Configuration
 
@@ -235,11 +238,325 @@ Add the following to your `info.plist` file
 |:---:|:---:|
 | Embedded iOS View | Embedded Android View |
 
+## Advanced Usage
+
+### Navigation History Management
+
+The plugin automatically records navigation sessions and provides APIs to manage and replay them.
+
+#### Get Navigation History List
+
+```dart
+// Get all navigation history records
+List<NavigationHistory> historyList = await MapBoxNavigation.instance.getNavigationHistoryList();
+
+for (var history in historyList) {
+  print('ID: ${history.id}');
+  print('Start Time: ${history.startTime}');
+  print('End Time: ${history.endTime}');
+  print('Distance: ${history.distance} meters');
+  print('Duration: ${history.duration} seconds');
+  print('Start Point: ${history.startPointName}');
+  print('End Point: ${history.endPointName}');
+  print('Cover Image: ${history.cover}');
+  print('History File: ${history.historyFilePath}');
+}
+```
+
+#### Replay Navigation History
+
+```dart
+// Replay a navigation session with UI
+await MapBoxNavigation.instance.startHistoryReplay(
+  historyFilePath: history.historyFilePath,
+  enableReplayUI: true, // Show replay UI with speed gradient visualization
+);
+
+// Replay without UI (programmatic only)
+await MapBoxNavigation.instance.startHistoryReplay(
+  historyFilePath: history.historyFilePath,
+  enableReplayUI: false,
+);
+```
+
+#### Generate History Cover Image
+
+```dart
+// Manually generate a cover image for a history record
+String? coverPath = await MapBoxNavigation.instance.generateHistoryCover(
+  historyFilePath: history.historyFilePath,
+  historyId: history.id,
+);
+
+if (coverPath != null) {
+  print('Cover generated at: $coverPath');
+}
+```
+
+#### Delete Navigation History
+
+```dart
+// Delete a specific history record
+bool success = await MapBoxNavigation.instance.deleteNavigationHistory(historyId);
+
+// Clear all history records
+bool cleared = await MapBoxNavigation.instance.clearAllNavigationHistory();
+```
+
+### Integrated Search
+
+The plugin provides comprehensive search capabilities powered by Mapbox Search API.
+
+#### Show Search View (Full UI)
+
+```dart
+// Open the full search UI with autocomplete
+List<Map<String, dynamic>>? wayPoints = await MapboxSearch.showSearchView();
+
+if (wayPoints != null && wayPoints.length >= 2) {
+  // wayPoints contains origin and destination
+  var origin = WayPoint(
+    name: wayPoints[0]['name'],
+    latitude: wayPoints[0]['latitude'],
+    longitude: wayPoints[0]['longitude'],
+  );
+  
+  var destination = WayPoint(
+    name: wayPoints[1]['name'],
+    latitude: wayPoints[1]['latitude'],
+    longitude: wayPoints[1]['longitude'],
+  );
+  
+  await MapBoxNavigation.instance.startNavigation(
+    wayPoints: [origin, destination],
+  );
+}
+```
+
+#### Search Places
+
+```dart
+// Search for places with options
+var results = await MapboxSearch.searchPlaces(
+  MapboxSearchOptions(
+    query: 'coffee shop',
+    proximity: MapboxCoordinate(latitude: 37.7749, longitude: -122.4194),
+    limit: 10,
+    categories: [MapboxSearchCategories.cafe],
+  ),
+);
+
+for (var result in results) {
+  print('${result.name} - ${result.address}');
+  print('Distance: ${result.distance} meters');
+}
+```
+
+#### Search Nearby Points of Interest
+
+```dart
+// Search for nearby POIs
+var nearbyResults = await MapboxSearch.searchPointsOfInterest(
+  coordinate: MapboxCoordinate(latitude: 37.7749, longitude: -122.4194),
+  radius: 1000.0, // 1km radius
+  categories: [MapboxSearchCategories.restaurant, MapboxSearchCategories.cafe],
+  limit: 20,
+);
+```
+
+#### Get Search Suggestions (Autocomplete)
+
+```dart
+// Get search suggestions as user types
+var suggestions = await MapboxSearch.getSearchSuggestions(
+  query: 'star',
+  proximity: MapboxCoordinate(latitude: 37.7749, longitude: -122.4194),
+  limit: 5,
+);
+
+for (var suggestion in suggestions) {
+  print('${suggestion.name} - ${suggestion.address}');
+}
+```
+
+#### Reverse Geocoding
+
+```dart
+// Get address from coordinates
+var results = await MapboxSearch.reverseGeocode(
+  MapboxCoordinate(latitude: 37.7749, longitude: -122.4194),
+);
+
+if (results.isNotEmpty) {
+  print('Address: ${results.first.address}');
+}
+```
+
+#### Search by Category
+
+```dart
+// Search for specific category
+var restaurants = await MapboxSearch.searchByCategory(
+  query: 'italian',
+  category: MapboxSearchCategories.restaurant,
+  proximity: MapboxCoordinate(latitude: 37.7749, longitude: -122.4194),
+  limit: 10,
+);
+```
+
+#### Search in Bounding Box
+
+```dart
+// Search within a specific area
+var results = await MapboxSearch.searchInBoundingBox(
+  query: 'hotel',
+  boundingBox: MapboxBoundingBox(
+    southwest: MapboxCoordinate(latitude: 37.7, longitude: -122.5),
+    northeast: MapboxCoordinate(latitude: 37.8, longitude: -122.4),
+  ),
+  limit: 15,
+);
+```
+
+#### Available Search Categories
+
+```dart
+// Common categories available in MapboxSearchCategories:
+MapboxSearchCategories.restaurant
+MapboxSearchCategories.hotel
+MapboxSearchCategories.gasStation
+MapboxSearchCategories.hospital
+MapboxSearchCategories.pharmacy
+MapboxSearchCategories.bank
+MapboxSearchCategories.atm
+MapboxSearchCategories.school
+MapboxSearchCategories.university
+MapboxSearchCategories.shopping
+MapboxSearchCategories.supermarket
+MapboxSearchCategories.parking
+MapboxSearchCategories.airport
+MapboxSearchCategories.trainStation
+MapboxSearchCategories.busStation
+MapboxSearchCategories.museum
+MapboxSearchCategories.park
+MapboxSearchCategories.gym
+MapboxSearchCategories.cinema
+MapboxSearchCategories.cafe
+```
+
+### Map Style Picker
+
+The plugin provides an interactive UI for selecting map styles with automatic persistence.
+
+#### Show Style Picker
+
+```dart
+// Open the style picker UI
+// User selections are automatically saved and applied to all future navigation
+bool saved = await MapboxStylePicker.show();
+
+if (saved) {
+  print('Style saved! All future navigation will use the selected style.');
+}
+
+// Start navigation - automatically uses the saved style
+await MapBoxNavigation.instance.startNavigation(
+  wayPoints: wayPoints,
+  // No need to pass style parameters - automatically applied
+);
+```
+
+#### Get Current Style Settings
+
+```dart
+// Retrieve the currently saved style configuration
+Map<String, dynamic> settings = await MapboxStylePicker.getStoredStyle();
+
+print('Map Style: ${settings['mapStyle']}'); // e.g., 'standard', 'dark', 'outdoors'
+print('Light Preset: ${settings['lightPreset']}'); // e.g., 'day', 'night', 'dawn', 'dusk'
+print('Light Mode: ${settings['lightPresetMode']}'); // 'manual' or 'automatic'
+```
+
+#### Clear Saved Style
+
+```dart
+// Reset to default style (standard + day)
+bool cleared = await MapboxStylePicker.clearStoredStyle();
+```
+
+#### Available Map Styles
+
+The following map styles are available:
+
+- **Standard** - Default Mapbox style (supports Light Preset)
+- **Standard Satellite** - Satellite imagery with labels (supports Light Preset)
+- **Faded** - Subtle, faded theme (supports Light Preset)
+- **Monochrome** - Single-color theme (supports Light Preset)
+- **Light** - Light theme
+- **Dark** - Dark theme
+- **Outdoors** - Optimized for outdoor activities
+
+#### Light Preset Options
+
+For styles that support Light Preset (Standard, Standard Satellite, Faded, Monochrome):
+
+- **Dawn** - Early morning lighting
+- **Day** - Daytime lighting (default)
+- **Dusk** - Evening lighting
+- **Night** - Nighttime lighting
+
+#### Automatic Light Adjustment
+
+When enabled, the Light Preset automatically adjusts based on the time of day:
+- Dawn: 5:00 AM - 7:00 AM
+- Day: 7:00 AM - 6:00 PM
+- Dusk: 6:00 PM - 8:00 PM
+- Night: 8:00 PM - 5:00 AM
+
+### Free Drive Mode
+
+Start navigation without a destination for passive navigation.
+
+```dart
+// Start free drive mode
+await MapBoxNavigation.instance.startFreeDrive(
+  options: MapBoxOptions(
+    mode: MapBoxNavigationMode.drivingWithTraffic,
+    simulateRoute: false,
+  ),
+);
+```
+
+### Add Waypoints During Navigation
+
+```dart
+// Add additional stops during active navigation
+await MapBoxNavigation.instance.addWayPoints(
+  wayPoints: [
+    WayPoint(name: "Gas Station", latitude: 42.888, longitude: -78.880),
+    WayPoint(name: "Restaurant", latitude: 42.890, longitude: -78.882),
+  ],
+);
+```
+
+### Get Navigation Metrics
+
+```dart
+// Get remaining distance in meters
+double? distance = await MapBoxNavigation.instance.getDistanceRemaining();
+
+// Get remaining duration in seconds
+double? duration = await MapBoxNavigation.instance.getDurationRemaining();
+```
+
 ## To Do
 * [DONE] Android Implementation
 * [DONE] Add more settings like Navigation Mode (driving, walking, etc)
 * [DONE] Stream Events like relevant navigation notifications, metrics, current location, etc. 
-* [DONE] Embeddable Navigation View 
+* [DONE] Embeddable Navigation View
+* [DONE] Navigation History Recording and Replay
+* [DONE] Integrated Search with Mapbox Search API
+* [DONE] Map Style Picker with Light Preset Support
 * Offline Routing
 
 <!-- Links -->

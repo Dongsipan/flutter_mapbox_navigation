@@ -516,6 +516,8 @@ final class HistoryReplayViewController: UIViewController {
             startLayer.circleRadius = .constant(6.0)
             startLayer.circleStrokeColor = .constant(StyleColor(.white))
             startLayer.circleStrokeWidth = .constant(2.0)
+            startLayer.circleOpacity = .constant(1.0)  // 完全不透明
+            startLayer.circleEmissiveStrength = .constant(1.0)  // 自发光，不受光照影响
             
             try mapView.mapboxMap.addPersistentLayer(startLayer)
         } catch {
@@ -536,6 +538,8 @@ final class HistoryReplayViewController: UIViewController {
                 endLayer.circleRadius = .constant(6.0)
                 endLayer.circleStrokeColor = .constant(StyleColor(.white))
                 endLayer.circleStrokeWidth = .constant(2.0)
+                endLayer.circleOpacity = .constant(1.0)  // 完全不透明
+                endLayer.circleEmissiveStrength = .constant(1.0)  // 自发光，不受光照影响
                 
                 try mapView.mapboxMap.addPersistentLayer(endLayer)
             } catch {

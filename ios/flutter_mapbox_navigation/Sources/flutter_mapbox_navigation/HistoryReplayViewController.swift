@@ -3,14 +3,7 @@ import MapboxMaps
 import MapboxNavigationCore
 import MapboxNavigationUIKit
 import UIKit
-
-// MARK: - Double Extension for Range Clamping
-
-extension Double {
-    func clamped(to range: ClosedRange<Double>) -> Double {
-        return Swift.min(Swift.max(self, range.lowerBound), range.upperBound)
-    }
-}
+import Combine
 
 // MARK: - UIColor Extension for Speed-based Colors
 
@@ -66,178 +59,17 @@ extension UIColor {
         }
     }
 }
-import Combine
-
-
-
-/// 自定义位置提供者，将历史回放位置流提供给地图的内置 puck
-/// 实现位置插值，在两个位置点之间生成多个中间点，确保高倍速下转弯平滑
-class ReplayLocationProvider: LocationProvider {
-    private var observers = NSHashTable<AnyObject>.weakObjects()
-    private var lastLocation: MapboxCommon.Location?
-    private var cancellable: AnyCancellable?
-    private var previousCLLocation: CLLocation?  // 上一个原始位置
-    private var interpolationTimer: Timer?
-    private var interpolationQueue: [MapboxCommon.Location] = []  // 插值位置队列
-    private let maxQueueSize = 100  // 队列最大长度，防止内存无限增长
-
-    func startReplay(with publisher: AnyPublisher<CLLocation, Never>) {
-        cancellable = publisher.sink { [weak self] newLocation in
-            guard let self = self else { return }
-            
-            // 如果有上一个位置，则在两点之间插值
-            if let previousLocation = self.previousCLLocation {
-                self.interpolateLocations(from: previousLocation, to: newLocation)
-            } else {
-                // 第一个位置，直接发送
-                self.publishLocation(newLocation)
-            }
-            
-            self.previousCLLocation = newLocation
-        }
-        
-        // 启动定时器，以固定频率发送插值位置
-        startInterpolationTimer()
-    }
-    
-    /// 在两个位置之间插值生成多个中间点
-    private func interpolateLocations(from start: CLLocation, to end: CLLocation) {
-        // 如果队列已满，跳过插值（防止内存无限增长）
-        guard interpolationQueue.count < maxQueueSize else {
-            print("⚠️ 插值队列已满，跳过插值")
-            return
-        }
-        
-        let steps = 5  // 在两点之间生成5个中间点
-        
-        for i in 0...steps {
-            let ratio = Double(i) / Double(steps)
-            
-            // 位置插值（线性插值）
-            let lat = start.coordinate.latitude + (end.coordinate.latitude - start.coordinate.latitude) * ratio
-            let lon = start.coordinate.longitude + (end.coordinate.longitude - start.coordinate.longitude) * ratio
-            
-            // 方向插值（考虑角度跨越0/360度）
-            var bearing: Double?
-            if start.course >= 0 && end.course >= 0 {
-                var delta = end.course - start.course
-                if delta > 180 {
-                    delta -= 360
-                } else if delta < -180 {
-                    delta += 360
-                }
-                bearing = start.course + delta * ratio
-                if bearing! < 0 {
-                    bearing! += 360
-                } else if bearing! >= 360 {
-                    bearing! -= 360
-                }
-            } else if end.course >= 0 {
-                bearing = end.course
-            }
-            
-            // 速度插值
-            let speed = start.speed >= 0 && end.speed >= 0 
-                ? start.speed + (end.speed - start.speed) * ratio
-                : (end.speed >= 0 ? end.speed : nil)
-            
-            // 时间戳插值
-            let timestamp = start.timestamp.addingTimeInterval(
-                end.timestamp.timeIntervalSince(start.timestamp) * ratio
-            )
-            
-            let location = MapboxCommon.Location(
-                coordinate: CLLocationCoordinate2D(latitude: lat, longitude: lon),
-                timestamp: timestamp,
-                altitude: start.altitude + (end.altitude - start.altitude) * ratio,
-                horizontalAccuracy: end.horizontalAccuracy,
-                verticalAccuracy: end.verticalAccuracy,
-                speed: speed,
-                bearing: bearing
-            )
-            
-            interpolationQueue.append(location)
-        }
-    }
-    
-    /// 启动定时器，以固定频率发送插值位置
-    private func startInterpolationTimer() {
-        interpolationTimer?.invalidate()
-        // 60 FPS = 16.67ms per frame
-        interpolationTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
-            self?.sendNextInterpolatedLocation()
-        }
-    }
-    
-    /// 发送队列中的下一个插值位置
-    private func sendNextInterpolatedLocation() {
-        guard !interpolationQueue.isEmpty else { return }
-        
-        // 如果队列过长，一次发送多个以快速消费（性能优化）
-        let batchSize = min(interpolationQueue.count > 50 ? 2 : 1, interpolationQueue.count)
-        
-        for _ in 0..<batchSize {
-            guard !interpolationQueue.isEmpty else { break }
-            let location = interpolationQueue.removeFirst()
-            
-            lastLocation = location
-            for observer in observers.allObjects {
-                (observer as? LocationObserver)?.onLocationUpdateReceived(for: [location])
-            }
-        }
-    }
-    
-    /// 直接发送位置（用于第一个位置）
-    private func publishLocation(_ clLocation: CLLocation) {
-        let location = MapboxCommon.Location(
-            coordinate: clLocation.coordinate,
-            timestamp: clLocation.timestamp,
-            altitude: clLocation.altitude,
-            horizontalAccuracy: clLocation.horizontalAccuracy,
-            verticalAccuracy: clLocation.verticalAccuracy,
-            speed: clLocation.speed >= 0 ? clLocation.speed : nil,
-            bearing: clLocation.course >= 0 ? clLocation.course : nil
-        )
-        interpolationQueue.append(location)
-    }
-
-    func getLastObservedLocation() -> MapboxCommon.Location? {
-        return lastLocation
-    }
-
-    func addLocationObserver(for observer: any LocationObserver) {
-        observers.add(observer)
-        if let lastLocation = lastLocation {
-            observer.onLocationUpdateReceived(for: [lastLocation])
-        }
-    }
-
-    func removeLocationObserver(for observer: any LocationObserver) {
-        observers.remove(observer)
-    }
-
-    deinit {
-        cancellable?.cancel()
-        interpolationTimer?.invalidate()
-        interpolationQueue.removeAll()
-    }
-}
-
-/// 历史轨迹回放视图控制器
-/// 按照官方最新建议：使用自定义 LocationProvider 将历史位置流提供给内置 puck
-/// 将位置更新到自定义 MapView，不启动导航相关组件
+/// 历史轨迹展示视图控制器
+/// 仅显示静态的历史轨迹路线，不包含回放功能
 final class HistoryReplayViewController: UIViewController {
 
-    // MARK: - Properties (following official example pattern)
+    // MARK: - Properties
 
     private let historyFilePath: String
     private let mapStyle: String?
     private let lightPreset: String?
 
-    // Combine 订阅管理
-    private var cancellables = Set<AnyCancellable>()
-
-    // 使用普通的 MapView 而不是 NavigationMapView，避免导航相关逻辑
+    // 使用普通的 MapView
     private var mapView: MapView! {
         didSet {
             if let mapView = oldValue {
@@ -250,35 +82,6 @@ final class HistoryReplayViewController: UIViewController {
         }
     }
 
-    // 按照官方建议：仅创建 HistoryReplayController，不与导航引擎结合
-    private lazy var historyReplayController: HistoryReplayController = {
-        // Smart path resolution for iOS sandbox changes
-        let currentHistoryDir = defaultHistoryDirectoryURL()
-        let fileURL = URL(fileURLWithPath: historyFilePath)
-        var finalFileURL = fileURL
-
-        // 文件路径智能解析
-        if !FileManager.default.fileExists(atPath: fileURL.path) {
-            let filename = fileURL.lastPathComponent
-            let currentDirFileURL = currentHistoryDir.appendingPathComponent(filename)
-            if FileManager.default.fileExists(atPath: currentDirFileURL.path) {
-                finalFileURL = currentDirFileURL
-            }
-        }
-
-        guard let historyReader = HistoryReader(fileUrl: finalFileURL, readOptions: nil) else {
-            fatalError("Failed to create HistoryReader with file: \(finalFileURL.path)")
-        }
-
-        var historyReplayController = HistoryReplayController(historyReader: historyReader)
-        historyReplayController.delegate = self
-        return historyReplayController
-    }()
-
-    // 按照官方最新建议：使用自定义 LocationProvider 将历史位置流提供给内置 puck
-    private let replayLocationProvider = ReplayLocationProvider()
-    private var locationSubscription: AnyCancellable?
-
     // 管理地图事件订阅的生命周期
     private var cancelables = Set<AnyCancellable>()
 
@@ -286,22 +89,15 @@ final class HistoryReplayViewController: UIViewController {
     private var historyLocations: [CLLocation] = []
     private let historyRouteSourceId = "history-route-source"
     private let historyRouteLayerId = "history-route-layer"
-    private let historyRouteOutlineLayerId = "history-route-outline-layer"  // 轨迹轮廓层
+    private let historyRouteOutlineLayerId = "history-route-outline-layer"
     private let startPointSourceId = "start-point-source"
     private let endPointSourceId = "end-point-source"
     private let startPointLayerId = "start-point-layer"
     private let endPointLayerId = "end-point-layer"
 
-    // 简化的速度数据存储（仅用于渐变显示）
+    // 速度数据存储（用于渐变显示）
     private var locationSpeeds: [Double] = []
     private var cumulativeDistances: [Double] = []
-    
-    // 全览/跟随模式
-    private var isOverviewMode = false
-    private var overviewButton: UIButton?
-    
-    // 回放控制
-    private var recommendedSpeed: Double = 8.0  // 降低回放速度，避免转弯时图标飞跃
 
 
     // MARK: - Initialization
@@ -324,9 +120,7 @@ final class HistoryReplayViewController: UIViewController {
 
     deinit {
         // 确保资源清理
-        locationSubscription?.cancel()
         cancelables.removeAll()
-        historyReplayController.pause()
     }
 
     // MARK: - Lifecycle
@@ -339,8 +133,8 @@ final class HistoryReplayViewController: UIViewController {
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
-        // 开始历史轨迹回放，仅显示轨迹，不启动导航界面
-        startHistoryReplay()
+        // 加载并显示历史轨迹
+        loadHistoryTrajectory()
     }
     
     override var preferredStatusBarStyle: UIStatusBarStyle {
@@ -369,14 +163,6 @@ final class HistoryReplayViewController: UIViewController {
                 print("🎬 历史回放: 使用默认样式")
             }
 
-            // 启用位置显示 - 使用带箭头的默认配置
-            let configuration = Puck2DConfiguration.makeDefault(showBearing: true)
-            mapView.location.options.puckType = .puck2D(configuration)
-            // 设置箭头方向跟随 course（行进方向）而不是 heading（设备朝向）
-            mapView.location.options.puckBearing = .course
-            // 关键：在 v11 中需要手动启用 puck 方向旋转（默认为 false）
-            mapView.location.options.puckBearingEnabled = true
-
             // 设置样式加载完成后的回调
             mapView.mapboxMap.onStyleLoaded.observeNext { [weak self] _ in
                 guard let self = self else { return }
@@ -399,29 +185,9 @@ final class HistoryReplayViewController: UIViewController {
         setupMapView()
     }
 
-    private func startHistoryReplay() {
-        // 按照官方建议：先解析历史文件获取完整轨迹
+    private func loadHistoryTrajectory() {
         Task {
             await parseHistoryFileAndDrawRoute()
-
-            // 然后订阅位置流用于当前位置更新
-            await MainActor.run {
-                // 将历史位置流连接到自定义 LocationProvider
-                // 这样内置的 puck 会自动显示和跟随历史轨迹
-                replayLocationProvider.startReplay(with: historyReplayController.locations.eraseToAnyPublisher())
-
-                locationSubscription = historyReplayController.locations
-                    .receive(on: RunLoop.main)
-                    .sink { [weak self] location in
-                        self?.updateCurrentLocation(location)
-                    }
-
-                // 设置推荐回放速度
-                historyReplayController.speedMultiplier = recommendedSpeed
-
-                // 开始回放
-                historyReplayController.play()
-            }
         }
     }
 
@@ -447,15 +213,11 @@ final class HistoryReplayViewController: UIViewController {
                 return
             }
 
-            // 预解析所有历史事件，类似 Android 端的 preDrawCompleteRoute
+            // 预解析所有历史事件
             await preParseCompleteRoute(reader: reader)
-            
-            // 设置固定回放速度
-            recommendedSpeed = 8.0  // 使用适中的回放速度，确保转弯平滑
 
-            // 在主线程创建按钮，但不立即绘制路线
+            // 在主线程绘制路线
             await MainActor.run {
-                setupOverviewButton()
                 // 如果地图已加载完成则立即绘制，否则等待地图加载回调
                 if mapView?.mapboxMap.isStyleLoaded == true {
                     drawCompleteHistoryRoute()
@@ -467,7 +229,7 @@ final class HistoryReplayViewController: UIViewController {
         }
     }
 
-    /// 预解析所有历史事件中的位置数据，类似 Android 端的 preDrawCompleteRoute
+    /// 预解析所有历史事件中的位置数据
     private func preParseCompleteRoute(reader: HistoryReader) async {
         do {
             let history = try await reader.parse()
@@ -488,7 +250,7 @@ final class HistoryReplayViewController: UIViewController {
                         timestamp: locationEvent.location.timestamp
                     )
                     
-                    // 过滤过近的点，类似 Android 端的逻辑
+                    // 过滤过近的点
                     if allLocations.isEmpty {
                         allLocations.append(location)
                     } else {
@@ -608,7 +370,7 @@ final class HistoryReplayViewController: UIViewController {
         }
     }
 
-    /// 一次性绘制完整历史路线，类似 Android 端的 drawCompleteRoute
+    /// 一次性绘制完整历史路线
     private func drawCompleteHistoryRoute() {
         guard !historyLocations.isEmpty else {
             return
@@ -787,154 +549,43 @@ final class HistoryReplayViewController: UIViewController {
         guard let mapView = mapView, !coordinates.isEmpty else { return }
         
         // 计算边界框
-            let minLat = coordinates.map { $0.latitude }.min() ?? 0
-            let maxLat = coordinates.map { $0.latitude }.max() ?? 0
-            let minLng = coordinates.map { $0.longitude }.min() ?? 0
-            let maxLng = coordinates.map { $0.longitude }.max() ?? 0
+        let minLat = coordinates.map { $0.latitude }.min() ?? 0
+        let maxLat = coordinates.map { $0.latitude }.max() ?? 0
+        let minLng = coordinates.map { $0.longitude }.min() ?? 0
+        let maxLng = coordinates.map { $0.longitude }.max() ?? 0
         
-        // 添加边距
-        let latPadding = (maxLat - minLat) * 0.3
-        let lngPadding = (maxLng - minLng) * 0.3
-
-            let center = CLLocationCoordinate2D(
-                latitude: (minLat + maxLat) / 2,
-                longitude: (minLng + maxLng) / 2
-            )
-
-        // 计算合适的缩放级别
-        let latDiff = maxLat - minLat + latPadding * 2
-        let lngDiff = maxLng - minLng + lngPadding * 2
-        let maxDiff = max(latDiff, lngDiff)
+        // 创建边界框的西南和东北角坐标
+        let southwest = CLLocationCoordinate2D(latitude: minLat, longitude: minLng)
+        let northeast = CLLocationCoordinate2D(latitude: maxLat, longitude: maxLng)
         
-        let zoom: Double
-        switch maxDiff {
-        case ..<0.005: zoom = 17.0
-        case ..<0.01:  zoom = 16.0
-        case ..<0.02:  zoom = 14.0
-        case ..<0.05:  zoom = 12.0
-        case ..<0.1:   zoom = 10.0
-        default:       zoom = 8.0
-        }
+        // 使用 CoordinateBounds 和 CameraOptions 来自动计算合适的缩放级别
+        let bounds = CoordinateBounds(southwest: southwest, northeast: northeast)
         
+        // 设置边距，确保轨迹不被UI元素遮挡
+        // 顶部留出导航栏空间，底部和左右留出合理边距
+        let edgeInsets = UIEdgeInsets(
+            top: 100,      // 顶部留出导航栏和状态栏空间
+            left: 60,      // 左侧边距
+            bottom: 100,   // 底部边距
+            right: 60      // 右侧边距
+        )
         
-        let cameraOptions = CameraOptions(center: center, zoom: zoom)
+        // 使用接收 CoordinateBounds 的重载方法（需要 maxZoom 和 offset 参数）
+        let cameraOptions = mapView.mapboxMap.camera(
+            for: bounds,
+            padding: edgeInsets,
+            bearing: nil,
+            pitch: nil,
+            maxZoom: nil,    // 不限制最大缩放级别
+            offset: nil      // 不偏移中心点
+        )
+        
+        // 平滑过渡到新的相机位置
         mapView.camera.ease(to: cameraOptions, duration: 1.0)
-        
-        isOverviewMode = true
-    }
-    
-    /// 设置全览按钮
-    private func setupOverviewButton() {
-        guard let mapView = mapView else { return }
-        
-        // 创建全览按钮
-        let button = UIButton(type: .system)
-        button.setImage(UIImage(systemName: "viewfinder"), for: .normal)
-        button.backgroundColor = UIColor.systemBackground.withAlphaComponent(0.9)
-        button.tintColor = .systemBlue
-        button.layer.cornerRadius = 8
-        button.layer.shadowColor = UIColor.black.cgColor
-        button.layer.shadowOffset = CGSize(width: 0, height: 2)
-        button.layer.shadowRadius = 4
-        button.layer.shadowOpacity = 0.1
-        button.translatesAutoresizingMaskIntoConstraints = false
-        
-        // 添加点击事件
-        button.addTarget(self, action: #selector(overviewButtonTapped), for: .touchUpInside)
-        
-        mapView.addSubview(button)
-        overviewButton = button
-        
-        // 设置约束
-        NSLayoutConstraint.activate([
-            button.widthAnchor.constraint(equalToConstant: 44),
-            button.heightAnchor.constraint(equalToConstant: 44),
-            button.trailingAnchor.constraint(equalTo: mapView.trailingAnchor, constant: -16),
-            button.topAnchor.constraint(equalTo: mapView.safeAreaLayoutGuide.topAnchor, constant: 16)
-        ])
-        
-        // 设置初始状态
-        updateOverviewButtonState()
-    }
-    
-    @objc private func overviewButtonTapped() {
-        
-        if isOverviewMode {
-            switchToFollowingMode()
-        } else {
-            switchToOverviewMode()
-        }
-    }
-    
-    /// 切换到全览模式
-    private func switchToOverviewMode() {
-        guard !historyLocations.isEmpty else {
-            return
-        }
-        
-        let coordinates = historyLocations.map { $0.coordinate }
-        setOverviewCamera(coordinates: coordinates)
-        isOverviewMode = true
-        updateOverviewButtonState()
-    }
-    
-    /// 切换到跟随模式
-    private func switchToFollowingMode() {
-        guard let currentLocation = replayLocationProvider.getLastObservedLocation() else {
-            return
-        }
-        
-        let coordinate = CLLocationCoordinate2D(
-            latitude: currentLocation.coordinate.latitude,
-            longitude: currentLocation.coordinate.longitude
-        )
-
-            let cameraOptions = CameraOptions(
-            center: coordinate,
-            zoom: 16.0,
-            bearing: currentLocation.bearing
-        )
-        
-        mapView?.camera.ease(to: cameraOptions, duration: 1.0)
-        isOverviewMode = false
-        updateOverviewButtonState()
-    }
-    
-    /// 更新全览按钮的状态显示
-    private func updateOverviewButtonState() {
-        guard let button = overviewButton else { return }
-        
-        if isOverviewMode {
-            // 全览模式：按钮高亮显示
-            button.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.9)
-            button.tintColor = .white
-        } else {
-            // 跟随模式：按钮普通显示
-            button.backgroundColor = UIColor.systemBackground.withAlphaComponent(0.9)
-            button.tintColor = .systemBlue
-        }
     }
 
     private func setupTrajectoryLayers() {
-        // 不需要设置自定义位置图层
-        // HistoryReplayController 会自动提供位置流给内置的 puck
-        // 我们已经设置了 puckType 为带箭头的配置
-    }
-
-    private func updateCurrentLocation(_ location: CLLocation) {
-        // 更新当前回放位置
-        // ReplayLocationProvider 会将位置流提供给内置的 puck
-        // 内置的 puck（箭头）会自动显示和更新
-
-        // 只在跟随模式下更新相机
-        if !isOverviewMode {
-        let cameraOptions = CameraOptions(
-            center: location.coordinate,
-                zoom: 16.0,
-            bearing: location.course >= 0 ? location.course : nil
-        )
-        mapView?.camera.ease(to: cameraOptions, duration: 0.3)
-        }
+        // 轨迹图层已在 drawCompleteHistoryRoute 中设置
     }
 
 
@@ -1008,22 +659,12 @@ final class HistoryReplayViewController: UIViewController {
             mapView.topAnchor.constraint(equalTo: view.topAnchor),
             mapView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
         ])
-
-        // 使用自定义 LocationProvider 将历史位置流提供给内置 puck
-        mapView.location.override(locationProvider: replayLocationProvider)
     }
 
 
     private func cleanupReplay() {
-        // 停止位置订阅
-        locationSubscription?.cancel()
-        locationSubscription = nil
-
         // 清理所有地图事件订阅
         cancelables.removeAll()
-
-        // 停止历史回放
-        historyReplayController.pause()
 
         // 清理历史数据
         historyLocations.removeAll()
@@ -1034,10 +675,6 @@ final class HistoryReplayViewController: UIViewController {
         if let mapView = mapView {
             cleanupExistingLayers()
         }
-        
-        // 清理全览按钮
-        overviewButton?.removeFromSuperview()
-        overviewButton = nil
 
         // 清理地图视图
         mapView?.removeFromSuperview()
@@ -1159,50 +796,3 @@ final class HistoryReplayViewController: UIViewController {
     }
 }
 
-// MARK: - HistoryReplayDelegate (following official example)
-
-extension HistoryReplayViewController: HistoryReplayDelegate {
-    func historyReplayController(
-        _: MapboxNavigationCore.HistoryReplayController,
-        didReplayEvent event: any MapboxNavigationCore.HistoryEvent
-    ) {
-        // Monitor all incoming events as they come (following official example)
-        // In this simplified version we don't need to handle specific events
-    }
-
-    func historyReplayController(
-        _: MapboxNavigationCore.HistoryReplayController,
-        wantsToSetRoutes routes: MapboxNavigationCore.NavigationRoutes
-    ) {
-        // 不启动导航相关组件，仅显示轨迹
-    }
-
-    func historyReplayControllerDidFinishReplay(_: HistoryReplayController) {
-        // 历史轨迹回放结束，停留在最后位置
-        print("✅ 历史轨迹回放结束")
-        
-        // 不关闭页面，用户可以继续查看轨迹
-        // 可以选择切换到全览模式以显示完整轨迹
-        if !isOverviewMode {
-            switchToOverviewMode()
-        }
-    }
-}
-
-// MARK: - NavigationViewControllerDelegate (following official example)
-
-extension HistoryReplayViewController: NavigationViewControllerDelegate {
-    func navigationViewControllerDidDismiss(
-        _ navigationViewController: NavigationViewController,
-        byCanceling canceled: Bool
-    ) {
-        // 协议完整性方法
-        cleanupReplay()
-
-        if let navigationController = self.navigationController {
-            navigationController.dismiss(animated: true, completion: nil)
-        } else {
-            dismiss(animated: true, completion: nil)
-        }
-    }
-}

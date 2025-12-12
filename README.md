@@ -293,6 +293,48 @@ if (coverPath != null) {
 }
 ```
 
+#### Get Detailed History Events
+
+```dart
+// Get detailed event data from a navigation history record
+try {
+  NavigationHistoryEvents events = await MapBoxNavigation.instance.getNavigationHistoryEvents(
+    historyId: history.id,
+  );
+  
+  print('History ID: ${events.historyId}');
+  print('Total Events: ${events.events.length}');
+  
+  // Process location update events
+  for (var event in events.events) {
+    if (event.eventType == 'location_update') {
+      var locationData = event.data as LocationData;
+      print('Location: ${locationData.latitude}, ${locationData.longitude}');
+      print('Speed: ${locationData.speed} m/s');
+      print('Timestamp: ${locationData.timestamp}');
+    } else if (event.eventType == 'route_assignment') {
+      print('Route assigned: ${event.data}');
+    } else if (event.eventType == 'user_pushed') {
+      print('Custom event: ${event.data}');
+    }
+  }
+  
+  // Access raw location trajectory
+  print('Raw locations: ${events.rawLocations.length} points');
+  for (var location in events.rawLocations) {
+    print('  ${location.latitude}, ${location.longitude} at ${location.timestamp}');
+  }
+  
+  // Access initial route information
+  if (events.initialRoute != null) {
+    print('Initial route distance: ${events.initialRoute!['distance']}');
+    print('Initial route duration: ${events.initialRoute!['duration']}');
+  }
+} catch (e) {
+  print('Error loading history events: $e');
+}
+```
+
 #### Delete Navigation History
 
 ```dart

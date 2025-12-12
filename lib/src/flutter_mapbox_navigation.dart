@@ -118,6 +118,18 @@ class MapBoxNavigation {
     return FlutterMapboxNavigationPlatform.instance.getNavigationHistoryList();
   }
 
+  /// 获取导航历史记录的详细事件数据
+  /// [historyId] 历史记录ID
+  /// 返回包含所有事件、原始位置和初始路线的详细数据
+  /// 如果历史记录不存在或解析失败，将抛出异常
+  Future<NavigationHistoryEvents> getNavigationHistoryEvents({
+    required String historyId,
+  }) async {
+    return FlutterMapboxNavigationPlatform.instance.getNavigationHistoryEvents(
+      historyId,
+    );
+  }
+
   /// 删除指定的导航历史记录
   Future<bool> deleteNavigationHistory(String historyId) async {
     return FlutterMapboxNavigationPlatform.instance

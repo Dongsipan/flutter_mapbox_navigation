@@ -219,6 +219,41 @@ class MethodChannelFlutterMapboxNavigation
     }
   }
 
+  @override
+  Future<NavigationHistoryEvents> getNavigationHistoryEvents(
+    String historyId,
+  ) async {
+    // 参数验证
+    if (historyId.isEmpty) {
+      throw ArgumentError('historyId cannot be empty');
+    }
+
+    try {
+      log('Calling getNavigationHistoryEvents with historyId: $historyId');
+      final result = await methodChannel.invokeMethod<Map<dynamic, dynamic>>(
+        'getNavigationHistoryEvents',
+        {'historyId': historyId},
+      );
+
+      if (result == null) {
+        throw Exception('Failed to get navigation history events: null result');
+      }
+
+      log('Received result from native: $result');
+      // 安全地转换 Map<dynamic, dynamic> 到 Map<String, dynamic>
+      final resultMap = Map<String, dynamic>.from(result);
+      return NavigationHistoryEvents.fromMap(resultMap);
+    } on PlatformException catch (e) {
+      log('Platform error getting navigation history events: ${e.code} - ${e.message}');
+      throw Exception(
+        'Failed to get navigation history events: ${e.message ?? e.code}',
+      );
+    } catch (e) {
+      log('Error getting navigation history events: $e');
+      rethrow;
+    }
+  }
+
   /// Events Handling
   Stream<RouteEvent>? get routeEventsListener {
     return eventChannel.receiveBroadcastStream().map((dynamic event) {

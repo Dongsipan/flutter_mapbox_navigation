@@ -261,6 +261,104 @@ class _HistoryTestPageState extends State<HistoryTestPage> {
     }
   }
 
+  /// 获取并显示历史事件详情
+  Future<void> _showHistoryEvents(String historyId) async {
+    setState(() {
+      _statusMessage = '正在加载历史事件...';
+    });
+
+    try {
+      final events = await MapBoxNavigation.instance.getNavigationHistoryEvents(
+        historyId: historyId,
+      );
+
+      setState(() {
+        _statusMessage = '已加载 ${events.events.length} 个事件';
+      });
+
+      // 显示事件详情对话框
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text('历史事件详情'),
+            content: SizedBox(
+              width: double.maxFinite,
+              height: 400,
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('历史记录 ID: ${events.historyId}',
+                        style: TextStyle(fontWeight: FontWeight.bold)),
+                    SizedBox(height: 8),
+                    Text('总事件数: ${events.events.length}'),
+                    Text('原始位置点数: ${events.rawLocations.length}'),
+                    SizedBox(height: 16),
+                    Text('事件列表:',
+                        style: TextStyle(fontWeight: FontWeight.bold)),
+                    SizedBox(height: 8),
+                    ...events.events.map((event) {
+                      if (event.eventType == 'location_update') {
+                        final locationData = LocationData.fromMap(event.data);
+                        return Card(
+                          child: ListTile(
+                            leading:
+                                Icon(Icons.location_on, color: Colors.blue),
+                            title: Text('位置更新'),
+                            subtitle: Text(
+                              '坐标: ${locationData.latitude.toStringAsFixed(4)}, ${locationData.longitude.toStringAsFixed(4)}\n'
+                              '速度: ${locationData.speed?.toStringAsFixed(2) ?? "N/A"} m/s\n'
+                              '时间: ${locationData.timestamp}',
+                            ),
+                          ),
+                        );
+                      } else if (event.eventType == 'route_assignment') {
+                        return Card(
+                          child: ListTile(
+                            leading: Icon(Icons.route, color: Colors.green),
+                            title: Text('路线分配'),
+                            subtitle: Text('路线数据: ${event.data}'),
+                          ),
+                        );
+                      } else if (event.eventType == 'user_pushed') {
+                        return Card(
+                          child: ListTile(
+                            leading: Icon(Icons.push_pin, color: Colors.orange),
+                            title: Text('自定义事件'),
+                            subtitle: Text('数据: ${event.data}'),
+                          ),
+                        );
+                      } else {
+                        return Card(
+                          child: ListTile(
+                            leading:
+                                Icon(Icons.help_outline, color: Colors.grey),
+                            title: Text('未知事件: ${event.eventType}'),
+                          ),
+                        );
+                      }
+                    }).toList(),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: Text('关闭'),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() {
+        _statusMessage = '加载历史事件失败: $e';
+      });
+    }
+  }
+
   /// 删除指定的导航历史记录
   Future<void> _deleteNavigationHistory(String historyId) async {
     setState(() {
@@ -363,13 +461,27 @@ class _HistoryTestPageState extends State<HistoryTestPage> {
                               Text('时长: ${history.duration}秒'),
                           ],
                         ),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.delete, color: Colors.red),
-                          tooltip: '删除此记录',
-                          onPressed: () {
-                            Navigator.of(context).pop();
-                            _deleteNavigationHistory(history.id);
-                          },
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.info_outline,
+                                  color: Colors.blue),
+                              tooltip: '查看事件详情',
+                              onPressed: () {
+                                Navigator.of(context).pop();
+                                _showHistoryEvents(history.id);
+                              },
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete, color: Colors.red),
+                              tooltip: '删除此记录',
+                              onPressed: () {
+                                Navigator.of(context).pop();
+                                _deleteNavigationHistory(history.id);
+                              },
+                            ),
+                          ],
                         ),
                       ),
                     );

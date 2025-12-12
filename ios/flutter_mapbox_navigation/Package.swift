@@ -25,6 +25,10 @@ let package = Package(
                 .product(name: "MapboxSearchUI", package: "search-ios")
             ],
             resources: []
+        ),
+        .testTarget(
+            name: "flutter_mapbox_navigationTests",
+            dependencies: ["flutter_mapbox_navigation"]
         )
     ]
 )

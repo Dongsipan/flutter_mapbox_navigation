@@ -725,6 +725,124 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
         }
     }
     
+    func getNavigationHistoryEvents(arguments: NSDictionary?, result: @escaping FlutterResult) {
+        print("📞 [NavigationFactory] getNavigationHistoryEvents called")
+        
+        // 验证参数
+        guard let historyId = arguments?["historyId"] as? String else {
+            print("❌ [NavigationFactory] INVALID_ARGUMENT: historyId is required")
+            result(FlutterError(code: "INVALID_ARGUMENT", message: "historyId is required", details: nil))
+            return
+        }
+        
+        print("🔍 [NavigationFactory] Fetching events for history ID: \(historyId)")
+        
+        // 初始化 HistoryManager
+        if historyManager == nil {
+            historyManager = HistoryManager()
+            print("📦 [NavigationFactory] HistoryManager initialized")
+        }
+        
+        // 根据 historyId 查找历史记录
+        let historyList = historyManager!.getHistoryList()
+        print("📋 [NavigationFactory] Found \(historyList.count) history records in database")
+        
+        guard let historyRecord = historyList.first(where: { $0.id == historyId }) else {
+            print("❌ [NavigationFactory] HISTORY_NOT_FOUND: History record with id \(historyId) not found")
+            print("❌ [NavigationFactory] Available history IDs: \(historyList.map { $0.id })")
+            result(FlutterError(code: "HISTORY_NOT_FOUND", message: "History record with id \(historyId) not found", details: nil))
+            return
+        }
+        
+        let originalFilePath = historyRecord.historyFilePath
+        print("📁 [NavigationFactory] Original history file path: \(originalFilePath)")
+        
+        // 智能路径解析 - 参照 HistoryReplayViewController 的逻辑
+        let currentHistoryDir = defaultHistoryDirectoryURL()
+        print("📂 [NavigationFactory] Current history directory: \(currentHistoryDir.path)")
+        
+        // 列出当前历史目录中的所有文件（用于调试）
+        do {
+            let files = try FileManager.default.contentsOfDirectory(atPath: currentHistoryDir.path)
+            print("📋 [NavigationFactory] Files in history directory (\(files.count) files):")
+            files.forEach { print("   - \($0)") }
+        } catch {
+            print("⚠️ [NavigationFactory] Could not list history directory: \(error)")
+        }
+        
+        let fileURL = URL(fileURLWithPath: originalFilePath)
+        var finalFileURL = fileURL
+        
+        // 检查文件是否存在，如果不存在则尝试在当前目录中查找
+        if !FileManager.default.fileExists(atPath: fileURL.path) {
+            print("⚠️ [NavigationFactory] File not found at original path, trying current directory")
+            let filename = fileURL.lastPathComponent
+            print("📄 [NavigationFactory] Looking for filename: \(filename)")
+            let currentDirFileURL = currentHistoryDir.appendingPathComponent(filename)
+            
+            if FileManager.default.fileExists(atPath: currentDirFileURL.path) {
+                finalFileURL = currentDirFileURL
+                print("✅ [NavigationFactory] Found file in current directory: \(currentDirFileURL.path)")
+            } else {
+                print("❌ [NavigationFactory] FILE_NOT_FOUND: History file not found at either path")
+                print("❌ [NavigationFactory] Original path: \(fileURL.path)")
+                print("❌ [NavigationFactory] Current dir path: \(currentDirFileURL.path)")
+                result(FlutterError(code: "FILE_NOT_FOUND", message: "History file not found at path \(originalFilePath)", details: nil))
+                return
+            }
+        } else {
+            print("✅ [NavigationFactory] File exists at original path")
+        }
+        
+        let filePath = finalFileURL.path
+        print("📁 [NavigationFactory] Final file path: \(filePath)")
+        print("✅ [NavigationFactory] File exists, starting background parsing")
+        
+        // 在后台线程解析历史文件
+        Task {
+            do {
+                let parser = HistoryEventsParser()
+                let eventsData = try await parser.parseHistoryFile(filePath: filePath, historyId: historyId)
+                
+                print("✅ [NavigationFactory] Successfully parsed history events")
+                
+                // 在主线程返回结果
+                await MainActor.run {
+                    result(eventsData)
+                }
+            } catch let error as HistoryParseError {
+                print("❌ [NavigationFactory] HistoryParseError caught: \(error)")
+                print("❌ [NavigationFactory] Error description: \(error.errorDescription ?? "No description")")
+                
+                await MainActor.run {
+                    switch error {
+                    case .fileNotFound(let path):
+                        print("❌ [NavigationFactory] Returning FILE_NOT_FOUND error to Flutter")
+                        result(FlutterError(code: "FILE_NOT_FOUND", message: "History file not found at path \(path)", details: nil))
+                    case .readerCreationFailed(let path):
+                        print("❌ [NavigationFactory] Returning READER_CREATION_FAILED error to Flutter")
+                        result(FlutterError(code: "READER_CREATION_FAILED", message: "Failed to create HistoryReader for file \(path)", details: nil))
+                    case .parseFailed(let underlyingError):
+                        print("❌ [NavigationFactory] Returning PARSE_ERROR to Flutter")
+                        print("❌ [NavigationFactory] Underlying error: \(underlyingError)")
+                        result(FlutterError(code: "PARSE_ERROR", message: "Failed to parse history file: \(underlyingError.localizedDescription)", details: nil))
+                    case .serializationFailed(let message):
+                        print("❌ [NavigationFactory] Returning SERIALIZATION_ERROR to Flutter")
+                        result(FlutterError(code: "SERIALIZATION_ERROR", message: "Failed to serialize event data: \(message)", details: nil))
+                    }
+                }
+            } catch {
+                print("❌ [NavigationFactory] Unexpected error caught: \(error)")
+                print("❌ [NavigationFactory] Error type: \(type(of: error))")
+                print("❌ [NavigationFactory] Error description: \(error.localizedDescription)")
+                
+                await MainActor.run {
+                    result(FlutterError(code: "UNKNOWN_ERROR", message: "An unexpected error occurred: \(error.localizedDescription)", details: nil))
+                }
+            }
+        }
+    }
+    
     // MARK: - History Recording Methods
     
     /**

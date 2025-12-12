@@ -206,6 +206,270 @@ class _HistoryReplayExampleState extends State<HistoryReplayExample> {
     );
   }
 
+  /// 查看历史事件详情
+  Future<void> _showHistoryEvents(NavigationHistory history) async {
+    try {
+      setState(() {
+        _isLoading = true;
+      });
+
+      final events = await MapBoxNavigation.instance.getNavigationHistoryEvents(
+        historyId: history.id,
+      );
+
+      setState(() {
+        _isLoading = false;
+      });
+
+      // 显示事件详情对话框
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('历史事件详情'),
+            content: SizedBox(
+              width: double.maxFinite,
+              height: 500,
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // 摘要信息
+                    Card(
+                      color: Colors.blue[50],
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '历史记录 ID',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                            Text(
+                              events.historyId,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                _buildStatItem(
+                                  '总事件数',
+                                  '${events.events.length}',
+                                  Icons.event,
+                                ),
+                                _buildStatItem(
+                                  '位置点数',
+                                  '${events.rawLocations.length}',
+                                  Icons.location_on,
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // 事件列表
+                    Text(
+                      '事件列表',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+
+                    // 统计不同类型的事件
+                    _buildEventTypeStats(events.events),
+                    const SizedBox(height: 12),
+
+                    // 显示前20个事件
+                    ...events.events.take(20).map((event) {
+                      return _buildEventCard(event);
+                    }).toList(),
+
+                    if (events.events.length > 20)
+                      Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: Text(
+                          '... 还有 ${events.events.length - 20} 个事件',
+                          style: TextStyle(
+                            color: Colors.grey[600],
+                            fontStyle: FontStyle.italic,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('关闭'),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      _showErrorDialog('加载历史事件失败: $e');
+    }
+  }
+
+  /// 构建统计项
+  Widget _buildStatItem(String label, String value, IconData icon) {
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: Colors.blue[700]),
+        const SizedBox(width: 4),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 10,
+                color: Colors.grey[600],
+              ),
+            ),
+            Text(
+              value,
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  /// 构建事件类型统计
+  Widget _buildEventTypeStats(List<HistoryEventData> events) {
+    final locationCount =
+        events.where((e) => e.eventType == 'location_update').length;
+    final routeCount =
+        events.where((e) => e.eventType == 'route_assignment').length;
+    final userCount = events.where((e) => e.eventType == 'user_pushed').length;
+    final unknownCount = events.where((e) => e.eventType == 'unknown').length;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            if (locationCount > 0)
+              _buildEventTypeBadge('位置', locationCount, Colors.blue),
+            if (routeCount > 0)
+              _buildEventTypeBadge('路线', routeCount, Colors.green),
+            if (userCount > 0)
+              _buildEventTypeBadge('自定义', userCount, Colors.orange),
+            if (unknownCount > 0)
+              _buildEventTypeBadge('未知', unknownCount, Colors.grey),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 构建事件类型徽章
+  Widget _buildEventTypeBadge(String label, int count, Color color) {
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.2),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Text(
+            '$count',
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+            ),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 10,
+            color: Colors.grey[600],
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// 构建事件卡片
+  Widget _buildEventCard(HistoryEventData event) {
+    IconData icon;
+    Color color;
+    String title;
+    String subtitle;
+
+    if (event.eventType == 'location_update') {
+      final locationData = LocationData.fromMap(event.data);
+      icon = Icons.location_on;
+      color = Colors.blue;
+      title = '位置更新';
+      subtitle = '${locationData.latitude.toStringAsFixed(4)}, '
+          '${locationData.longitude.toStringAsFixed(4)}\n'
+          '速度: ${locationData.speed?.toStringAsFixed(2) ?? "N/A"} m/s';
+    } else if (event.eventType == 'route_assignment') {
+      icon = Icons.route;
+      color = Colors.green;
+      title = '路线分配';
+      subtitle = '路线已分配';
+    } else if (event.eventType == 'user_pushed') {
+      icon = Icons.push_pin;
+      color = Colors.orange;
+      title = '自定义事件';
+      subtitle = '用户推送事件';
+    } else {
+      icon = Icons.help_outline;
+      color = Colors.grey;
+      title = '未知事件';
+      subtitle = event.eventType;
+    }
+
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      child: ListTile(
+        dense: true,
+        leading: Icon(icon, color: color, size: 20),
+        title: Text(
+          title,
+          style: const TextStyle(fontSize: 14),
+        ),
+        subtitle: Text(
+          subtitle,
+          style: const TextStyle(fontSize: 11),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -382,6 +646,16 @@ class _HistoryReplayExampleState extends State<HistoryReplayExample> {
                   spacing: 8,
                   runSpacing: 8,
                   children: [
+                    OutlinedButton.icon(
+                      onPressed:
+                          _isLoading ? null : () => _showHistoryEvents(history),
+                      icon: const Icon(Icons.info_outline, size: 16),
+                      label: const Text('查看事件'),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
+                      ),
+                    ),
                     if (!hasCover) ...[
                       OutlinedButton.icon(
                         onPressed:

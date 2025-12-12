@@ -146,4 +146,16 @@ abstract class FlutterMapboxNavigationPlatform extends PlatformInterface {
       'generateHistoryCover() has not been implemented.',
     );
   }
+
+  /// 根据历史记录 ID 获取导航历史的详细事件数据
+  /// [historyId] 历史记录的唯一标识符
+  /// 返回包含所有事件、原始位置数据和初始路线信息的 NavigationHistoryEvents 对象
+  /// 如果历史记录不存在或解析失败，将抛出异常
+  Future<NavigationHistoryEvents> getNavigationHistoryEvents(
+    String historyId,
+  ) async {
+    throw UnimplementedError(
+      'getNavigationHistoryEvents() has not been implemented.',
+    );
+  }
 }

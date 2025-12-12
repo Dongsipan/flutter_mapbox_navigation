@@ -129,6 +129,10 @@ public class FlutterMapboxNavigationPlugin: NavigationFactory, FlutterPlugin {
                 }
             }
         }
+        else if(call.method == "getNavigationHistoryEvents")
+        {
+            getNavigationHistoryEvents(arguments: arguments, result: result)
+        }
 
         else
         {

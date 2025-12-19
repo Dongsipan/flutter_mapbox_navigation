@@ -14,6 +14,7 @@ import 'package:flutter_mapbox_navigation/src/models/route_leg.dart';
 ///   "currentLegDistanceTraveled": 112.6682,
 ///   "currentLegDistanceRemaining": 2463.3588,
 ///   "currentStepInstruction": "Links auf Scott Street abbiegen.",
+///   "currentStepDistanceRemaining": 315.835,
 ///   "legIndex": 0,
 ///   "stepIndex": 1,
 ///   "currentLeg": {
@@ -36,6 +37,9 @@ import 'package:flutter_mapbox_navigation/src/models/route_leg.dart';
 ///
 /// 说明：
 /// - 距离单位为米（m），时长单位为秒（s）。
+/// - `currentStepDistanceRemaining` 表示从用户当前位置到当前 step 结束的剩余距离（米）。
+///   - iOS: RouteProgress → currentLegProgress → currentStepProgress → distanceRemaining
+///   - Android: RouteProgress → currentLegProgress → currentStepProgress → distanceRemaining
 /// - `currentVisualInstruction` 对应 iOS v3 的 `RouteStepProgress.currentVisualInstruction`，
 ///   其中包含主指令文本（text）、机动类型（maneuverType）、方向（maneuverDirection）以及步内剩余距离（distanceAlongStep）。
 /// - 参考文档：
@@ -50,6 +54,7 @@ class RouteProgressEvent {
     this.currentLegDistanceTraveled,
     this.currentLegDistanceRemaining,
     this.currentStepInstruction,
+    this.currentStepDistanceRemaining,
     this.currentLeg,
     this.priorLeg,
     this.remainingLegs,
@@ -80,6 +85,10 @@ class RouteProgressEvent {
             ? 0.0
             : (json['currentLegDistanceRemaining'] as num).toDouble();
     currentStepInstruction = json['currentStepInstruction'] as String?;
+    currentStepDistanceRemaining =
+        isNullOrZero(json['currentStepDistanceRemaining'] as num?)
+            ? 0.0
+            : (json['currentStepDistanceRemaining'] as num).toDouble();
     currentLeg = json['currentLeg'] == null
         ? null
         : RouteLeg.fromJson(json['currentLeg'] as Map<String, dynamic>);
@@ -109,6 +118,7 @@ class RouteProgressEvent {
   double? currentLegDistanceTraveled;
   double? currentLegDistanceRemaining;
   String? currentStepInstruction;
+  double? currentStepDistanceRemaining;
   RouteLeg? currentLeg;
   RouteLeg? priorLeg;
   List<RouteLeg>? remainingLegs;

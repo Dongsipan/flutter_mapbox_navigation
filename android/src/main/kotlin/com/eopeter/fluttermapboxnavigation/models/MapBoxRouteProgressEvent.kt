@@ -13,6 +13,7 @@ class MapBoxRouteProgressEvent(progress: RouteProgress) {
     private var currentLegDistanceTraveled: Float? = null
     private var currentLegDistanceRemaining: Float? = null
     private var currentStepInstruction: String? = null
+    private var currentStepDistanceRemaining: Float? = null
     private var legIndex: Int? = null
     var stepIndex: Int? = null
     private var currentLeg: MapBoxRouteLeg? = null
@@ -33,6 +34,9 @@ class MapBoxRouteProgressEvent(progress: RouteProgress) {
         currentStepInstruction = progress.bannerInstructions?.primary()?.text()
         currentLegDistanceTraveled = progress.currentLegProgress?.distanceTraveled
         currentLegDistanceRemaining = progress.currentLegProgress?.distanceRemaining
+        
+        // Get current step distance remaining from currentStepProgress
+        currentStepDistanceRemaining = progress.currentLegProgress?.currentStepProgress?.distanceRemaining
     }
 
     fun toJson(): String {
@@ -48,6 +52,7 @@ class MapBoxRouteProgressEvent(progress: RouteProgress) {
         addProperty(json, "currentLegDistanceRemaining", currentLegDistanceRemaining)
         addProperty(json, "currentLegDistanceTraveled", currentLegDistanceTraveled)
         addProperty(json, "currentStepInstruction", currentStepInstruction)
+        addProperty(json, "currentStepDistanceRemaining", currentStepDistanceRemaining)
 
         if (currentLeg != null) {
             json.add("currentLeg", currentLeg!!.toJsonObject())

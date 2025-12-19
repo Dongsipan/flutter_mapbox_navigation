@@ -12,6 +12,7 @@ public class MapBoxRouteProgressEvent : Codable
     let currentLegDistanceTraveled: Double
     let currentLegDistanceRemaining: Double
     let currentStepInstruction: String
+    let currentStepDistanceRemaining: Double
     let legIndex: Int
     let stepIndex: Int
     let currentLeg: MapBoxRouteLeg
@@ -44,6 +45,9 @@ public class MapBoxRouteProgressEvent : Codable
         currentLegDistanceTraveled = progress.currentLegProgress.distanceTraveled
         currentLegDistanceRemaining = progress.currentLegProgress.distanceRemaining
         currentStepInstruction = progress.currentLegProgress.currentStep.description
+        
+        // Get current step distance remaining from currentStepProgress
+        currentStepDistanceRemaining = progress.currentLegProgress.currentStepProgress.distanceRemaining
 
         // Map current visual instruction (v3)
         if let banner = progress.currentLegProgress.currentStepProgress.currentVisualInstruction {

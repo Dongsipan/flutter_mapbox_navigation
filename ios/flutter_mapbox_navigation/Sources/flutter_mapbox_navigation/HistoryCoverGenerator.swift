@@ -115,40 +115,12 @@ final class HistoryCoverGenerator {
                     return (coord: loc.coordinate, speed: loc.speed >= 0 ? loc.speed * 3.6 : 0.0)
                 }
                 let coords = coordsWithSpeed.map { $0.coord }
-                let lats = coords.map { $0.latitude }
-                let lngs = coords.map { $0.longitude }
-                guard let minLat = lats.min(), let maxLat = lats.max(), 
-                      let minLng = lngs.min(), let maxLng = lngs.max(), 
-                      maxLat > minLat, maxLng > minLng else {
-                    await MainActor.run { completion(nil) }
-                    return
-                }
-
-                // 计算相机参数
-                let center = CLLocationCoordinate2D(
-                    latitude: (minLat + maxLat) / 2.0, 
-                    longitude: (minLng + maxLng) / 2.0
-                )
-                let latDiff = maxLat - minLat
-                let lngDiff = maxLng - minLng
-                let maxDiff = max(latDiff, lngDiff)
-                let zoom: Double = {
-                    switch maxDiff {
-                    case ..<0.005: return 17.0
-                    case ..<0.01:  return 16.0
-                    case ..<0.02:  return 14.0
-                    case ..<0.05:  return 12.0
-                    case ..<0.1:   return 10.0
-                    default:       return 8.0
-                    }
-                }()
 
                 // 在主线程创建和使用 Snapshotter
                 await MainActor.run {
                     self.createSnapshot(
                         coordsWithSpeed: coordsWithSpeed,
-                        center: center,
-                        zoom: zoom,
+                        coordinates: coords,
                         historyId: historyId,
                         mapStyle: mapStyle,
                         lightPreset: lightPreset,
@@ -166,8 +138,7 @@ final class HistoryCoverGenerator {
     @MainActor
     private func createSnapshot(
         coordsWithSpeed: [(coord: CLLocationCoordinate2D, speed: Double)],
-        center: CLLocationCoordinate2D,
-        zoom: Double,
+        coordinates: [CLLocationCoordinate2D],
         historyId: String,
         mapStyle: String?,
         lightPreset: String?,
@@ -190,9 +161,19 @@ final class HistoryCoverGenerator {
         // 使用用户选择的样式或默认 streets 样式
         let styleURI = getStyleURI(for: mapStyle)
         snapshotter.styleURI = styleURI
-        snapshotter.setCamera(to: CameraOptions(center: center, zoom: zoom))
+        
+        // 使用固定边距，让 Mapbox 自动计算合适的缩放级别
+        let padding = UIEdgeInsets(top: 50, left: 30, bottom: 50, right: 30)
+        let camera = snapshotter.camera(
+            for: coordinates,
+            padding: padding,
+            bearing: nil,
+            pitch: nil
+        )
+        snapshotter.setCamera(to: camera)
         
         print("📸 封面生成: 使用样式 \(mapStyle ?? "streets"), lightPreset: \(lightPreset ?? "nil")")
+        print("📸 固定边距: top=\(padding.top), left=\(padding.left), bottom=\(padding.bottom), right=\(padding.right)")
 
         // 等待样式加载完成再开始生成快照
         snapshotter.onStyleLoaded.observeNext { [weak self] _ in

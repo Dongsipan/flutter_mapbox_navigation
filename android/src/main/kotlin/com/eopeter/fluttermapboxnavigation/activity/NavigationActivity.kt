@@ -233,15 +233,30 @@ class NavigationActivity : AppCompatActivity() {
             }
         }
         
-        registerReceiver(
-            finishBroadcastReceiver,
-            IntentFilter(NavigationLauncher.KEY_STOP_NAVIGATION)
-        )
-        
-        registerReceiver(
-            addWayPointsBroadcastReceiver,
-            IntentFilter(NavigationLauncher.KEY_ADD_WAYPOINTS)
-        )
+        // Android 14+ requires explicit export flag for BroadcastReceiver
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(
+                finishBroadcastReceiver,
+                IntentFilter(NavigationLauncher.KEY_STOP_NAVIGATION),
+                Context.RECEIVER_NOT_EXPORTED
+            )
+            
+            registerReceiver(
+                addWayPointsBroadcastReceiver,
+                IntentFilter(NavigationLauncher.KEY_ADD_WAYPOINTS),
+                Context.RECEIVER_NOT_EXPORTED
+            )
+        } else {
+            registerReceiver(
+                finishBroadcastReceiver,
+                IntentFilter(NavigationLauncher.KEY_STOP_NAVIGATION)
+            )
+            
+            registerReceiver(
+                addWayPointsBroadcastReceiver,
+                IntentFilter(NavigationLauncher.KEY_ADD_WAYPOINTS)
+            )
+        }
     }
     
     private fun requestRoutes(waypointSet: WaypointSet) {

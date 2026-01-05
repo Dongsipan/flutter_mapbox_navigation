@@ -171,9 +171,9 @@ class NavigationActivity : AppCompatActivity() {
     
     private fun initializeMap() {
         // Load map style
-        var styleUrl = FlutterMapboxNavigationPlugin.mapStyleUrlDay ?: Style.MAPBOX_STREETS
+        val styleUrl = FlutterMapboxNavigationPlugin.mapStyleUrlDay ?: Style.MAPBOX_STREETS
         
-        binding.mapView.getMapboxMap().loadStyleUri(styleUrl) { style ->
+        binding.mapView.mapboxMap.loadStyle(styleUrl) {
             // Enable location component
             binding.mapView.location.updateSettings {
                 enabled = true
@@ -405,7 +405,7 @@ class NavigationActivity : AppCompatActivity() {
         
         // Update route line
         routeLineApi.updateWithRouteProgress(routeProgress) { result ->
-            binding.mapView.getMapboxMap().getStyle()?.let { style ->
+            binding.mapView.mapboxMap.style?.let { style ->
                 routeLineView.renderRouteLineUpdate(style, result)
             }
         }
@@ -415,7 +415,7 @@ class NavigationActivity : AppCompatActivity() {
         if (routeUpdateResult.navigationRoutes.isNotEmpty()) {
             // Draw routes on map
             routeLineApi.setNavigationRoutes(routeUpdateResult.navigationRoutes) { result ->
-                binding.mapView.getMapboxMap().getStyle()?.let { style ->
+                binding.mapView.mapboxMap.style?.let { style ->
                     routeLineView.renderRouteDrawData(style, result)
                 }
             }
@@ -428,8 +428,13 @@ class NavigationActivity : AppCompatActivity() {
                 }
                 
                 if (routePoints != null && routePoints.isNotEmpty()) {
-                    val cameraOptions = binding.mapView.getMapboxMap().cameraForCoordinates(
-                        routePoints,
+                    // Use camera for coordinate bounds instead of deprecated method
+                    val bounds = com.mapbox.geojson.BoundingBox.fromPoints(routePoints)
+                    val cameraOptions = binding.mapView.mapboxMap.cameraForCoordinateBounds(
+                        com.mapbox.maps.CoordinateBounds(
+                            com.mapbox.geojson.Point.fromLngLat(bounds.west(), bounds.south()),
+                            com.mapbox.geojson.Point.fromLngLat(bounds.east(), bounds.north())
+                        ),
                         EdgeInsets(100.0, 100.0, 100.0, 100.0)
                     )
                     binding.mapView.camera.easeTo(cameraOptions)

@@ -313,12 +313,13 @@ class NavigationActivity : AppCompatActivity() {
         // Set routes
         mapboxNavigation.setNavigationRoutes(routes)
         
-        // Start trip session
-        mapboxNavigation.startTripSession()
-        
-        // Enable replay if simulating
+        // Start trip session based on simulation mode
         if (FlutterMapboxNavigationPlugin.simulateRoute) {
+            // Use replay trip session for simulation
             mapboxNavigation.startReplayTripSession()
+        } else {
+            // Use regular trip session for real navigation
+            mapboxNavigation.startTripSession()
         }
         
         isNavigationInProgress = true

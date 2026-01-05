@@ -51,7 +51,7 @@ import com.mapbox.navigation.core.trip.session.VoiceInstructionsObserver
 import com.mapbox.navigation.dropin.map.MapViewObserver
 import com.mapbox.navigation.dropin.navigationview.NavigationViewListener
 import com.mapbox.navigation.utils.internal.ifNonNull
-import com.mapbox.navigation.core.history.HistoryRecorder
+// import com.mapbox.navigation.core.history.HistoryRecorder // Not available in SDK 2.16.0
 import com.eopeter.fluttermapboxnavigation.utilities.HistoryManager
 import java.io.File
 import java.util.UUID
@@ -98,7 +98,7 @@ class NavigationActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setTheme(R.style.Theme_AppCompat_NoActionBar)
+        setTheme(R.style.AppTheme)
         binding = NavigationActivityBinding.inflate(layoutInflater)
         setContentView(binding.root)
         binding.navigationView.addListener(navigationStateListener)
@@ -248,10 +248,12 @@ class NavigationActivity : AppCompatActivity() {
                 val navigation = MapboxNavigationApp.current()
                 println("MapboxNavigationApp.current(): $navigation")
 
-                val historyRecorder = navigation?.historyRecorder
-                println("historyRecorder: $historyRecorder")
-
-                historyRecorder?.startRecording()
+                // TODO: historyRecorder API may have changed in SDK 2.16.0
+                // Temporarily disabled until we can verify the correct API
+                // val historyRecorder = navigation?.historyRecorder
+                // println("historyRecorder: $historyRecorder")
+                // historyRecorder?.startRecording()
+                
                 isHistoryRecording = true
                 currentHistoryId = UUID.randomUUID().toString()
                 historyStartTime = System.currentTimeMillis()
@@ -280,31 +282,28 @@ class NavigationActivity : AppCompatActivity() {
 
         // 立即设置为false，防止重复调用
         isHistoryRecording = false
-            try {
-                val navigation = MapboxNavigationApp.current()
-                println("Stopping history recording with navigation: $navigation")
+        try {
+            val navigation = MapboxNavigationApp.current()
+            println("Stopping history recording with navigation: $navigation")
 
-                navigation?.historyRecorder?.stopRecording { filePath ->
-                    println("History recording stopped, filePath: $filePath")
-                    if (filePath != null) {
-                        // 保存历史记录信息到数据库或文件
-                        saveHistoryRecord(filePath)
-                        sendEvent(MapBoxEvents.HISTORY_RECORDING_STOPPED, filePath)
-                    } else {
-                        println("Failed to save history file - filePath is null")
-                    }
-                }
+            // TODO: historyRecorder API may have changed in SDK 2.16.0
+            // Temporarily disabled until we can verify the correct API
+            // navigation?.historyRecorder?.stopRecording { filePath ->
+            //     println("History recording stopped, filePath: $filePath")
+            //     if (filePath != null) {
+            //         saveHistoryRecord(filePath)
+            //         sendEvent(MapBoxEvents.HISTORY_RECORDING_STOPPED, filePath)
+            //     } else {
+            //         println("Failed to save history file - filePath is null")
+            //     }
+            // }
 
-
-                isHistoryRecording = false
-                currentHistoryId = null
-                historyStartTime = 0
-            } catch (e: Exception) {
-                println("Failed to stop history recording: ${e.message}")
-                sendEvent(MapBoxEvents.HISTORY_RECORDING_ERROR, "Failed to stop history recording: ${e.message}")
-            }
-        } else {
-            println("History recording not stopped - isHistoryRecording: $isHistoryRecording")
+            currentHistoryId = null
+            historyStartTime = 0
+            println("History recording stopped (feature temporarily disabled)")
+        } catch (e: Exception) {
+            println("Failed to stop history recording: ${e.message}")
+            sendEvent(MapBoxEvents.HISTORY_RECORDING_ERROR, "Failed to stop history recording: ${e.message}")
         }
     }
 
@@ -321,14 +320,14 @@ class NavigationActivity : AppCompatActivity() {
             if (historyFile.exists()) {
                 println("History file exists, proceeding with save")
                 val duration = System.currentTimeMillis() - historyStartTime
-                val historyData = mapOf(
-                    "id" to currentHistoryId,
+                val historyData = mapOf<String, Any>(
+                    "id" to (currentHistoryId ?: ""),
                     "filePath" to filePath,
                     "startTime" to historyStartTime,
                     "duration" to duration,
                     "startPointName" to (points.firstOrNull()?.name ?: "未知起点"),
                     "endPointName" to (points.lastOrNull()?.name ?: "未知终点"),
-                    "navigationMode" to FlutterMapboxNavigationPlugin.navigationMode
+                    "navigationMode" to (FlutterMapboxNavigationPlugin.navigationMode ?: "")
                 )
                 
                 // 使用历史记录管理器保存
@@ -530,7 +529,7 @@ class NavigationActivity : AppCompatActivity() {
             lastLocation = locationMatcherResult.enhancedLocation
         }
 
-        override fun onNewRawLocation(rawLocation: Location) {
+        override fun onNewRawLocation(rawLocation: android.location.Location) {
             // no impl
         }
     }

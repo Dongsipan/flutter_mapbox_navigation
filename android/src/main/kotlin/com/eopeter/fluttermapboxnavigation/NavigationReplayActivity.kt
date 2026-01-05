@@ -1,4 +1,4 @@
-package com.kunteng.plugins.kt
+package com.eopeter.fluttermapboxnavigation
 
 import android.annotation.SuppressLint
 import android.graphics.Color
@@ -13,13 +13,10 @@ import androidx.core.view.WindowInsetsControllerCompat
 import android.view.WindowManager
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
-import com.kunteng.plugins.kt.databinding.MapboxActivityReplayViewBinding
+import com.eopeter.fluttermapboxnavigation.databinding.MapboxActivityReplayViewBinding
 import com.mapbox.maps.CameraOptions
 import com.mapbox.maps.plugin.locationcomponent.location
 import com.mapbox.maps.plugin.animation.camera
-import com.mapbox.maps.plugin.LocationPuck2D
-import com.mapbox.maps.plugin.PuckBearing
-import com.mapbox.maps.ImageHolder
 import com.mapbox.maps.extension.style.expressions.dsl.generated.interpolate
 import com.mapbox.maps.extension.style.expressions.dsl.generated.zoom
 import com.mapbox.maps.extension.style.expressions.dsl.generated.literal
@@ -72,9 +69,13 @@ import com.mapbox.maps.plugin.compass.compass
 import com.mapbox.maps.plugin.scalebar.scalebar
 import com.mapbox.maps.EdgeInsets
 import kotlinx.coroutines.delay
-import com.kunteng.plugins.kt.replay.ReplayStatsBottomSheet
-import com.kunteng.plugins.kt.replay.ReplayStatsCalculator
+// Replay stats temporarily disabled - import com.eopeter.fluttermapboxnavigation.replay.ReplayStatsBottomSheet
+// Replay stats temporarily disabled - import com.eopeter.fluttermapboxnavigation.replay.ReplayStatsCalculator
 import com.mapbox.navigation.core.replay.history.ReplayEventBase
+import com.eopeter.fluttermapboxnavigation.utilities.StatusBarStyleManager
+import com.eopeter.fluttermapboxnavigation.utilities.MapStyleManager
+import com.eopeter.fluttermapboxnavigation.utilities.NavigationHistoryManager
+import com.eopeter.fluttermapboxnavigation.activity.MapStyleSelectorActivity
 
 /**
  * 导航历史回放页面 - 参照官方示例重构
@@ -108,7 +109,7 @@ class NavigationReplayActivity : AppCompatActivity() {
     private var endPointCoord: Point? = null
 
     private val locationObserver = object : LocationObserver {
-        override fun onNewRawLocation(rawLocation: com.mapbox.common.location.Location) {
+        override fun onNewRawLocation(rawLocation: android.location.Location) {
             Log.d(TAG, "收到原始位置更新: lat=${rawLocation.latitude}, lng=${rawLocation.longitude}")
         }
 
@@ -119,7 +120,7 @@ class NavigationReplayActivity : AppCompatActivity() {
                 isLocationInitialized = true
                 // 首次定位时设置相机
                 val location = locationMatcherResult.enhancedLocation
-                binding.mapView.mapboxMap.setCamera(
+                binding.mapView.getMapboxMap().setCamera(
                     CameraOptions.Builder()
                         .center(com.mapbox.geojson.Point.fromLngLat(location.longitude, location.latitude))
                         .zoom(15.0)
@@ -202,13 +203,12 @@ class NavigationReplayActivity : AppCompatActivity() {
         
         // 初始化地图样式
         val styleUri = MapStyleSelectorActivity.getStyleForUiMode(this)
-        binding.mapView.mapboxMap.loadStyle(styleUri) {
-            // 根据地图样式调整状态栏文字颜色
-            StatusBarStyleManager.updateStatusBarForMapStyle(this@NavigationReplayActivity, styleUri)
-        }
+        binding.mapView.getMapboxMap().loadStyleUri(styleUri)
+        // 根据地图样式调整状态栏文字颜色
+        StatusBarStyleManager.updateStatusBarForMapStyle(this@NavigationReplayActivity, styleUri)
 
         // 设置初始相机位置
-        binding.mapView.mapboxMap.setCamera(
+        binding.mapView.getMapboxMap().setCamera(
             CameraOptions.Builder()
                 .zoom(15.0)
                 .build()
@@ -220,7 +220,7 @@ class NavigationReplayActivity : AppCompatActivity() {
 
     private fun initNavigation() {
         // 初始化"真实行驶轨迹"源与图层（基于回放位置点绘制折线），并添加起终点图层
-        binding.mapView.mapboxMap.getStyle { style ->
+        binding.mapView.getMapboxMap().getStyle { style ->
             val travelSourceId = "replay-travel-line-source"
             val travelLayerId = "replay-travel-line-layer"
             val startSrcId = "replay-start-source"
@@ -293,9 +293,9 @@ class NavigationReplayActivity : AppCompatActivity() {
         // 不再初始化路线绘制组件，只显示真实行驶轨迹
 
         // 初始化相机和视口组件
-        viewportDataSource = MapboxNavigationViewportDataSource(binding.mapView.mapboxMap)
+        viewportDataSource = MapboxNavigationViewportDataSource(binding.mapView.getMapboxMap())
         navigationCamera = NavigationCamera(
-            binding.mapView.mapboxMap,
+            binding.mapView.getMapboxMap(),
             binding.mapView.camera,
             viewportDataSource
         )
@@ -304,38 +304,11 @@ class NavigationReplayActivity : AppCompatActivity() {
             NavigationBasicGesturesHandler(navigationCamera)
         )
 
-        // 配置地图位置组件 - 参照 NavigationDialogFragment
+        // 配置地图位置组件 - 使用默认配置
         binding.mapView.location.apply {
             setLocationProvider(navigationLocationProvider)
-            val arrowResId = resources.getIdentifier("mapbox_user_puck_icon", "drawable", packageName)
-            val shadowResId = resources.getIdentifier("mapbox_user_icon_shadow", "drawable", packageName)
-            val scaleExpr = interpolate {
-                linear()
-                zoom()
-                stop {
-                    literal(0.0)
-                    literal(0.6)
-                }
-                stop {
-                    literal(10.0)
-                    literal(1.0)
-                }
-            }.toJson()
-
-            updateSettings {
-                puckBearing = PuckBearing.COURSE
-                puckBearingEnabled = true
-                enabled = true
-                locationPuck = if (arrowResId != 0 || shadowResId != 0) {
-                    LocationPuck2D(
-                        bearingImage = if (arrowResId != 0) ImageHolder.from(arrowResId) else null,
-                        shadowImage = if (shadowResId != 0) ImageHolder.from(shadowResId) else null,
-                        scaleExpression = scaleExpr
-                    )
-                } else {
-                    LocationPuck2D(scaleExpression = scaleExpr)
-                }
-            }
+            enabled = true
+            pulsingEnabled = true
         }
 
         // 设置路线全览按钮点击事件 - 支持切换
@@ -393,12 +366,8 @@ class NavigationReplayActivity : AppCompatActivity() {
                 // 判断是否只做解析落盘
                 val dumpOnly = intent.getBooleanExtra("dumpOnly", false)
                 if (dumpOnly) {
-                    val out = com.kunteng.plugins.kt.replay.ReplayHistoryDumper.dumpToJson(this@NavigationReplayActivity, filePath, true)
-                    if (out != null) {
-                        Log.i(TAG, "dumpOnly 完成，输出: $out")
-                    } else {
-                        Log.e(TAG, "dumpOnly 失败")
-                    }
+                    // Temporarily disabled - val out = com.eopeter.fluttermapboxnavigation.replay.ReplayHistoryDumper.dumpToJson(this@NavigationReplayActivity, filePath, true)
+                    Log.i(TAG, "dumpOnly mode temporarily disabled")
                     finish()
                     return@launch
                 }
@@ -429,11 +398,11 @@ class NavigationReplayActivity : AppCompatActivity() {
 
                 // 计算统计数据并绑定到底部面板（隐藏显示）
                 Log.d(TAG, "开始计算统计数据...")
-                val stats = ReplayStatsCalculator.calculate(events)
-                Log.d(TAG, "统计数据计算完成")
+                // Temporarily disabled - val stats = ReplayStatsCalculator.calculate(events)
+                Log.d(TAG, "统计数据计算完成（功能暂时禁用）")
                 // 隐藏底部统计面板
-                binding.replayStatsSheet.visibility = View.GONE
-                binding.replayStatsSheet.bind(stats)
+                // Temporarily disabled - binding.replayStatsSheet.visibility = View.GONE
+                // Temporarily disabled - binding.replayStatsSheet.bind(stats)
 
                 // 从回放事件中提取路线
                 val routeEvents = events.filterIsInstance<ReplaySetNavigationRoute>()
@@ -466,7 +435,7 @@ class NavigationReplayActivity : AppCompatActivity() {
                             val lat = (loc?.javaClass?.declaredFields?.firstOrNull { f -> f.name == "latitude" }?.apply { isAccessible = true }?.get(loc) as? Number)?.toDouble()
                             val lon = (loc?.javaClass?.declaredFields?.firstOrNull { f -> f.name == "longitude" }?.apply { isAccessible = true }?.get(loc) as? Number)?.toDouble()
                             if (lat != null && lon != null) {
-                                binding.mapView.mapboxMap.setCamera(
+                                binding.mapView.getMapboxMap().setCamera(
                                     CameraOptions.Builder()
                                         .center(com.mapbox.geojson.Point.fromLngLat(lon, lat))
                                         .zoom(15.0)
@@ -478,7 +447,8 @@ class NavigationReplayActivity : AppCompatActivity() {
                     } catch (_: Throwable) {}
 
                     // 根据轨迹统计动态计算推荐回放倍速
-                    val recommendedSpeed = recommendReplaySpeed(stats.totalDistance, stats.averageSpeed)
+                    // Temporarily use default speed since stats calculation is disabled
+                    val recommendedSpeed = 16.0 // recommendReplaySpeed(stats.totalDistance, stats.averageSpeed)
                     mapboxNavigation.mapboxReplayer.playbackSpeed(recommendedSpeed)
                     Log.d(TAG, "设置回放倍速为 ${recommendedSpeed}x")
 
@@ -754,7 +724,7 @@ class NavigationReplayActivity : AppCompatActivity() {
         }
 
         // 获取当前相机中心点
-        val currentCamera = binding.mapView.mapboxMap.cameraState
+        val currentCamera = binding.mapView.getMapboxMap().cameraState
         val cameraCenter = currentCamera.center
 
         // 获取屏幕尺寸
@@ -763,7 +733,7 @@ class NavigationReplayActivity : AppCompatActivity() {
         val screenHeight = displayMetrics.heightPixels
 
         // 将地理坐标转换为屏幕坐标
-        val currentScreenPoint = binding.mapView.mapboxMap.pixelForCoordinate(currentPoint)
+        val currentScreenPoint = binding.mapView.getMapboxMap().pixelForCoordinate(currentPoint)
 
         // 定义边缘阈值（距离屏幕边缘的像素距离）
         val edgeThreshold = 100 // 100像素
@@ -895,7 +865,7 @@ class NavigationReplayActivity : AppCompatActivity() {
      * 一次性绘制完整路线
      */
     private fun drawCompleteRoute() {
-        binding.mapView.mapboxMap.getStyle { style ->
+        binding.mapView.getMapboxMap().getStyle { style ->
             try {
                 // 绘制完整轨迹线
                 val line = LineString.fromLngLats(traveledPoints)

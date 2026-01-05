@@ -547,15 +547,41 @@ open class TurnByTurn(
 
     private val arrivalObserver: ArrivalObserver = object : ArrivalObserver {
         override fun onFinalDestinationArrival(routeProgress: RouteProgress) {
-            PluginUtilities.sendEvent(MapBoxEvents.ON_ARRIVAL)
+            Log.d(TAG, "🏁 Final destination arrival")
+            
+            // Send detailed arrival information
+            val arrivalData = mapOf(
+                "isFinalDestination" to true,
+                "legIndex" to routeProgress.currentLegProgress?.legIndex,
+                "distanceRemaining" to routeProgress.distanceRemaining,
+                "durationRemaining" to routeProgress.durationRemaining
+            )
+            PluginUtilities.sendEvent(MapBoxEvents.ON_ARRIVAL, com.google.gson.Gson().toJson(arrivalData))
         }
 
         override fun onNextRouteLegStart(routeLegProgress: RouteLegProgress) {
-            // not impl
+            Log.d(TAG, "🚩 Next route leg started: leg ${routeLegProgress.legIndex}")
+            
+            // Send waypoint arrival event when moving to next leg
+            val waypointData = mapOf(
+                "legIndex" to routeLegProgress.legIndex,
+                "distanceRemaining" to routeLegProgress.distanceRemaining,
+                "durationRemaining" to routeLegProgress.durationRemaining
+            )
+            PluginUtilities.sendEvent(MapBoxEvents.WAYPOINT_ARRIVAL, com.google.gson.Gson().toJson(waypointData))
         }
 
         override fun onWaypointArrival(routeProgress: RouteProgress) {
-            // not impl
+            Log.d(TAG, "📍 Waypoint arrival: leg ${routeProgress.currentLegProgress?.legIndex}")
+            
+            // Send waypoint arrival event
+            val waypointData = mapOf(
+                "isFinalDestination" to false,
+                "legIndex" to routeProgress.currentLegProgress?.legIndex,
+                "distanceRemaining" to routeProgress.distanceRemaining,
+                "durationRemaining" to routeProgress.durationRemaining
+            )
+            PluginUtilities.sendEvent(MapBoxEvents.WAYPOINT_ARRIVAL, com.google.gson.Gson().toJson(waypointData))
         }
     }
 
@@ -600,15 +626,36 @@ open class TurnByTurn(
 
     /**
      * 开始历史记录
-     * Note: In SDK v3, MapboxHistoryRecorder is internal
-     * This functionality is temporarily disabled pending proper SDK v3 implementation
+     * Using SDK v3 HistoryRecordingStateHandler
      */
     private fun startHistoryRecording() {
         try {
-            // TODO: Implement history recording using SDK v3 public APIs
-            // MapboxHistoryRecorder is internal in SDK v3
-            Log.w(TAG, "History recording temporarily disabled - SDK v3 API needs verification")
-            PluginUtilities.sendEvent(MapBoxEvents.HISTORY_RECORDING_ERROR)
+            val mapboxNavigation = MapboxNavigationApp.current()
+            if (mapboxNavigation == null) {
+                Log.e(TAG, "MapboxNavigation is null, cannot start history recording")
+                PluginUtilities.sendEvent(MapBoxEvents.HISTORY_RECORDING_ERROR)
+                return
+            }
+            
+            // Create history file path
+            val historyDir = context.getExternalFilesDir("navigation_history")
+            if (historyDir != null && !historyDir.exists()) {
+                historyDir.mkdirs()
+            }
+            
+            val timestamp = System.currentTimeMillis()
+            val historyFile = java.io.File(historyDir, "history_$timestamp.json")
+            currentHistoryFilePath = historyFile.absolutePath
+            
+            // Start history recording using SDK v3 API
+            // Note: In SDK v3, history recording is managed through NavigationOptions
+            // and HistoryRecordingStateHandler
+            mapboxNavigation.historyRecorder.startRecording()
+            
+            isRecordingHistory = true
+            
+            Log.d(TAG, "History recording started: $currentHistoryFilePath")
+            PluginUtilities.sendEvent(MapBoxEvents.HISTORY_RECORDING_STARTED)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start history recording: ${e.message}", e)
             PluginUtilities.sendEvent(MapBoxEvents.HISTORY_RECORDING_ERROR)
@@ -617,16 +664,39 @@ open class TurnByTurn(
 
     /**
      * 停止历史记录
-     * Note: In SDK v3, MapboxHistoryRecorder is internal
-     * This functionality is temporarily disabled pending proper SDK v3 implementation
+     * Using SDK v3 HistoryRecordingStateHandler
      */
     private fun stopHistoryRecording() {
         try {
-            // TODO: Implement history recording using SDK v3 public APIs
-            Log.w(TAG, "History recording temporarily disabled - SDK v3 API needs verification")
+            val mapboxNavigation = MapboxNavigationApp.current()
+            if (mapboxNavigation == null) {
+                Log.w(TAG, "MapboxNavigation is null when stopping history recording")
+                isRecordingHistory = false
+                currentHistoryFilePath = null
+                return
+            }
+            
+            // Stop history recording
+            mapboxNavigation.historyRecorder.stopRecording { historyFilePath ->
+                if (historyFilePath != null) {
+                    Log.d(TAG, "History recording stopped and saved: $historyFilePath")
+                    currentHistoryFilePath = historyFilePath
+                    
+                    // Send file path to Flutter
+                    val eventData = mapOf(
+                        "historyFilePath" to historyFilePath
+                    )
+                    PluginUtilities.sendEvent(
+                        MapBoxEvents.HISTORY_RECORDING_STOPPED,
+                        com.google.gson.Gson().toJson(eventData)
+                    )
+                } else {
+                    Log.w(TAG, "History recording stopped but no file path returned")
+                    PluginUtilities.sendEvent(MapBoxEvents.HISTORY_RECORDING_STOPPED)
+                }
+            }
+            
             isRecordingHistory = false
-            currentHistoryFilePath = null
-            PluginUtilities.sendEvent(MapBoxEvents.HISTORY_RECORDING_STOPPED)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to stop history recording: ${e.message}", e)
             isRecordingHistory = false

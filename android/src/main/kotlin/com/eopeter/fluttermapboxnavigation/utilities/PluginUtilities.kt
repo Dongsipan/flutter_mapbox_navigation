@@ -131,7 +131,9 @@ class PluginUtilities {
                     else -> false
                 }
             } else {
+                @Suppress("DEPRECATION")
                 val nwInfo = connectivityManager.activeNetworkInfo ?: return false
+                @Suppress("DEPRECATION")
                 return nwInfo.isConnected
             }
         }
@@ -144,6 +146,7 @@ class PluginUtilities {
             return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
                 activity.intent.getSerializableExtra(name, clazz)!!
             else
+                @Suppress("DEPRECATION")
                 activity.intent.getSerializableExtra(name) as T
         }
     }

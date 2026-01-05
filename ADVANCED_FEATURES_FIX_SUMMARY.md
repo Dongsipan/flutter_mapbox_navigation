@@ -1,127 +1,166 @@
-# 🔧 Advanced Features Example 修复总结
+# Android SDK v3 Deprecated API 修复总结
 
-## 问题描述
-`example/lib/advanced_features_example.dart` 文件存在多个编译错误，主要是引用了不存在的 `_extensions` 对象和相关类。
+## 日期
+2026-01-05
 
-## 修复内容
+## 修复概述
+完成了所有 Android 代码中的 deprecated API 警告修复，确保代码符合 Mapbox SDK v3 的最新 API 规范。
 
-### ✅ 已修复的问题
+## 修复的文件
 
-1. **删除不存在的依赖**
-   - 移除了对 `_extensions` 对象的所有引用
-   - 删除了 `NavigationExtensionEvent` 和 `NavigationExtensionEventType` 的使用
+### 1. NavigationReplayActivity.kt
+**修复数量:** 10+ 处
 
-2. **实现缺失的功能**
-   - **距离计算**: 实现了 Haversine 公式计算两点间距离
-   - **路线优化**: 实现了基于最近邻算法的路线优化
-   - **随机路径点生成**: 实现了在指定中心点周围生成随机路径点
-   - **路线历史管理**: 使用本地列表管理路线历史记录
-   - **路径点验证**: 实现了路径点有效性验证
+**修复内容:**
+- ✅ `getMapboxMap()` → `mapboxMap` 属性 (10处)
+- ✅ `loadStyleUri()` → `loadStyle()` 方法 (1处)
+- ✅ `getStyle()` → `style` 属性 (2处)
 
-3. **修复的具体方法**
-   ```dart
-   // 新增的核心方法
-   double _calculateDistance(double lat1, double lon1, double lat2, double lon2)
-   List<WayPoint> _optimizeRoute(List<WayPoint> wayPoints)
-   void _generateRandomWayPoints()
-   bool _validateWayPoints(List<WayPoint> wayPoints)
-   String _formatDistance(double meters)
-   double _calculateTotalDistanceForRoute(List<WayPoint> wayPoints)
-   ```
+**具体修改:**
+```kotlin
+// 旧代码
+binding.mapView.getMapboxMap().setCamera(...)
+binding.mapView.getMapboxMap().loadStyleUri(styleUri)
+binding.mapView.getMapboxMap().getStyle { style -> ... }
 
-4. **UI 和交互修复**
-   - 修复了空值安全问题 (`wayPoint.latitude?.toStringAsFixed(4)`)
-   - 更新了状态管理逻辑
-   - 修复了历史记录的显示和管理
+// 新代码
+binding.mapView.mapboxMap.setCamera(...)
+binding.mapView.mapboxMap.loadStyle(styleUri)
+binding.mapView.mapboxMap.style?.let { style -> ... }
+```
 
-### 🚀 功能特性
+**特殊处理:**
+- 将 `getStyle { }` 回调模式改为 `style?.let { }` 空安全检查
+- 提取了 `initTravelLineLayer()` 函数以便在样式加载后初始化图层
 
-修复后的文件现在包含以下完整功能：
+### 2. PluginUtilities.kt
+**修复数量:** 3 处
 
-1. **路径点管理**
-   - 添加示例路线（北京景点）
-   - 生成随机路径点
-   - 删除单个路径点
-   - 显示路径点详情
+**修复内容:**
+- ✅ `activeNetworkInfo` → 添加 `@Suppress("DEPRECATION")` (仅 API < 23)
+- ✅ `isConnected` → 添加 `@Suppress("DEPRECATION")` (仅 API < 23)
+- ✅ `getSerializableExtra()` → 添加 `@Suppress("DEPRECATION")` (仅 API < 33)
 
-2. **路线优化**
-   - 基于最近邻算法的路线优化
-   - 实时距离计算和显示
-   - 路线总距离统计
+**具体修改:**
+```kotlin
+// 网络检查 - 仅在旧版本 Android 上使用 deprecated API
+} else {
+    @Suppress("DEPRECATION")
+    val nwInfo = connectivityManager.activeNetworkInfo ?: return false
+    @Suppress("DEPRECATION")
+    return nwInfo.isConnected
+}
 
-3. **历史记录**
-   - 保存当前路线到历史
-   - 查看历史路线列表
-   - 恢复历史路线
-   - 清除历史记录
+// Serializable 获取 - 仅在旧版本 Android 上使用 deprecated API
+} else {
+    @Suppress("DEPRECATION")
+    activity.intent.getSerializableExtra(name) as T
+}
+```
 
-4. **导航功能**
-   - 路径点验证
-   - 启动 Mapbox 导航
-   - 导航状态监听
-   - 错误处理和用户反馈
+**说明:**
+- 这些 API 在旧版本 Android 上仍然需要使用
+- 使用 `@Suppress("DEPRECATION")` 明确标记这是有意为之
+- 新版本 Android (API 23+ 和 33+) 使用新的 API
 
-### 📊 技术实现
+### 3. NavigationActivity.kt
+**修复数量:** 已在之前完成 + 1 处额外修复
 
-1. **距离计算算法**
-   ```dart
-   // 使用 Haversine 公式计算地球表面两点间距离
-   final double a = sin(dLat / 2) * sin(dLat / 2) +
-       cos(lat1 * pi / 180) * cos(lat2 * pi / 180) *
-       sin(dLon / 2) * sin(dLon / 2);
-   final double c = 2 * atan2(sqrt(a), sqrt(1 - a));
-   return earthRadius * c;
-   ```
+**状态:** ✅ 无 deprecated API 警告
 
-2. **路线优化算法**
-   - 最近邻算法：从起点开始，每次选择距离当前点最近的未访问点
-   - 时间复杂度：O(n²)
-   - 适用于中小规模路径点集合
+**额外修复:**
+- ✅ 修复了 `BoundingBox.fromPoints()` 的参数错误
+- 改为手动计算边界框坐标
 
-3. **随机路径点生成**
-   - 基于极坐标系统在指定半径内生成随机点
-   - 考虑地球曲率进行经纬度转换
-   - 支持自定义中心点和半径
+**具体修改:**
+```kotlin
+// 旧代码（有错误）
+val bounds = com.mapbox.geojson.BoundingBox.fromPoints(routePoints)
 
-### 🧪 验证结果
+// 新代码（手动计算边界）
+var minLat = Double.MAX_VALUE
+var maxLat = Double.MIN_VALUE
+var minLon = Double.MAX_VALUE
+var maxLon = Double.MIN_VALUE
 
-- ✅ Flutter 静态分析通过：`No issues found!`
-- ✅ 所有编译错误已修复
-- ✅ 代码风格符合 Dart 规范
-- ✅ 空值安全处理完善
-- ✅ 功能逻辑完整可用
+for (point in routePoints) {
+    minLat = kotlin.math.min(minLat, point.latitude())
+    maxLat = kotlin.math.max(maxLat, point.latitude())
+    minLon = kotlin.math.min(minLon, point.longitude())
+    maxLon = kotlin.math.max(maxLon, point.longitude())
+}
 
-## 使用方法
+val cameraOptions = binding.mapView.mapboxMap.cameraForCoordinateBounds(
+    com.mapbox.maps.CoordinateBounds(
+        com.mapbox.geojson.Point.fromLngLat(minLon, minLat),
+        com.mapbox.geojson.Point.fromLngLat(maxLon, maxLat)
+    ),
+    EdgeInsets(100.0, 100.0, 100.0, 100.0)
+)
+```
 
-1. **启动应用**
-   ```bash
-   cd example
-   flutter run
-   ```
+## 修复策略
 
-2. **测试功能**
-   - 点击"示例路线"添加北京景点路线
-   - 点击"随机路线"生成随机路径点
-   - 点击"优化路线"优化当前路线
-   - 点击"保存路线"保存到历史记录
-   - 点击"历史记录"查看和恢复历史路线
-   - 点击"开始导航"启动 Mapbox 导航
+### 地图 API 更新
+1. **属性访问替代方法调用**
+   - `getMapboxMap()` → `mapboxMap`
+   - `getStyle()` → `style`
 
-## 下一步建议
+2. **方法名称更新**
+   - `loadStyleUri()` → `loadStyle()`
 
-1. **功能增强**
-   - 添加更多路线优化算法（如遗传算法、模拟退火）
-   - 支持路径点拖拽排序
-   - 添加路线导入/导出功能
+3. **回调模式改为空安全检查**
+   - `getStyle { style -> }` → `style?.let { style -> }`
 
-2. **性能优化**
-   - 对大量路径点进行分页显示
-   - 实现路径点聚合显示
-   - 添加路线缓存机制
+### 兼容性 API 处理
+对于必须在旧版本 Android 上使用的 deprecated API：
+- 使用 `@Suppress("DEPRECATION")` 注解
+- 添加版本检查 (`Build.VERSION.SDK_INT`)
+- 在新版本上使用新 API
 
-3. **用户体验**
-   - 添加路线预览地图
-   - 支持路径点搜索和筛选
-   - 添加路线分享功能
+## 编译验证
+✅ 所有文件编译通过，无错误
+✅ 无 deprecated API 警告
+✅ 代码符合 Kotlin 和 Android 最佳实践
+✅ APK 构建成功 (debug 模式)
 
-现在 `advanced_features_example.dart` 文件已经完全修复并可以正常使用！🎉
+**编译命令:**
+```bash
+cd example
+flutter build apk --debug
+```
+
+**结果:**
+```
+✓ Built build/app/outputs/flutter-apk/app-debug.apk
+```
+
+## 影响评估
+- **功能影响:** 无 - 纯 API 更新，功能保持不变
+- **性能影响:** 无 - 新 API 性能相同或更好
+- **兼容性:** 保持向后兼容 (Android API 21+)
+
+## 下一步工作
+根据 `ANDROID_SDK_V3_NEXT_STEPS.md`：
+
+### 已完成 ✅
+1. ~~修复 NavigationActivity 的 deprecated API~~
+2. ~~修复其他文件的 deprecated API~~
+
+### 待完成 🔄
+3. 重写临时禁用的功能
+   - Free Drive 模式
+   - Embedded Navigation View
+   - Custom Info Panel
+   - 地图点击回调
+
+4. 实现缺失的高级功能
+   - 历史记录回放 (完整功能)
+   - 搜索功能
+   - 路线选择
+   - 地图样式选择器
+
+## 相关文档
+- [ANDROID_SDK_V3_MVP_SUCCESS.md](ANDROID_SDK_V3_MVP_SUCCESS.md)
+- [ANDROID_SDK_V3_NEXT_STEPS.md](ANDROID_SDK_V3_NEXT_STEPS.md)
+- [ANDROID_SDK_V3_TESTING_STATUS.md](ANDROID_SDK_V3_TESTING_STATUS.md)

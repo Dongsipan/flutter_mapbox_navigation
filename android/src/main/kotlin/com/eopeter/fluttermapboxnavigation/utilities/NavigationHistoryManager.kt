@@ -5,7 +5,9 @@ import com.mapbox.navigation.core.replay.history.ReplayEventBase
 import java.io.File
 
 /**
- * 导航历史管理器
+ * 导航历史管理器 - SDK v3
+ * Note: ReplayHistoryDTO API has changed in SDK v3
+ * This implementation is temporarily simplified pending proper SDK v3 API verification
  */
 object NavigationHistoryManager {
     
@@ -13,6 +15,8 @@ object NavigationHistoryManager {
     
     /**
      * 加载回放事件
+     * Note: SDK v3 history file format may have changed
+     * This needs to be updated with the correct SDK v3 API
      */
     fun loadReplayEvents(filePath: String): List<ReplayEventBase> {
         return try {
@@ -22,13 +26,28 @@ object NavigationHistoryManager {
                 return emptyList()
             }
             
-            // TODO: The ReplayHistoryDTO and ReplayHistoryMapper APIs may have changed in SDK 2.16.0
-            // For now, return empty list until we can verify the correct API
-            Log.w(TAG, "Replay history loading temporarily disabled - API needs verification")
+            // TODO: Implement proper SDK v3 history file loading
+            // The ReplayHistoryDTO API has changed or been removed in SDK v3
+            Log.w(TAG, "History file loading temporarily disabled - SDK v3 API needs verification")
+            Log.d(TAG, "History file path: $filePath")
+            
             emptyList()
         } catch (e: Exception) {
             Log.e(TAG, "Failed to load replay events: ${e.message}", e)
             emptyList()
+        }
+    }
+    
+    /**
+     * 验证历史文件是否有效
+     */
+    fun isValidHistoryFile(filePath: String): Boolean {
+        return try {
+            val file = File(filePath)
+            file.exists() && file.length() > 0
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to validate history file: ${e.message}", e)
+            false
         }
     }
 }

@@ -11,19 +11,20 @@
 
 ### 🔥 高优先级 (本周)
 
-#### 1. 修复 NavigationActivity 中的 Deprecated API
+#### ~~1. 修复 NavigationActivity 中的 Deprecated API~~ ✅
+**状态:** 已完成
 **文件:** `NavigationActivity.kt`
-**问题:**
-- `getMapboxMap()` → 使用 `mapboxMap` 属性
-- `getStyle()` → 使用 `style` 属性  
-- `loadStyleUri()` → 使用新的样式加载方法
-- `cameraForCoordinates()` → 使用新的相机 API
-- `getSerializableExtra()` → 使用类型安全的方法
+**完成日期:** 2026-01-05
 
-**影响:** 低 (仅警告,不影响功能)
-**工作量:** 1-2 小时
+#### ~~2. 修复其他文件的 Deprecated API~~ ✅
+**状态:** 已完成
+**文件:**
+- `NavigationReplayActivity.kt` - 10+ 处警告已修复
+- `PluginUtilities.kt` - 3 处警告已修复
+**完成日期:** 2026-01-05
+**详细文档:** [ADVANCED_FEATURES_FIX_SUMMARY.md](ADVANCED_FEATURES_FIX_SUMMARY.md)
 
-#### 2. 测试和验证位置更新
+#### 3. 测试和验证位置更新
 **目标:** 确认位置服务修复是否有效
 **测试项:**
 - 位置更新事件
@@ -36,12 +37,9 @@
 
 ### ⚡ 中优先级 (下周)
 
-#### 3. 修复其他文件的 Deprecated API
-**文件:**
-- `NavigationReplayActivity.kt` - 12 处警告
-- `PluginUtilities.kt` - 3 处警告
-
-**工作量:** 2-3 小时
+#### ~~3. 修复其他文件的 Deprecated API~~ ✅
+**状态:** 已完成
+**完成日期:** 2026-01-05
 
 #### 4. 完善临时禁用的功能
 **需要重写的功能:**
@@ -72,12 +70,12 @@
 
 ## 建议的执行顺序
 
-### 第一步: 快速修复 (今天)
-1. 修复 NavigationActivity 的 deprecated API
-2. 重新测试位置更新
+### ~~第一步: 快速修复~~ ✅ 已完成
+1. ~~修复 NavigationActivity 的 deprecated API~~
+2. ~~修复其他文件的 deprecated API~~
 
-### 第二步: 完善功能 (本周)
-3. 修复其他文件的 deprecated API
+### 第二步: 测试和完善功能 (本周)
+3. 重新测试位置更新
 4. 重写 Free Drive 模式
 
 ### 第三步: 高级功能 (下周+)
@@ -87,40 +85,14 @@
 
 ## 详细任务清单
 
-### Task 1: 修复 NavigationActivity Deprecated API
+### ~~Task 1: 修复 NavigationActivity Deprecated API~~ ✅
+**状态:** 已完成 (2026-01-05)
 
-#### 1.1 修复 getMapboxMap()
-```kotlin
-// 旧代码
-binding.mapView.getMapboxMap().loadStyleUri(styleUrl)
+### ~~Task 2: 修复其他文件 Deprecated API~~ ✅
+**状态:** 已完成 (2026-01-05)
+**详细文档:** [ADVANCED_FEATURES_FIX_SUMMARY.md](ADVANCED_FEATURES_FIX_SUMMARY.md)
 
-// 新代码
-binding.mapView.mapboxMap.loadStyle(styleUrl)
-```
-
-#### 1.2 修复 getStyle()
-```kotlin
-// 旧代码
-binding.mapView.getMapboxMap().getStyle()?.let { style ->
-
-// 新代码
-binding.mapView.mapboxMap.style?.let { style ->
-```
-
-#### 1.3 修复 cameraForCoordinates()
-```kotlin
-// 旧代码
-val cameraOptions = binding.mapView.getMapboxMap().cameraForCoordinates(
-    routePoints,
-    EdgeInsets(100.0, 100.0, 100.0, 100.0)
-)
-
-// 新代码
-val cameraOptions = binding.mapView.mapboxMap.cameraForCoordinateBounds(
-    CoordinateBounds(routePoints, false),
-    EdgeInsets(100.0, 100.0, 100.0, 100.0)
-)
-```
+### Task 3: 重写 Free Drive 模式
 
 ## 相关文档
 - [ANDROID_SDK_V3_MVP_SUCCESS.md](ANDROID_SDK_V3_MVP_SUCCESS.md)

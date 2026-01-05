@@ -11,7 +11,6 @@ import com.eopeter.fluttermapboxnavigation.models.Waypoint
 import com.eopeter.fluttermapboxnavigation.utilities.HistoryManager
 import com.mapbox.api.directions.v5.DirectionsCriteria
 import com.mapbox.api.directions.v5.models.DirectionsRoute
-import com.mapbox.maps.Style
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
@@ -455,31 +454,6 @@ class FlutterMapboxNavigationPlugin : FlutterPlugin, MethodCallHandler,
             }
         }
         // super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-    }
-
-    /**
-     * 处理样式选择器相关的方法调用
-     */
-    private fun handleStylePickerMethod(call: MethodCall, result: Result) {
-        when (call.method) {
-            "showStylePicker" -> {
-                result.success(false)
-            }
-            "getStoredStyle" -> {
-                val styleSettings = mapOf(
-                    "mapStyle" to (mapStyleUrlDay ?: Style.MAPBOX_STREETS),
-                    "lightPreset" to "day",
-                    "lightPresetMode" to "manual"
-                )
-                result.success(styleSettings)
-            }
-            "clearStoredStyle" -> {
-                mapStyleUrlDay = null
-                mapStyleUrlNight = null
-                result.success(true)
-            }
-            else -> result.notImplemented()
-        }
     }
 }
 

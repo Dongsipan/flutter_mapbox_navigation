@@ -16,6 +16,7 @@ import com.eopeter.fluttermapboxnavigation.models.Waypoint
 import com.eopeter.fluttermapboxnavigation.models.WaypointSet
 import com.eopeter.fluttermapboxnavigation.utilities.PluginUtilities
 import com.eopeter.fluttermapboxnavigation.utilities.PluginUtilities.Companion.sendEvent
+import com.eopeter.fluttermapboxnavigation.utilities.MapStyleManager
 import com.google.gson.Gson
 import com.mapbox.api.directions.v5.models.RouteOptions
 import com.mapbox.geojson.Point
@@ -52,6 +53,10 @@ import com.mapbox.navigation.ui.maps.route.line.api.MapboxRouteLineApi
 import com.mapbox.navigation.ui.maps.route.line.api.MapboxRouteLineView
 import com.mapbox.navigation.ui.maps.route.line.model.MapboxRouteLineApiOptions
 import com.mapbox.navigation.ui.maps.route.line.model.MapboxRouteLineViewOptions
+import com.mapbox.navigation.ui.maps.camera.NavigationCamera
+import com.mapbox.navigation.ui.maps.camera.data.MapboxNavigationViewportDataSource
+import com.mapbox.navigation.ui.maps.camera.lifecycle.NavigationBasicGesturesHandler
+import com.mapbox.navigation.ui.maps.camera.state.NavigationCameraState
 import org.json.JSONObject
 import java.text.DecimalFormat
 
@@ -67,6 +72,10 @@ import java.text.DecimalFormat
  * - 进度事件
  */
 class NavigationActivity : AppCompatActivity() {
+    
+    companion object {
+        private const val TAG = "NavigationActivity"
+    }
     
     // View Binding
     private lateinit var binding: NavigationActivityBinding
@@ -87,9 +96,17 @@ class NavigationActivity : AppCompatActivity() {
     private lateinit var routeLineApi: MapboxRouteLineApi
     private lateinit var routeLineView: MapboxRouteLineView
     
+    // Navigation Camera for automatic camera management (following official Turn-by-Turn pattern)
+    private lateinit var navigationCamera: NavigationCamera
+    private lateinit var viewportDataSource: MapboxNavigationViewportDataSource
+    
+    // Replay Route Mapper for simulation
+    private val replayRouteMapper = com.mapbox.navigation.core.replay.route.ReplayRouteMapper()
+    
     // MapboxNavigation observer for lifecycle management
     private val mapboxNavigationObserver = object : MapboxNavigationObserver {
         override fun onAttached(mapboxNavigation: MapboxNavigation) {
+            android.util.Log.d(TAG, "🔗 MapboxNavigationObserver onAttached - registering observers")
             // Register observers when navigation is attached
             mapboxNavigation.registerLocationObserver(locationObserver)
             mapboxNavigation.registerRouteProgressObserver(routeProgressObserver)
@@ -98,9 +115,11 @@ class NavigationActivity : AppCompatActivity() {
             mapboxNavigation.registerOffRouteObserver(offRouteObserver)
             mapboxNavigation.registerBannerInstructionsObserver(bannerInstructionObserver)
             mapboxNavigation.registerVoiceInstructionsObserver(voiceInstructionObserver)
+            android.util.Log.d(TAG, "✅ All observers registered successfully")
         }
 
         override fun onDetached(mapboxNavigation: MapboxNavigation) {
+            android.util.Log.d(TAG, "🔌 MapboxNavigationObserver onDetached - unregistering observers")
             // Unregister observers when navigation is detached
             mapboxNavigation.unregisterLocationObserver(locationObserver)
             mapboxNavigation.unregisterRouteProgressObserver(routeProgressObserver)
@@ -132,6 +151,9 @@ class NavigationActivity : AppCompatActivity() {
         // Initialize Map
         initializeMap()
         
+        // Initialize Navigation Camera (must be after map initialization)
+        initializeNavigationCamera()
+        
         // Initialize Route Line API
         initializeRouteLine()
         
@@ -157,49 +179,136 @@ class NavigationActivity : AppCompatActivity() {
     }
     
     private fun initializeNavigation() {
-        // In SDK v3, access token is automatically retrieved from resources
-        val navigationOptions = NavigationOptions.Builder(this.applicationContext)
-            .build()
-        
-        MapboxNavigationApp
-            .setup { navigationOptions }
-            .attach(this)
-        
-        // Register navigation observer
-        MapboxNavigationApp.registerObserver(mapboxNavigationObserver)
+        try {
+            // In SDK v3, access token is automatically retrieved from resources
+            val navigationOptions = NavigationOptions.Builder(this.applicationContext)
+                .build()
+            
+            MapboxNavigationApp
+                .setup { navigationOptions }
+                .attach(this)
+            
+            // Register navigation observer
+            MapboxNavigationApp.registerObserver(mapboxNavigationObserver)
+            
+            android.util.Log.d(TAG, "Navigation initialized successfully")
+        } catch (e: Exception) {
+            android.util.Log.e(TAG, "Failed to initialize navigation: ${e.message}", e)
+            sendEvent(MapBoxEvents.NAVIGATION_CANCELLED)
+            finish()
+        }
     }
     
     private fun initializeMap() {
-        // Load map style
-        val styleUrl = FlutterMapboxNavigationPlugin.mapStyleUrlDay ?: Style.MAPBOX_STREETS
-        
-        binding.mapView.mapboxMap.loadStyle(styleUrl) {
-            // Enable location component
-            binding.mapView.location.updateSettings {
-                enabled = true
-                pulsingEnabled = true
+        try {
+            // Register map view with MapStyleManager
+            MapStyleManager.registerMapView(binding.mapView)
+            
+            // Set day and night styles
+            val dayStyle = FlutterMapboxNavigationPlugin.mapStyleUrlDay ?: Style.MAPBOX_STREETS
+            val nightStyle = FlutterMapboxNavigationPlugin.mapStyleUrlNight ?: Style.DARK
+            MapStyleManager.setDayStyle(dayStyle)
+            MapStyleManager.setNightStyle(nightStyle)
+            
+            // Load map style
+            val styleUrl = FlutterMapboxNavigationPlugin.mapStyleUrlDay ?: Style.MAPBOX_STREETS
+            
+            binding.mapView.mapboxMap.loadStyle(styleUrl) {
+                // Enable location component
+                binding.mapView.location.updateSettings {
+                    enabled = true
+                    pulsingEnabled = true
+                }
+                
+                // Register position changed listener for vanishing route line
+                binding.mapView.location.addOnIndicatorPositionChangedListener(onIndicatorPositionChangedListener)
+                
+                android.util.Log.d(TAG, "Map style loaded successfully: $styleUrl")
             }
+            
+            // Setup map gestures
+            if (FlutterMapboxNavigationPlugin.longPressDestinationEnabled) {
+                binding.mapView.gestures.addOnMapLongClickListener(onMapLongClick)
+            }
+            
+            if (FlutterMapboxNavigationPlugin.enableOnMapTapCallback) {
+                binding.mapView.gestures.addOnMapClickListener(onMapClick)
+            }
+            
+            android.util.Log.d(TAG, "Map initialized successfully")
+        } catch (e: Exception) {
+            android.util.Log.e(TAG, "Failed to initialize map: ${e.message}", e)
         }
-        
-        // Setup map gestures
-        if (FlutterMapboxNavigationPlugin.longPressDestinationEnabled) {
-            binding.mapView.gestures.addOnMapLongClickListener(onMapLongClick)
-        }
-        
-        if (FlutterMapboxNavigationPlugin.enableOnMapTapCallback) {
-            binding.mapView.gestures.addOnMapClickListener(onMapClick)
+    }
+    
+    private fun initializeNavigationCamera() {
+        try {
+            // Initialize viewport data source (following official Turn-by-Turn pattern)
+            viewportDataSource = MapboxNavigationViewportDataSource(binding.mapView.mapboxMap)
+            
+            // Configure camera padding for better UX
+            val pixelDensity = resources.displayMetrics.density
+            val overviewPadding = EdgeInsets(
+                140.0 * pixelDensity,
+                40.0 * pixelDensity,
+                120.0 * pixelDensity,
+                40.0 * pixelDensity
+            )
+            val followingPadding = EdgeInsets(
+                180.0 * pixelDensity,
+                40.0 * pixelDensity,
+                150.0 * pixelDensity,
+                40.0 * pixelDensity
+            )
+            
+            viewportDataSource.overviewPadding = overviewPadding
+            viewportDataSource.followingPadding = followingPadding
+            
+            // Initialize navigation camera
+            navigationCamera = NavigationCamera(
+                binding.mapView.mapboxMap,
+                binding.mapView.camera,
+                viewportDataSource
+            )
+            
+            // Add gesture handler to stop camera following when user interacts with map
+            binding.mapView.camera.addCameraAnimationsLifecycleListener(
+                NavigationBasicGesturesHandler(navigationCamera)
+            )
+            
+            // Register camera state change observer
+            navigationCamera.registerNavigationCameraStateChangeObserver { navigationCameraState ->
+                android.util.Log.d(TAG, "📷 Camera state changed: $navigationCameraState")
+                // You can update UI based on camera state here
+                // For example, show/hide recenter button
+            }
+            
+            android.util.Log.d(TAG, "Navigation camera initialized successfully")
+        } catch (e: Exception) {
+            android.util.Log.e(TAG, "Failed to initialize navigation camera: ${e.message}", e)
         }
     }
     
     private fun initializeRouteLine() {
+        // Configure vanishing route line with transparent traveled route (official style)
+        val customColorResources = com.mapbox.navigation.ui.maps.route.line.model.RouteLineColorResources.Builder()
+            .routeLineTraveledColor(android.graphics.Color.TRANSPARENT) // 走过的路线变透明（官方规范）
+            .routeLineTraveledCasingColor(android.graphics.Color.TRANSPARENT) // 走过路线的边框也透明
+            .build()
+        
         val apiOptions = MapboxRouteLineApiOptions.Builder()
+            .vanishingRouteLineEnabled(true) // 启用消失路线功能
+            .styleInactiveRouteLegsIndependently(true) // 独立样式化非活动路段
             .build()
         
         val viewOptions = MapboxRouteLineViewOptions.Builder(this)
+            .routeLineColorResources(customColorResources) // 应用自定义颜色
             .build()
         
         routeLineApi = MapboxRouteLineApi(apiOptions)
         routeLineView = MapboxRouteLineView(viewOptions)
+        
+        android.util.Log.d(TAG, "Route line initialized with vanishing route line enabled (transparent style)")
     }
     
     private fun setupUI() {
@@ -308,69 +417,159 @@ class NavigationActivity : AppCompatActivity() {
     
     @OptIn(com.mapbox.navigation.base.ExperimentalPreviewMapboxNavigationAPI::class)
     private fun startNavigation(routes: List<NavigationRoute>) {
-        val mapboxNavigation = MapboxNavigationApp.current() ?: return
-        
-        // Set routes
-        mapboxNavigation.setNavigationRoutes(routes)
-        
-        // Start trip session based on simulation mode
-        if (FlutterMapboxNavigationPlugin.simulateRoute) {
-            // Use replay trip session for simulation
-            mapboxNavigation.startReplayTripSession()
-        } else {
-            // Use regular trip session for real navigation
-            mapboxNavigation.startTripSession()
+        val mapboxNavigation = MapboxNavigationApp.current() ?: run {
+            android.util.Log.e(TAG, "MapboxNavigation is null, cannot start navigation")
+            sendEvent(MapBoxEvents.NAVIGATION_CANCELLED)
+            return
         }
         
-        isNavigationInProgress = true
-        
-        // Show control panel
-        binding.navigationControlPanel.visibility = View.VISIBLE
-        
-        sendEvent(MapBoxEvents.NAVIGATION_RUNNING)
+        try {
+            android.util.Log.d(TAG, "Starting navigation with ${routes.size} routes, simulateRoute=${FlutterMapboxNavigationPlugin.simulateRoute}")
+            
+            // Set navigation in progress FIRST
+            isNavigationInProgress = true
+            android.util.Log.d(TAG, "isNavigationInProgress set to true")
+            
+            // Set routes for navigation
+            mapboxNavigation.setNavigationRoutes(routes)
+            android.util.Log.d(TAG, "Routes set, count: ${routes.size}")
+            
+            // Start trip session based on simulation mode
+            if (FlutterMapboxNavigationPlugin.simulateRoute) {
+                // Use replay trip session for simulation
+                mapboxNavigation.startReplayTripSession()
+                android.util.Log.d(TAG, "Started replay trip session for simulation")
+                
+                // CRITICAL: Push replay events to mapboxReplayer
+                // This is what actually generates the simulated location updates
+                val replayData = replayRouteMapper.mapDirectionsRouteGeometry(
+                    routes.first().directionsRoute
+                )
+                android.util.Log.d(TAG, "Generated ${replayData.size} replay events")
+                
+                mapboxNavigation.mapboxReplayer.pushEvents(replayData)
+                mapboxNavigation.mapboxReplayer.seekTo(replayData.first())
+                mapboxNavigation.mapboxReplayer.play()
+                android.util.Log.d(TAG, "Mapbox replayer started playing")
+            } else {
+                // Use regular trip session for real navigation
+                mapboxNavigation.startTripSession()
+                android.util.Log.d(TAG, "Started regular trip session")
+            }
+            
+            // Draw routes on map
+            routeLineApi.setNavigationRoutes(routes) { result ->
+                binding.mapView.mapboxMap.style?.let { style ->
+                    routeLineView.renderRouteDrawData(style, result)
+                    android.util.Log.d(TAG, "Route drawn on map")
+                }
+            }
+            
+            // Use NavigationCamera to show route overview first, then switch to following
+            // This is the official Turn-by-Turn pattern
+            navigationCamera.requestNavigationCameraToOverview()
+            android.util.Log.d(TAG, "📷 Camera set to overview mode")
+            
+            // After a short delay, switch to following mode to start turn-by-turn navigation
+            binding.mapView.postDelayed({
+                navigationCamera.requestNavigationCameraToFollowing()
+                android.util.Log.d(TAG, "📷 Camera switched to following mode")
+            }, 1500)
+            
+            // Show control panel
+            binding.navigationControlPanel.visibility = View.VISIBLE
+            
+            sendEvent(MapBoxEvents.NAVIGATION_RUNNING)
+        } catch (e: Exception) {
+            android.util.Log.e(TAG, "Failed to start navigation: ${e.message}", e)
+            sendEvent(MapBoxEvents.NAVIGATION_CANCELLED)
+        }
     }
+    
+    // Note: adjustCameraToRoute is no longer needed as NavigationCamera handles this automatically
     
     private fun startFreeDrive() {
-        val mapboxNavigation = MapboxNavigationApp.current() ?: return
+        val mapboxNavigation = MapboxNavigationApp.current() ?: run {
+            android.util.Log.e(TAG, "MapboxNavigation is null, cannot start free drive")
+            sendEvent(MapBoxEvents.NAVIGATION_CANCELLED)
+            return
+        }
         
-        // Start trip session without routes (free drive)
-        mapboxNavigation.startTripSession()
-        
-        isNavigationInProgress = true
-        
-        sendEvent(MapBoxEvents.NAVIGATION_RUNNING)
+        try {
+            // Start trip session without routes (free drive)
+            mapboxNavigation.startTripSession()
+            
+            isNavigationInProgress = true
+            
+            android.util.Log.d(TAG, "Free drive started successfully")
+            sendEvent(MapBoxEvents.NAVIGATION_RUNNING)
+        } catch (e: Exception) {
+            android.util.Log.e(TAG, "Failed to start free drive: ${e.message}", e)
+            sendEvent(MapBoxEvents.NAVIGATION_CANCELLED)
+        }
     }
     
+    @OptIn(com.mapbox.navigation.base.ExperimentalPreviewMapboxNavigationAPI::class)
     private fun stopNavigation() {
-        val mapboxNavigation = MapboxNavigationApp.current() ?: return
+        val mapboxNavigation = MapboxNavigationApp.current() ?: run {
+            android.util.Log.w(TAG, "MapboxNavigation is null when stopping navigation")
+            finish()
+            return
+        }
         
-        // Stop trip session
-        mapboxNavigation.stopTripSession()
-        
-        // Clear routes
-        mapboxNavigation.setNavigationRoutes(emptyList())
-        
-        isNavigationInProgress = false
-        
-        // Hide control panel
-        binding.navigationControlPanel.visibility = View.GONE
-        
-        sendEvent(MapBoxEvents.NAVIGATION_CANCELLED)
-        
-        // Finish activity
-        finish()
+        try {
+            // Stop replayer if it was running
+            if (FlutterMapboxNavigationPlugin.simulateRoute) {
+                mapboxNavigation.mapboxReplayer.stop()
+                mapboxNavigation.mapboxReplayer.clearEvents()
+                android.util.Log.d(TAG, "Mapbox replayer stopped")
+            }
+            
+            // Stop trip session
+            mapboxNavigation.stopTripSession()
+            
+            // Clear routes
+            mapboxNavigation.setNavigationRoutes(emptyList())
+            
+            isNavigationInProgress = false
+            
+            // Hide control panel
+            binding.navigationControlPanel.visibility = View.GONE
+            
+            android.util.Log.d(TAG, "Navigation stopped successfully")
+            sendEvent(MapBoxEvents.NAVIGATION_CANCELLED)
+            
+            // Finish activity
+            finish()
+        } catch (e: Exception) {
+            android.util.Log.e(TAG, "Error stopping navigation: ${e.message}", e)
+            sendEvent(MapBoxEvents.NAVIGATION_CANCELLED)
+            finish()
+        }
     }
     
     // ==================== Observers ====================
     
+    // Position changed listener for vanishing route line
+    private val onIndicatorPositionChangedListener = com.mapbox.maps.plugin.locationcomponent.OnIndicatorPositionChangedListener { point ->
+        // Update traveled route line based on current position
+        val result = routeLineApi.updateTraveledRouteLine(point)
+        binding.mapView.mapboxMap.style?.let { style ->
+            routeLineView.renderRouteLineUpdate(style, result)
+        }
+    }
+    
     private val locationObserver = object : LocationObserver {
         override fun onNewRawLocation(rawLocation: com.mapbox.common.location.Location) {
-            // Required by SDK v3 but not used in MVP
+            // Required by SDK v3 - receives raw location updates
+            android.util.Log.d(TAG, "📍 Raw location: lat=${rawLocation.latitude}, lng=${rawLocation.longitude}")
         }
 
         override fun onNewLocationMatcherResult(locationMatcherResult: LocationMatcherResult) {
             // Convert to android.location.Location for compatibility
             val enhancedLocation = locationMatcherResult.enhancedLocation
+            android.util.Log.d(TAG, "📍 Location update: lat=${enhancedLocation.latitude}, lng=${enhancedLocation.longitude}, bearing=${enhancedLocation.bearing}, speed=${enhancedLocation.speed}, isNavigationInProgress=$isNavigationInProgress")
+            
             lastLocation = android.location.Location("").apply {
                 latitude = enhancedLocation.latitude
                 longitude = enhancedLocation.longitude
@@ -378,18 +577,11 @@ class NavigationActivity : AppCompatActivity() {
                 speed = enhancedLocation.speed?.toFloat() ?: 0f
             }
             
-            // Update camera to follow location
-            val cameraOptions = CameraOptions.Builder()
-                .center(Point.fromLngLat(
-                    enhancedLocation.longitude,
-                    enhancedLocation.latitude
-                ))
-                .zoom(15.0)
-                .bearing(enhancedLocation.bearing?.toDouble() ?: 0.0)
-                .pitch(45.0)
-                .build()
+            // Update viewport data source with new location (official Turn-by-Turn pattern)
+            viewportDataSource.onLocationChanged(enhancedLocation)
+            viewportDataSource.evaluate()
             
-            binding.mapView.camera.easeTo(cameraOptions)
+            android.util.Log.d(TAG, "📷 ViewportDataSource updated with location")
         }
     }
     
@@ -403,7 +595,11 @@ class NavigationActivity : AppCompatActivity() {
         FlutterMapboxNavigationPlugin.durationRemaining = routeProgress.durationRemaining
         sendEvent(progressEvent)
         
-        // Update route line
+        // Update viewport data source with route progress (official Turn-by-Turn pattern)
+        viewportDataSource.onRouteProgressChanged(routeProgress)
+        viewportDataSource.evaluate()
+        
+        // Update route line with progress
         routeLineApi.updateWithRouteProgress(routeProgress) { result ->
             binding.mapView.mapboxMap.style?.let { style ->
                 routeLineView.renderRouteLineUpdate(style, result)
@@ -412,7 +608,13 @@ class NavigationActivity : AppCompatActivity() {
     }
     
     private val routesObserver = RoutesObserver { routeUpdateResult ->
+        android.util.Log.d(TAG, "RoutesObserver triggered, routes count: ${routeUpdateResult.navigationRoutes.size}, reason: ${routeUpdateResult.reason}")
+        
         if (routeUpdateResult.navigationRoutes.isNotEmpty()) {
+            // Update viewport data source with new route (official Turn-by-Turn pattern)
+            viewportDataSource.onRouteChanged(routeUpdateResult.navigationRoutes.first())
+            viewportDataSource.evaluate()
+            
             // Draw routes on map
             routeLineApi.setNavigationRoutes(routeUpdateResult.navigationRoutes) { result ->
                 binding.mapView.mapboxMap.style?.let { style ->
@@ -420,28 +622,12 @@ class NavigationActivity : AppCompatActivity() {
                 }
             }
             
-            // Camera to route overview
-            val routes = routeUpdateResult.navigationRoutes
-            if (routes.isNotEmpty()) {
-                val routePoints = routes.first().directionsRoute.geometry()?.let { geometry ->
-                    com.mapbox.geojson.LineString.fromPolyline(geometry, 6).coordinates()
-                }
-                
-                if (routePoints != null && routePoints.isNotEmpty()) {
-                    // Use camera for coordinate bounds instead of deprecated method
-                    val bounds = com.mapbox.geojson.BoundingBox.fromPoints(routePoints)
-                    val cameraOptions = binding.mapView.mapboxMap.cameraForCoordinateBounds(
-                        com.mapbox.maps.CoordinateBounds(
-                            com.mapbox.geojson.Point.fromLngLat(bounds.west(), bounds.south()),
-                            com.mapbox.geojson.Point.fromLngLat(bounds.east(), bounds.north())
-                        ),
-                        EdgeInsets(100.0, 100.0, 100.0, 100.0)
-                    )
-                    binding.mapView.camera.easeTo(cameraOptions)
-                }
-            }
-            
+            // Send reroute event if applicable
             sendEvent(MapBoxEvents.REROUTE_ALONG)
+        } else {
+            // Clear route data from viewport
+            viewportDataSource.clearRouteData()
+            viewportDataSource.evaluate()
         }
     }
     
@@ -527,15 +713,27 @@ class NavigationActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         
-        // Unregister broadcast receivers
-        unregisterReceiver(finishBroadcastReceiver)
-        unregisterReceiver(addWayPointsBroadcastReceiver)
-        
-        // Unregister navigation observer
-        MapboxNavigationApp.unregisterObserver(mapboxNavigationObserver)
-        
-        // Clean up map
-        binding.mapView.gestures.removeOnMapLongClickListener(onMapLongClick)
-        binding.mapView.gestures.removeOnMapClickListener(onMapClick)
+        try {
+            // Unregister broadcast receivers
+            unregisterReceiver(finishBroadcastReceiver)
+            unregisterReceiver(addWayPointsBroadcastReceiver)
+            
+            // Unregister navigation observer
+            MapboxNavigationApp.unregisterObserver(mapboxNavigationObserver)
+            
+            // Clean up map
+            binding.mapView.gestures.removeOnMapLongClickListener(onMapLongClick)
+            binding.mapView.gestures.removeOnMapClickListener(onMapClick)
+            
+            // Remove position changed listener
+            binding.mapView.location.removeOnIndicatorPositionChangedListener(onIndicatorPositionChangedListener)
+            
+            // Unregister map view from MapStyleManager
+            MapStyleManager.unregisterMapView(binding.mapView)
+            
+            android.util.Log.d(TAG, "NavigationActivity destroyed successfully")
+        } catch (e: Exception) {
+            android.util.Log.e(TAG, "Error in onDestroy: ${e.message}", e)
+        }
     }
 }

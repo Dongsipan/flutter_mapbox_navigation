@@ -121,7 +121,7 @@ class NavigationReplayActivity : AppCompatActivity() {
                 isLocationInitialized = true
                 // 首次定位时设置相机
                 val location = locationMatcherResult.enhancedLocation
-                binding.mapView.getMapboxMap().setCamera(
+                binding.mapView.mapboxMap.setCamera(
                     CameraOptions.Builder()
                         .center(com.mapbox.geojson.Point.fromLngLat(location.longitude, location.latitude))
                         .zoom(15.0)
@@ -204,12 +204,12 @@ class NavigationReplayActivity : AppCompatActivity() {
         
         // 初始化地图样式
         val styleUri = MapStyleSelectorActivity.getStyleForUiMode(this)
-        binding.mapView.getMapboxMap().loadStyleUri(styleUri)
+        binding.mapView.mapboxMap.loadStyle(styleUri)
         // 根据地图样式调整状态栏文字颜色
         StatusBarStyleManager.updateStatusBarForMapStyle(this@NavigationReplayActivity, styleUri)
 
         // 设置初始相机位置
-        binding.mapView.getMapboxMap().setCamera(
+        binding.mapView.mapboxMap.setCamera(
             CameraOptions.Builder()
                 .zoom(15.0)
                 .build()
@@ -221,7 +221,7 @@ class NavigationReplayActivity : AppCompatActivity() {
 
     private fun initNavigation() {
         // 初始化"真实行驶轨迹"源与图层（基于回放位置点绘制折线），并添加起终点图层
-        binding.mapView.getMapboxMap().getStyle { style ->
+        binding.mapView.mapboxMap.style?.let { style ->
             val travelSourceId = "replay-travel-line-source"
             val travelLayerId = "replay-travel-line-layer"
             val startSrcId = "replay-start-source"
@@ -284,6 +284,11 @@ class NavigationReplayActivity : AppCompatActivity() {
                     })
                 }
             }
+        } ?: run {
+            // 如果样式还未加载，等待样式加载完成后再初始化
+            binding.mapView.mapboxMap.loadStyle(MapStyleSelectorActivity.getStyleForUiMode(this)) { style ->
+                initTravelLineLayer(style)
+            }
         }
 
         MapboxNavigationApp.setup(
@@ -294,9 +299,9 @@ class NavigationReplayActivity : AppCompatActivity() {
         // 不再初始化路线绘制组件，只显示真实行驶轨迹
 
         // 初始化相机和视口组件
-        viewportDataSource = MapboxNavigationViewportDataSource(binding.mapView.getMapboxMap())
+        viewportDataSource = MapboxNavigationViewportDataSource(binding.mapView.mapboxMap)
         navigationCamera = NavigationCamera(
-            binding.mapView.getMapboxMap(),
+            binding.mapView.mapboxMap,
             binding.mapView.camera,
             viewportDataSource
         )
@@ -436,7 +441,7 @@ class NavigationReplayActivity : AppCompatActivity() {
                             val lat = (loc?.javaClass?.declaredFields?.firstOrNull { f -> f.name == "latitude" }?.apply { isAccessible = true }?.get(loc) as? Number)?.toDouble()
                             val lon = (loc?.javaClass?.declaredFields?.firstOrNull { f -> f.name == "longitude" }?.apply { isAccessible = true }?.get(loc) as? Number)?.toDouble()
                             if (lat != null && lon != null) {
-                                binding.mapView.getMapboxMap().setCamera(
+                                binding.mapView.mapboxMap.setCamera(
                                     CameraOptions.Builder()
                                         .center(com.mapbox.geojson.Point.fromLngLat(lon, lat))
                                         .zoom(15.0)
@@ -725,7 +730,7 @@ class NavigationReplayActivity : AppCompatActivity() {
         }
 
         // 获取当前相机中心点
-        val currentCamera = binding.mapView.getMapboxMap().cameraState
+        val currentCamera = binding.mapView.mapboxMap.cameraState
         val cameraCenter = currentCamera.center
 
         // 获取屏幕尺寸
@@ -734,7 +739,7 @@ class NavigationReplayActivity : AppCompatActivity() {
         val screenHeight = displayMetrics.heightPixels
 
         // 将地理坐标转换为屏幕坐标
-        val currentScreenPoint = binding.mapView.getMapboxMap().pixelForCoordinate(currentPoint)
+        val currentScreenPoint = binding.mapView.mapboxMap.pixelForCoordinate(currentPoint)
 
         // 定义边缘阈值（距离屏幕边缘的像素距离）
         val edgeThreshold = 100 // 100像素
@@ -866,7 +871,7 @@ class NavigationReplayActivity : AppCompatActivity() {
      * 一次性绘制完整路线
      */
     private fun drawCompleteRoute() {
-        binding.mapView.getMapboxMap().getStyle { style ->
+        binding.mapView.mapboxMap.style?.let { style ->
             try {
                 // 绘制完整轨迹线
                 val line = LineString.fromLngLats(traveledPoints)
@@ -893,6 +898,74 @@ class NavigationReplayActivity : AppCompatActivity() {
 
             } catch (e: Exception) {
                 Log.e(TAG, "绘制完整路线失败: ${e.message}", e)
+            }
+        } ?: Log.w(TAG, "样式未加载，无法绘制路线")
+    }
+
+    /**
+     * 初始化轨迹线图层（提取为独立函数以便复用）
+     */
+    private fun initTravelLineLayer(style: com.mapbox.maps.Style) {
+        val travelSourceId = "replay-travel-line-source"
+        val travelLayerId = "replay-travel-line-layer"
+        val startSrcId = "replay-start-source"
+        val endSrcId = "replay-end-source"
+        val startLayerId = "replay-start-layer"
+        val endLayerId = "replay-end-layer"
+
+        if (style.getSource(travelSourceId) == null) {
+            style.addSource(geoJsonSource(travelSourceId) { lineMetrics(true) })
+        }
+        // 找到位置图层的ID，确保我们的图层添加在它下面
+        val locationLayerId = "mapbox-location-indicator-layer"
+        val belowLayerId = if (style.getLayer(locationLayerId) != null) locationLayerId else null
+
+        if (style.getLayer(travelLayerId) == null) {
+            val layer = lineLayer(travelLayerId, travelSourceId) {
+                // 不设置lineColor，使用lineGradient
+                lineWidth(8.0) // 增加线宽从4.0到8.0，让轨迹更明显
+                lineJoin(LineJoin.ROUND)
+                // lineCap(LineCap.ROUND) // 添加圆形端点，让线条更美观 - 暂时注释掉，避免导入问题
+                // 设置初始渐变（单色）
+                lineGradient(toColor { literal("#4CAF50") })
+            }
+
+            if (belowLayerId != null) {
+                style.addLayerBelow(layer, belowLayerId)
+            } else {
+                style.addLayer(layer)
+            }
+        }
+        if (style.getSource(startSrcId) == null) {
+            style.addSource(geoJsonSource(startSrcId) { })
+        }
+        if (style.getSource(endSrcId) == null) {
+            style.addSource(geoJsonSource(endSrcId) { })
+        }
+        if (style.getLayer(startLayerId) == null) {
+            if (belowLayerId != null) {
+                style.addLayerBelow(circleLayer(startLayerId, startSrcId) {
+                    circleColor("#00E676")
+                    circleRadius(6.0)
+                }, belowLayerId)
+            } else {
+                style.addLayer(circleLayer(startLayerId, startSrcId) {
+                    circleColor("#00E676")
+                    circleRadius(6.0)
+                })
+            }
+        }
+        if (style.getLayer(endLayerId) == null) {
+            if (belowLayerId != null) {
+                style.addLayerBelow(circleLayer(endLayerId, endSrcId) {
+                    circleColor("#FF5252")
+                    circleRadius(6.0)
+                }, belowLayerId)
+            } else {
+                style.addLayer(circleLayer(endLayerId, endSrcId) {
+                    circleColor("#FF5252")
+                    circleRadius(6.0)
+                })
             }
         }
     }

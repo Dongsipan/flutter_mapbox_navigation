@@ -36,6 +36,7 @@ import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import java.util.*
+import java.io.File
 
 open class TurnByTurn(
     ctx: Context,
@@ -45,6 +46,10 @@ open class TurnByTurn(
 ) : MethodChannel.MethodCallHandler,
     EventChannel.StreamHandler,
     Application.ActivityLifecycleCallbacks {
+
+    companion object {
+        private const val TAG = "TurnByTurn"
+    }
 
     open fun initFlutterChannelHandlers() {
         this.methodChannel?.setMethodCallHandler(this)
@@ -59,6 +64,9 @@ open class TurnByTurn(
         MapboxNavigationApp
             .setup { navigationOptions }
             .attach(this.activity as LifecycleOwner)
+
+        // Note: MapboxHistoryRecorder is internal in SDK v3
+        // History recording will be handled differently
 
         // initialize navigation trip observers
         this.registerObservers()
@@ -180,10 +188,24 @@ open class TurnByTurn(
     }
 
     private fun startFreeDrive() {
-        // NavigationView API removed in SDK v3 - needs complete rewrite
-        // Temporarily disabled for MVP
-        // this.binding.navigationView.api.startFreeDrive()
-        Log.w("TurnByTurn", "startFreeDrive not implemented in SDK v3 MVP")
+        val mapboxNavigation = MapboxNavigationApp.current() ?: run {
+            Log.e(TAG, "MapboxNavigation not initialized")
+            PluginUtilities.sendEvent(MapBoxEvents.NAVIGATION_CANCELLED)
+            return
+        }
+        
+        try {
+            // 启动 trip session 但不设置路线（Free Drive 模式）
+            mapboxNavigation.startTripSession()
+            
+            // 发送事件到 Flutter
+            PluginUtilities.sendEvent(MapBoxEvents.NAVIGATION_RUNNING)
+            
+            Log.d(TAG, "Free Drive mode started successfully")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to start Free Drive mode: ${e.message}", e)
+            PluginUtilities.sendEvent(MapBoxEvents.NAVIGATION_CANCELLED)
+        }
     }
 
     private fun startNavigation(methodCall: MethodCall, result: MethodChannel.Result) {
@@ -211,23 +233,72 @@ open class TurnByTurn(
         }
     }
 
+    @OptIn(com.mapbox.navigation.base.ExperimentalPreviewMapboxNavigationAPI::class)
     @SuppressLint("MissingPermission")
     private fun startNavigation() {
-        if (this.currentRoutes == null) {
+        if (this.currentRoutes == null || this.currentRoutes!!.isEmpty()) {
+            Log.w(TAG, "No routes available for navigation")
             PluginUtilities.sendEvent(MapBoxEvents.NAVIGATION_CANCELLED)
             return
         }
-        // NavigationView API removed in SDK v3 - needs complete rewrite
-        // Temporarily disabled for MVP
-        // this.binding.navigationView.api.startActiveGuidance(this.currentRoutes!!)
-        Log.w("TurnByTurn", "startNavigation not fully implemented in SDK v3 MVP")
-        PluginUtilities.sendEvent(MapBoxEvents.NAVIGATION_RUNNING)
+        
+        val mapboxNavigation = MapboxNavigationApp.current() ?: run {
+            Log.e(TAG, "MapboxNavigation not initialized")
+            PluginUtilities.sendEvent(MapBoxEvents.NAVIGATION_CANCELLED)
+            return
+        }
+        
+        try {
+            // 设置导航路线
+            mapboxNavigation.setNavigationRoutes(this.currentRoutes!!)
+            Log.d(TAG, "Navigation routes set, route count: ${this.currentRoutes!!.size}")
+            
+            // 根据 simulateRoute 标志选择 trip session 类型
+            if (this.simulateRoute) {
+                // 模拟导航
+                mapboxNavigation.startReplayTripSession()
+                Log.d(TAG, "Started simulated navigation")
+            } else {
+                // 真实导航
+                mapboxNavigation.startTripSession()
+                Log.d(TAG, "Started real navigation")
+            }
+            
+            // 开始历史记录（如果启用）
+            if (FlutterMapboxNavigationPlugin.enableHistoryRecording) {
+                startHistoryRecording()
+            }
+            
+            // 发送事件到 Flutter
+            PluginUtilities.sendEvent(MapBoxEvents.NAVIGATION_RUNNING)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to start navigation: ${e.message}", e)
+            PluginUtilities.sendEvent(MapBoxEvents.NAVIGATION_CANCELLED)
+        }
     }
 
     private fun finishNavigation(isOffRouted: Boolean = false) {
-        MapboxNavigationApp.current()!!.stopTripSession()
-        this.isNavigationCanceled = true
-        PluginUtilities.sendEvent(MapBoxEvents.NAVIGATION_CANCELLED)
+        try {
+            // 停止历史记录（如果正在记录）
+            if (isRecordingHistory) {
+                stopHistoryRecording()
+            }
+            
+            val mapboxNavigation = MapboxNavigationApp.current()
+            if (mapboxNavigation != null) {
+                mapboxNavigation.stopTripSession()
+                Log.d(TAG, "Navigation finished successfully")
+            } else {
+                Log.w(TAG, "MapboxNavigation is null when finishing navigation")
+            }
+            
+            this.isNavigationCanceled = true
+            PluginUtilities.sendEvent(MapBoxEvents.NAVIGATION_CANCELLED)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error finishing navigation: ${e.message}", e)
+            this.isNavigationCanceled = true
+            PluginUtilities.sendEvent(MapBoxEvents.NAVIGATION_CANCELLED)
+        }
     }
 
     private fun setOptions(arguments: Map<*, *>) {
@@ -364,7 +435,7 @@ open class TurnByTurn(
     private val token: String = accessToken
     open var methodChannel: MethodChannel? = null
     open var eventChannel: EventChannel? = null
-    private var lastLocation: android.location.Location? = null
+    protected var lastLocation: android.location.Location? = null
 
     /**
      * Helper class that keeps added waypoints and transforms them to the [RouteOptions] params.
@@ -401,6 +472,12 @@ open class TurnByTurn(
 
     private var currentRoutes: List<NavigationRoute>? = null
     private var isNavigationCanceled = false
+
+    // History recording
+    // Note: In SDK v3, MapboxHistoryRecorder is internal and not directly accessible
+    // History recording functionality needs to be implemented differently
+    private var isRecordingHistory = false
+    private var currentHistoryFilePath: String? = null
 
     /**
      * Bindings to the example layout.
@@ -457,14 +534,13 @@ open class TurnByTurn(
         // update flutter events
         if (!this.isNavigationCanceled) {
             try {
-
                 this.distanceRemaining = routeProgress.distanceRemaining
                 this.durationRemaining = routeProgress.durationRemaining
 
                 val progressEvent = MapBoxRouteProgressEvent(routeProgress)
                 PluginUtilities.sendEvent(progressEvent)
-            } catch (_: java.lang.Exception) {
-                // handle this error
+            } catch (e: Exception) {
+                Log.e(TAG, "Error processing route progress: ${e.message}", e)
             }
         }
     }
@@ -484,30 +560,78 @@ open class TurnByTurn(
     }
 
     override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {
-        Log.d("Embedded", "onActivityCreated not implemented")
+        Log.d(TAG, "onActivityCreated")
     }
 
     override fun onActivityStarted(activity: Activity) {
-        Log.d("Embedded", "onActivityStarted not implemented")
+        Log.d(TAG, "onActivityStarted")
     }
 
     override fun onActivityResumed(activity: Activity) {
-        Log.d("Embedded", "onActivityResumed not implemented")
+        Log.d(TAG, "onActivityResumed")
     }
 
     override fun onActivityPaused(activity: Activity) {
-        Log.d("Embedded", "onActivityPaused not implemented")
+        Log.d(TAG, "onActivityPaused")
     }
 
     override fun onActivityStopped(activity: Activity) {
-        Log.d("Embedded", "onActivityStopped not implemented")
+        Log.d(TAG, "onActivityStopped")
     }
 
     override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) {
-        Log.d("Embedded", "onActivitySaveInstanceState not implemented")
+        Log.d(TAG, "onActivitySaveInstanceState")
     }
 
     override fun onActivityDestroyed(activity: Activity) {
-        Log.d("Embedded", "onActivityDestroyed not implemented")
+        try {
+            // Stop history recording if active
+            if (isRecordingHistory) {
+                stopHistoryRecording()
+            }
+            
+            // Unregister observers to prevent memory leaks
+            unregisterObservers()
+            Log.d(TAG, "onActivityDestroyed - observers unregistered successfully")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in onActivityDestroyed: ${e.message}", e)
+        }
+    }
+
+    /**
+     * 开始历史记录
+     * Note: In SDK v3, MapboxHistoryRecorder is internal
+     * This functionality is temporarily disabled pending proper SDK v3 implementation
+     */
+    private fun startHistoryRecording() {
+        try {
+            // TODO: Implement history recording using SDK v3 public APIs
+            // MapboxHistoryRecorder is internal in SDK v3
+            Log.w(TAG, "History recording temporarily disabled - SDK v3 API needs verification")
+            PluginUtilities.sendEvent(MapBoxEvents.HISTORY_RECORDING_ERROR)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to start history recording: ${e.message}", e)
+            PluginUtilities.sendEvent(MapBoxEvents.HISTORY_RECORDING_ERROR)
+        }
+    }
+
+    /**
+     * 停止历史记录
+     * Note: In SDK v3, MapboxHistoryRecorder is internal
+     * This functionality is temporarily disabled pending proper SDK v3 implementation
+     */
+    private fun stopHistoryRecording() {
+        try {
+            // TODO: Implement history recording using SDK v3 public APIs
+            Log.w(TAG, "History recording temporarily disabled - SDK v3 API needs verification")
+            isRecordingHistory = false
+            currentHistoryFilePath = null
+            PluginUtilities.sendEvent(MapBoxEvents.HISTORY_RECORDING_STOPPED)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to stop history recording: ${e.message}", e)
+            isRecordingHistory = false
+            currentHistoryFilePath = null
+            PluginUtilities.sendEvent(MapBoxEvents.HISTORY_RECORDING_ERROR)
+        }
     }
 }

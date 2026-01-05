@@ -80,6 +80,15 @@ org.gradle.java.home=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/H
 org.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=1024m -XX:+HeapDumpOnOutOfMemoryError
 ```
 
+### 6. 运行时修复 ✅
+
+#### Android 14+ BroadcastReceiver 兼容性
+修复了 Android 14 (API 34) 运行时崩溃问题:
+- 添加 `RECEIVER_NOT_EXPORTED` 标志到 BroadcastReceiver 注册
+- 使用版本检查确保向后兼容
+- 详见: [ANDROID_SDK_V3_RUNTIME_FIX.md](ANDROID_SDK_V3_RUNTIME_FIX.md)
+```
+
 ## 关键技术变更
 
 ### SDK v3 架构变化
@@ -173,6 +182,7 @@ BUILD SUCCESSFUL in 53s
 - [ANDROID_SDK_V3_MVP_COMPILATION_STATUS.md](ANDROID_SDK_V3_MVP_COMPILATION_STATUS.md) - 编译状态详情
 - [ANDROID_SDK_V3_DEPENDENCY_UPDATE.md](ANDROID_SDK_V3_DEPENDENCY_UPDATE.md) - 依赖更新记录
 - [ANDROID_SDK_V3_UPGRADE_GUIDE.md](ANDROID_SDK_V3_UPGRADE_GUIDE.md) - 升级指南
+- [ANDROID_SDK_V3_RUNTIME_FIX.md](ANDROID_SDK_V3_RUNTIME_FIX.md) - 运行时修复
 
 ## 总结
 

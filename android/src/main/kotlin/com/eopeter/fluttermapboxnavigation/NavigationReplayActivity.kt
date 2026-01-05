@@ -109,7 +109,8 @@ class NavigationReplayActivity : AppCompatActivity() {
     private var endPointCoord: Point? = null
 
     private val locationObserver = object : LocationObserver {
-        override fun onNewRawLocation(rawLocation: android.location.Location) {
+        override fun onNewRawLocation(rawLocation: com.mapbox.common.location.Location) {
+            // Required by SDK v3 - receives raw location updates
             Log.d(TAG, "收到原始位置更新: lat=${rawLocation.latitude}, lng=${rawLocation.longitude}")
         }
 

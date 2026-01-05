@@ -22,4 +22,7 @@ plugins {
     id "org.jetbrains.kotlin.android" version "1.9.22" apply false
 }
 
+// 仓库配置已移至 example/android/build.gradle 的 allprojects 块
+// 这样可以与 Flutter 插件添加的仓库兼容
+
 include ":app"

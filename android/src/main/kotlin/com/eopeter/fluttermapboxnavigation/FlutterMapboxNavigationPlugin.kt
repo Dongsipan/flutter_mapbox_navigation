@@ -416,11 +416,73 @@ class FlutterMapboxNavigationPlugin : FlutterPlugin, MethodCallHandler,
     override fun onAttachedToActivity(binding: ActivityPluginBinding) {
         currentActivity = binding.activity
         currentContext = binding.activity.applicationContext
+        
+        // 添加 Activity 结果监听器
+        binding.addActivityResultListener { requestCode, resultCode, data ->
+            if (requestCode == STYLE_PICKER_REQUEST_CODE) {
+                handleStylePickerResult(resultCode, data)
+                return@addActivityResultListener true
+            }
+            false
+        }
+        
         if (platformViewRegistry != null && binaryMessenger != null && currentActivity != null) {
             platformViewRegistry?.registerViewFactory(
                 viewId,
                 EmbeddedNavigationViewFactory(binaryMessenger!!, currentActivity!!)
             )
+        }
+    }
+    
+    /**
+     * 处理样式选择器 Activity 的返回结果
+     */
+    private fun handleStylePickerResult(resultCode: Int, data: android.content.Intent?) {
+        val result = stylePickerResult ?: return
+        stylePickerResult = null
+        
+        if (resultCode == Activity.RESULT_OK && data != null) {
+            val mapStyle = data.getStringExtra(com.eopeter.fluttermapboxnavigation.activity.StylePickerActivity.RESULT_STYLE)
+            val lightPreset = data.getStringExtra(com.eopeter.fluttermapboxnavigation.activity.StylePickerActivity.RESULT_LIGHT_PRESET)
+            val lightPresetMode = data.getStringExtra(com.eopeter.fluttermapboxnavigation.activity.StylePickerActivity.RESULT_LIGHT_PRESET_MODE)
+            
+            // 保存到 SharedPreferences
+            val activity = currentActivity
+            if (activity != null && mapStyle != null) {
+                val prefs = activity.getSharedPreferences("mapbox_style_settings", Context.MODE_PRIVATE)
+                prefs.edit().apply {
+                    putString("map_style", mapStyle)
+                    putString("light_preset", lightPreset ?: "day")
+                    putString("light_preset_mode", lightPresetMode ?: "manual")
+                    apply()
+                }
+                
+                // 更新全局样式设置
+                mapStyleUrlDay = getStyleUrl(mapStyle)
+                mapStyleUrlNight = mapStyleUrlDay
+                
+                result.success(true)
+            } else {
+                result.success(false)
+            }
+        } else {
+            result.success(false)
+        }
+    }
+    
+    /**
+     * 根据样式名称获取样式 URL
+     */
+    private fun getStyleUrl(styleName: String): String {
+        return when (styleName) {
+            "standard" -> Style.MAPBOX_STREETS
+            "standardSatellite" -> Style.SATELLITE_STREETS
+            "faded" -> "mapbox://styles/mapbox/light-v11"
+            "monochrome" -> "mapbox://styles/mapbox/dark-v11"
+            "light" -> Style.LIGHT
+            "dark" -> Style.DARK
+            "outdoors" -> Style.OUTDOORS
+            else -> Style.MAPBOX_STREETS
         }
     }
 
@@ -463,24 +525,87 @@ class FlutterMapboxNavigationPlugin : FlutterPlugin, MethodCallHandler,
     private fun handleStylePickerMethod(call: MethodCall, result: Result) {
         when (call.method) {
             "showStylePicker" -> {
-                result.success(false)
+                showStylePicker(result)
             }
             "getStoredStyle" -> {
-                val styleSettings = mapOf(
-                    "mapStyle" to (mapStyleUrlDay ?: Style.MAPBOX_STREETS),
-                    "lightPreset" to "day",
-                    "lightPresetMode" to "manual"
-                )
-                result.success(styleSettings)
+                getStoredStyle(result)
             }
             "clearStoredStyle" -> {
-                mapStyleUrlDay = null
-                mapStyleUrlNight = null
-                result.success(true)
+                clearStoredStyle(result)
             }
             else -> result.notImplemented()
         }
     }
+    
+    /**
+     * 显示样式选择器
+     */
+    private fun showStylePicker(result: Result) {
+        val activity = currentActivity
+        if (activity == null) {
+            result.error("NO_ACTIVITY", "Activity is null", null)
+            return
+        }
+        
+        // 从 SharedPreferences 读取当前设置
+        val prefs = activity.getSharedPreferences("mapbox_style_settings", Context.MODE_PRIVATE)
+        val currentStyle = prefs.getString("map_style", "standard") ?: "standard"
+        val currentLightPreset = prefs.getString("light_preset", "day") ?: "day"
+        val lightPresetMode = prefs.getString("light_preset_mode", "manual") ?: "manual"
+        
+        // 启动样式选择器 Activity
+        val intent = android.content.Intent(activity, com.eopeter.fluttermapboxnavigation.activity.StylePickerActivity::class.java)
+        intent.putExtra(com.eopeter.fluttermapboxnavigation.activity.StylePickerActivity.EXTRA_CURRENT_STYLE, currentStyle)
+        intent.putExtra(com.eopeter.fluttermapboxnavigation.activity.StylePickerActivity.EXTRA_CURRENT_LIGHT_PRESET, currentLightPreset)
+        intent.putExtra(com.eopeter.fluttermapboxnavigation.activity.StylePickerActivity.EXTRA_LIGHT_PRESET_MODE, lightPresetMode)
+        
+        // 保存 result 以便在 Activity 返回时使用
+        stylePickerResult = result
+        activity.startActivityForResult(intent, STYLE_PICKER_REQUEST_CODE)
+    }
+    
+    /**
+     * 获取存储的样式设置
+     */
+    private fun getStoredStyle(result: Result) {
+        val activity = currentActivity
+        if (activity == null) {
+            result.error("NO_ACTIVITY", "Activity is null", null)
+            return
+        }
+        
+        val prefs = activity.getSharedPreferences("mapbox_style_settings", Context.MODE_PRIVATE)
+        val styleSettings = mapOf(
+            "mapStyle" to (prefs.getString("map_style", "standard") ?: "standard"),
+            "lightPreset" to (prefs.getString("light_preset", "day") ?: "day"),
+            "lightPresetMode" to (prefs.getString("light_preset_mode", "manual") ?: "manual")
+        )
+        result.success(styleSettings)
+    }
+    
+    /**
+     * 清除存储的样式设置
+     */
+    private fun clearStoredStyle(result: Result) {
+        val activity = currentActivity
+        if (activity == null) {
+            result.error("NO_ACTIVITY", "Activity is null", null)
+            return
+        }
+        
+        val prefs = activity.getSharedPreferences("mapbox_style_settings", Context.MODE_PRIVATE)
+        prefs.edit().clear().apply()
+        
+        // 重置为默认值
+        mapStyleUrlDay = null
+        mapStyleUrlNight = null
+        
+        result.success(true)
+    }
+    
+    // 样式选择器请求码
+    private val STYLE_PICKER_REQUEST_CODE = 9001
+    private var stylePickerResult: Result? = null
 }
 
 private const val MAPBOX_ACCESS_TOKEN_PLACEHOLDER = "YOUR_MAPBOX_ACCESS_TOKEN_GOES_HERE"

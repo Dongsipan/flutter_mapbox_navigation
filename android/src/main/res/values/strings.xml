@@ -5,4 +5,23 @@
     <string name="back_button">Back</string>
     <string name="navigation_replay_title">Navigation Replay</string>
     <string name="route_overview">Route Overview</string>
+    
+    <!-- Map Styles -->
+    <string-array name="map_styles">
+        <item>Standard（标准）</item>
+        <item>Standard Satellite（卫星）</item>
+        <item>Faded（褪色）</item>
+        <item>Monochrome（单色）</item>
+        <item>Light（浅色）</item>
+        <item>Dark（深色）</item>
+        <item>Outdoors（户外）</item>
+    </string-array>
+    
+    <!-- Light Presets -->
+    <string-array name="light_presets">
+        <item>🌅 Dawn（黎明）</item>
+        <item>☀️ Day（白天）</item>
+        <item>🌇 Dusk（黄昏）</item>
+        <item>🌙 Night（夜晚）</item>
+    </string-array>
 </resources>

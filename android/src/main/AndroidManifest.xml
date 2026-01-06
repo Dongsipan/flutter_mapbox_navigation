@@ -7,6 +7,9 @@
 
     <application>
         <activity android:name="com.eopeter.fluttermapboxnavigation.activity.NavigationActivity" />
+        <activity 
+            android:name="com.eopeter.fluttermapboxnavigation.activity.StylePickerActivity"
+            android:theme="@style/Theme.AppCompat.Light" />
     </application>
 
 </manifest>

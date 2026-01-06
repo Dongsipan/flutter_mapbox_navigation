@@ -26,6 +26,8 @@
     </string-array>
     
     <!-- Search Activity -->
+    <string name="simple_ui_toolbar_title">搜索地点</string>
+    <string name="query_hint">搜索地点</string>
     <string name="search_hint">搜索地点</string>
     <string name="go_to_place">🧭 前往此处</string>
     <string name="current_location">当前位置</string>

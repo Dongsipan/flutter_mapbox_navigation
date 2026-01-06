@@ -1,84 +1,52 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.coordinatorlayout.widget.CoordinatorLayout
+<FrameLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    tools:context=".activity.SearchActivity">
 
     <!-- 地图视图 -->
     <com.mapbox.maps.MapView
         android:id="@+id/mapView"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:contentDescription="@string/map_view_description" />
+        android:layout_height="match_parent" />
 
-    <!-- 顶部搜索栏容器 -->
-    <LinearLayout
-        android:id="@+id/searchBarContainer"
+    <!-- Toolbar -->
+    <androidx.appcompat.widget.Toolbar
+        android:id="@+id/toolbar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:padding="16dp"
-        android:background="@android:color/white"
+        android:background="?attr/colorPrimary"
         android:elevation="4dp"
-        android:gravity="center_vertical">
+        app:popupTheme="@style/ThemeOverlay.AppCompat.Light" />
 
-        <!-- 取消按钮 -->
-        <ImageButton
-            android:id="@+id/cancelButton"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:src="@drawable/ic_arrow_back"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="@string/cancel"
-            android:tint="#424242" />
-
-        <!-- 搜索输入框 -->
-        <EditText
-            android:id="@+id/searchEditText"
-            android:layout_width="0dp"
-            android:layout_height="48dp"
-            android:layout_weight="1"
-            android:layout_marginStart="8dp"
-            android:layout_marginEnd="8dp"
-            android:hint="@string/search_hint"
-            android:imeOptions="actionSearch"
-            android:inputType="text"
-            android:paddingStart="16dp"
-            android:paddingEnd="16dp"
-            android:background="@android:drawable/edit_text"
-            android:textSize="16sp"
-            android:maxLines="1"
-            android:singleLine="true" />
-
-        <!-- 定位按钮 -->
-        <ImageButton
-            android:id="@+id/locationButton"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:src="@drawable/ic_my_location"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="@string/my_location"
-            android:tint="#1976D2" />
-    </LinearLayout>
-
-    <!-- 搜索结果列表 (官方UI组件) -->
+    <!-- 搜索结果列表 -->
     <com.mapbox.search.ui.view.SearchResultsView
-        android:id="@+id/searchResultsView"
+        android:id="@+id/search_results_view"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="80dp"
-        android:background="@android:color/white"
-        android:elevation="4dp"
-        android:visibility="gone" />
+        android:layout_height="match_parent"
+        android:layout_marginTop="?actionBarSize"
+        android:clipToPadding="false"
+        android:paddingTop="22dp"
+        android:paddingBottom="22dp" />
 
-    <!-- 底部抽屉 (官方UI组件) -->
-    <com.mapbox.search.ui.view.SearchPlaceBottomSheetView
-        android:id="@+id/searchPlaceBottomSheetView"
+    <!-- CoordinatorLayout 包裹 SearchPlaceBottomSheetView -->
+    <androidx.coordinatorlayout.widget.CoordinatorLayout
+        android:id="@+id/search_container_view"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        app:layout_behavior="com.google.android.material.bottomsheet.BottomSheetBehavior"
-        app:behavior_peekHeight="0dp"
-        app:behavior_hideable="true" />
+        android:layout_height="match_parent"
+        android:layout_marginTop="?actionBarSize">
 
-</androidx.coordinatorlayout.widget.CoordinatorLayout>
+        <!-- 底部抽屉 - 显式添加 BottomSheetBehavior -->
+        <com.mapbox.search.ui.view.place.SearchPlaceBottomSheetView
+            android:id="@+id/search_place_view"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:elevation="8dp"/>
+
+    </androidx.coordinatorlayout.widget.CoordinatorLayout>
+
+</FrameLayout>

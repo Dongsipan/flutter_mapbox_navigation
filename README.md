@@ -4,6 +4,13 @@
 
 A comprehensive Flutter plugin for Mapbox Navigation SDK that brings professional-grade navigation capabilities to your Flutter applications. Build immersive navigation experiences with advanced features including turn-by-turn guidance, route selection, integrated search, navigation history recording and replay, automatic route cover generation with speed gradients, and real-time traffic updates.
 
+## 📚 Documentation
+
+- **[API Documentation](./API_DOCUMENTATION.md)** - Complete API reference and usage examples
+- **[Development Guide](./DEVELOPMENT_GUIDE.md)** - Setup and development instructions
+- **[Changelog](./CHANGELOG.md)** - Version history and updates
+- **[Technical Documentation](./docs/README.md)** - Detailed implementation docs and guides
+
 ## Features
 
 ### Core Navigation

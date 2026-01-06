@@ -20,6 +20,7 @@ import com.eopeter.fluttermapboxnavigation.utilities.MapStyleManager
 import com.google.gson.Gson
 import com.mapbox.api.directions.v5.models.RouteOptions
 import com.mapbox.geojson.Point
+import com.mapbox.bindgen.Expected
 import com.mapbox.maps.CameraOptions
 import com.mapbox.maps.EdgeInsets
 import com.mapbox.maps.Style
@@ -28,6 +29,10 @@ import com.mapbox.maps.plugin.gestures.OnMapClickListener
 import com.mapbox.maps.plugin.gestures.OnMapLongClickListener
 import com.mapbox.maps.plugin.gestures.gestures
 import com.mapbox.maps.plugin.locationcomponent.location
+import com.mapbox.maps.plugin.LocationPuck2D
+import com.mapbox.maps.ImageHolder
+import com.mapbox.navigation.ui.maps.location.NavigationLocationProvider
+import com.mapbox.navigation.voice.model.SpeechVolume
 import com.mapbox.navigation.base.extensions.applyDefaultNavigationOptions
 import com.mapbox.navigation.base.extensions.applyLanguageAndVoiceUnitOptions
 import com.mapbox.navigation.base.options.NavigationOptions
@@ -57,31 +62,52 @@ import com.mapbox.navigation.ui.maps.camera.NavigationCamera
 import com.mapbox.navigation.ui.maps.camera.data.MapboxNavigationViewportDataSource
 import com.mapbox.navigation.ui.maps.camera.lifecycle.NavigationBasicGesturesHandler
 import com.mapbox.navigation.ui.maps.camera.state.NavigationCameraState
-import com.mapbox.navigation.ui.voice.api.MapboxSpeechApi
-import com.mapbox.navigation.ui.voice.api.MapboxVoiceInstructionsPlayer
-import com.mapbox.navigation.ui.voice.api.VoiceInstructionsPlayerCallback
-import com.mapbox.navigation.ui.voice.model.SpeechAnnouncement
-import com.mapbox.navigation.ui.voice.model.SpeechError
+import com.mapbox.navigation.voice.api.MapboxSpeechApi
+import com.mapbox.navigation.voice.api.MapboxVoiceInstructionsPlayer
+import com.mapbox.navigation.voice.model.SpeechAnnouncement
+import com.mapbox.navigation.voice.model.SpeechError
+import com.mapbox.navigation.voice.model.SpeechValue
 import com.mapbox.navigation.ui.maps.route.arrow.api.MapboxRouteArrowApi
 import com.mapbox.navigation.ui.maps.route.arrow.api.MapboxRouteArrowView
 import com.mapbox.navigation.ui.maps.route.arrow.model.RouteArrowOptions
-import com.mapbox.navigation.ui.maneuver.api.MapboxManeuverApi
-import com.mapbox.navigation.ui.maneuver.model.MapboxManeuverOptions
-import com.mapbox.navigation.ui.tripprogress.api.MapboxTripProgressApi
-import com.mapbox.navigation.ui.tripprogress.model.TripProgressUpdateFormatter
+import com.mapbox.navigation.tripdata.maneuver.api.MapboxManeuverApi
+import com.mapbox.navigation.tripdata.progress.api.MapboxTripProgressApi
+import com.mapbox.navigation.tripdata.progress.model.DistanceRemainingFormatter
+import com.mapbox.navigation.tripdata.progress.model.EstimatedTimeToArrivalFormatter
+import com.mapbox.navigation.tripdata.progress.model.PercentDistanceTraveledFormatter
+import com.mapbox.navigation.tripdata.progress.model.TimeRemainingFormatter
+import com.mapbox.navigation.tripdata.progress.model.TripProgressUpdateFormatter
+import com.mapbox.navigation.base.formatter.DistanceFormatterOptions
+import com.mapbox.navigation.core.formatter.MapboxDistanceFormatter
+import com.mapbox.navigation.base.TimeFormat
+import com.mapbox.navigation.ui.base.util.MapboxNavigationConsumer
+import com.mapbox.navigation.ui.components.maneuver.view.MapboxManeuverView
+import com.mapbox.navigation.ui.components.tripprogress.view.MapboxTripProgressView
 import org.json.JSONObject
 import java.text.DecimalFormat
 
 /**
- * NavigationActivity - MVP 版本
- * 使用 Mapbox Navigation SDK v3 核心 API
+ * NavigationActivity - Mapbox Navigation SDK v3 Implementation
  * 
- * 功能：
- * - 基础地图显示
- * - 路线规划和显示
- * - 导航启动/停止
- * - 位置跟踪
- * - 进度事件
+ * This implementation follows the official Mapbox Navigation SDK v3 patterns and best practices.
+ * Reference: https://github.com/mapbox/mapbox-navigation-android-examples
+ * 
+ * Key Features:
+ * - Uses MapboxNavigationApp lifecycle management (SDK v3 official pattern)
+ * - Implements NavigationCamera for automatic camera transitions
+ * - Uses MapboxRouteLineApi/View for route rendering with vanishing route line
+ * - Integrates MapboxSpeechApi and MapboxVoiceInstructionsPlayer for voice guidance
+ * - Supports MapboxManeuverApi and MapboxTripProgressApi for UI updates
+ * - Implements route selection with alternative routes
+ * - Includes history recording capabilities
+ * - Supports both real and simulated navigation
+ * 
+ * SDK v3 Changes from v2:
+ * - Voice/Maneuver/TripProgress APIs moved to tripdata package
+ * - UI components available in ui-components package
+ * - MapboxNavigationApp replaces direct MapboxNavigation instantiation
+ * - NavigationCamera replaces manual camera management
+ * - Expected<Error, Value> pattern for async operations
  */
 class NavigationActivity : AppCompatActivity() {
     
@@ -111,14 +137,14 @@ class NavigationActivity : AppCompatActivity() {
     private lateinit var routeLineView: MapboxRouteLineView
     
     // Route Arrow API for showing turn arrows
-    private lateinit var routeArrowApi: com.mapbox.navigation.ui.maps.route.arrow.api.MapboxRouteArrowApi
-    private lateinit var routeArrowView: com.mapbox.navigation.ui.maps.route.arrow.api.MapboxRouteArrowView
+    private lateinit var routeArrowApi: MapboxRouteArrowApi
+    private lateinit var routeArrowView: MapboxRouteArrowView
     
-    // Maneuver API for turn instructions
-    private lateinit var maneuverApi: com.mapbox.navigation.ui.maneuver.api.MapboxManeuverApi
+    // Maneuver API for turn instructions (from tripdata package in SDK v3)
+    private lateinit var maneuverApi: MapboxManeuverApi
     
-    // Trip Progress API for progress information
-    private lateinit var tripProgressApi: com.mapbox.navigation.ui.tripprogress.api.MapboxTripProgressApi
+    // Trip Progress API for progress information (from tripdata package in SDK v3)
+    private lateinit var tripProgressApi: MapboxTripProgressApi
     
     // History Recording
     private var isRecordingHistory = false
@@ -136,9 +162,25 @@ class NavigationActivity : AppCompatActivity() {
     private val replayRouteMapper = com.mapbox.navigation.core.replay.route.ReplayRouteMapper()
     
     // Voice Instructions components
-    private lateinit var speechApi: com.mapbox.navigation.ui.voice.api.MapboxSpeechApi
-    private lateinit var voiceInstructionsPlayer: com.mapbox.navigation.ui.voice.api.MapboxVoiceInstructionsPlayer
+    private lateinit var speechApi: com.mapbox.navigation.voice.api.MapboxSpeechApi
+    private lateinit var voiceInstructionsPlayer: com.mapbox.navigation.voice.api.MapboxVoiceInstructionsPlayer
     private val voiceInstructionsObserverImpl = VoiceInstructionsObserverImpl()
+    
+    // NavigationLocationProvider for location puck (官方示例模式)
+    private val navigationLocationProvider = NavigationLocationProvider()
+    
+    // Voice instructions mute state (官方示例模式)
+    private var isVoiceInstructionsMuted = false
+        set(value) {
+            field = value
+            if (value) {
+                binding.soundButton?.muteAndExtend(1500L)
+                voiceInstructionsPlayer.volume(SpeechVolume(0f))
+            } else {
+                binding.soundButton?.unmuteAndExtend(1500L)
+                voiceInstructionsPlayer.volume(SpeechVolume(1f))
+            }
+        }
     
     // MapboxNavigation observer for lifecycle management
     private val mapboxNavigationObserver = object : MapboxNavigationObserver {
@@ -201,10 +243,10 @@ class NavigationActivity : AppCompatActivity() {
         // Initialize Voice Instructions
         initializeVoiceInstructions()
         
-        // Initialize Maneuver API
+        // Initialize Maneuver API (SDK v3 style)
         initializeManeuverApi()
         
-        // Initialize Trip Progress API
+        // Initialize Trip Progress API (SDK v3 style)
         initializeTripProgressApi()
         
         // Initialize Route Line API
@@ -244,6 +286,22 @@ class NavigationActivity : AppCompatActivity() {
             // Register navigation observer
             MapboxNavigationApp.registerObserver(mapboxNavigationObserver)
             
+            // Initialize location puck (官方示例模式 - 在 initNavigation 中初始化)
+            // 设置 puck 在最上层，使用 topImage 确保可见性
+            binding.mapView.location.apply {
+                setLocationProvider(navigationLocationProvider)
+                this.locationPuck = LocationPuck2D(
+                    topImage = ImageHolder.from(
+                        com.mapbox.navigation.ui.maps.R.drawable.mapbox_navigation_puck_icon
+                    ),
+                    bearingImage = ImageHolder.from(
+                        com.mapbox.navigation.ui.maps.R.drawable.mapbox_navigation_puck_icon
+                    )
+                )
+                puckBearingEnabled = true
+                enabled = true
+            }
+            
             android.util.Log.d(TAG, "Navigation initialized successfully")
         } catch (e: Exception) {
             android.util.Log.e(TAG, "Failed to initialize navigation: ${e.message}", e)
@@ -266,11 +324,16 @@ class NavigationActivity : AppCompatActivity() {
             // Load map style
             val styleUrl = FlutterMapboxNavigationPlugin.mapStyleUrlDay ?: Style.MAPBOX_STREETS
             
-            binding.mapView.mapboxMap.loadStyle(styleUrl) {
-                // Enable location component
-                binding.mapView.location.updateSettings {
+            binding.mapView.mapboxMap.loadStyle(styleUrl) { style ->
+                // 初始化路线层级 (官方示例模式)
+                // 先初始化路线层，这样它们会在 location puck 下方
+                routeLineView.initializeLayers(style)
+                
+                // 确保 location puck 在最上层
+                // 通过重新设置 location provider 来刷新 puck 层级
+                binding.mapView.location.apply {
+                    enabled = false
                     enabled = true
-                    pulsingEnabled = true
                 }
                 
                 // Register position changed listener for vanishing route line
@@ -340,7 +403,7 @@ class NavigationActivity : AppCompatActivity() {
                 NavigationBasicGesturesHandler(navigationCamera)
             )
             
-            // Register camera state change observer
+            // Register camera state change observer (官方示例模式)
             navigationCamera.registerNavigationCameraStateChangeObserver { navigationCameraState ->
                 android.util.Log.d(TAG, "📷 Camera state changed: $navigationCameraState")
                 
@@ -352,15 +415,13 @@ class NavigationActivity : AppCompatActivity() {
                     else -> isCameraFollowing
                 }
                 
-                // Show/hide recenter button based on camera state
-                runOnUiThread {
-                    if (isCameraFollowing) {
-                        binding.recenterButton.visibility = View.GONE
-                        userHasMovedMap = false
-                    } else if (isNavigationInProgress) {
-                        binding.recenterButton.visibility = View.VISIBLE
-                        userHasMovedMap = true
-                    }
+                // 根据相机状态显示/隐藏 recenter 按钮 (官方示例模式)
+                when (navigationCameraState) {
+                    NavigationCameraState.TRANSITION_TO_FOLLOWING,
+                    NavigationCameraState.FOLLOWING -> binding.recenter?.visibility = View.INVISIBLE
+                    NavigationCameraState.TRANSITION_TO_OVERVIEW,
+                    NavigationCameraState.OVERVIEW,
+                    NavigationCameraState.IDLE -> binding.recenter?.visibility = View.VISIBLE
                 }
             }
             
@@ -372,15 +433,14 @@ class NavigationActivity : AppCompatActivity() {
     
     private fun initializeVoiceInstructions() {
         try {
-            // Initialize Speech API for voice instructions
-            speechApi = com.mapbox.navigation.ui.voice.api.MapboxSpeechApi(
+            // Initialize Speech API for voice instructions (SDK v3 style)
+            speechApi = MapboxSpeechApi(
                 this,
-                accessToken ?: "",
                 FlutterMapboxNavigationPlugin.navigationLanguage
             )
             
             // Initialize Voice Instructions Player
-            voiceInstructionsPlayer = com.mapbox.navigation.ui.voice.api.MapboxVoiceInstructionsPlayer(
+            voiceInstructionsPlayer = MapboxVoiceInstructionsPlayer(
                 this,
                 FlutterMapboxNavigationPlugin.navigationLanguage
             )
@@ -393,9 +453,10 @@ class NavigationActivity : AppCompatActivity() {
     
     private fun initializeManeuverApi() {
         try {
-            // Initialize Maneuver API for turn instructions
-            maneuverApi = com.mapbox.navigation.ui.maneuver.api.MapboxManeuverApi(
-                com.mapbox.navigation.ui.maneuver.model.MapboxManeuverOptions.Builder().build()
+            // Initialize Maneuver API following official example
+            val distanceFormatterOptions = DistanceFormatterOptions.Builder(this).build()
+            maneuverApi = MapboxManeuverApi(
+                MapboxDistanceFormatter(distanceFormatterOptions)
             )
             
             android.util.Log.d(TAG, "Maneuver API initialized successfully")
@@ -406,9 +467,15 @@ class NavigationActivity : AppCompatActivity() {
     
     private fun initializeTripProgressApi() {
         try {
-            // Initialize Trip Progress API for progress information
-            tripProgressApi = com.mapbox.navigation.ui.tripprogress.api.MapboxTripProgressApi(
-                com.mapbox.navigation.ui.tripprogress.model.TripProgressUpdateFormatter.Builder(this)
+            // Initialize Trip Progress API following official example
+            val distanceFormatterOptions = DistanceFormatterOptions.Builder(this).build()
+            
+            tripProgressApi = MapboxTripProgressApi(
+                TripProgressUpdateFormatter.Builder(this)
+                    .distanceRemainingFormatter(DistanceRemainingFormatter(distanceFormatterOptions))
+                    .timeRemainingFormatter(TimeRemainingFormatter(this))
+                    .percentRouteTraveledFormatter(PercentDistanceTraveledFormatter())
+                    .estimatedTimeToArrivalFormatter(EstimatedTimeToArrivalFormatter(this, TimeFormat.NONE_SPECIFIED))
                     .build()
             )
             
@@ -419,47 +486,72 @@ class NavigationActivity : AppCompatActivity() {
     }
     
     private fun initializeRouteLine() {
-        // Configure vanishing route line with transparent traveled route (official style)
+        // Configure vanishing route line (SDK v3 official feature)
+        // This makes the traveled portion of the route transparent as you progress
         val customColorResources = com.mapbox.navigation.ui.maps.route.line.model.RouteLineColorResources.Builder()
-            .routeLineTraveledColor(android.graphics.Color.TRANSPARENT) // 走过的路线变透明（官方规范）
-            .routeLineTraveledCasingColor(android.graphics.Color.TRANSPARENT) // 走过路线的边框也透明
+            .routeLineTraveledColor(android.graphics.Color.TRANSPARENT) // Traveled route becomes transparent
+            .routeLineTraveledCasingColor(android.graphics.Color.TRANSPARENT) // Traveled route casing also transparent
             .build()
         
         val apiOptions = MapboxRouteLineApiOptions.Builder()
-            .vanishingRouteLineEnabled(true) // 启用消失路线功能
-            .styleInactiveRouteLegsIndependently(true) // 独立样式化非活动路段
+            .vanishingRouteLineEnabled(true) // Enable vanishing route line feature
+            .styleInactiveRouteLegsIndependently(true) // Style inactive route legs independently
             .build()
         
+        // 设置路线层级，确保路线在 location puck 下方
+        // 不指定 routeLineBelowLayerId，让路线层自动放置在合适的位置
+        // location puck 会自动显示在最上层
         val viewOptions = MapboxRouteLineViewOptions.Builder(this)
-            .routeLineColorResources(customColorResources) // 应用自定义颜色
+            .routeLineColorResources(customColorResources) // Apply custom colors
             .build()
         
         routeLineApi = MapboxRouteLineApi(apiOptions)
         routeLineView = MapboxRouteLineView(viewOptions)
         
-        // Initialize Route Arrow API for turn arrows
-        routeArrowApi = com.mapbox.navigation.ui.maps.route.arrow.api.MapboxRouteArrowApi()
-        routeArrowView = com.mapbox.navigation.ui.maps.route.arrow.api.MapboxRouteArrowView(
-            com.mapbox.navigation.ui.maps.route.arrow.model.RouteArrowOptions.Builder(this).build()
+        // Initialize Route Arrow API for turn arrows (SDK v3 official pattern)
+        routeArrowApi = MapboxRouteArrowApi()
+        routeArrowView = MapboxRouteArrowView(
+            RouteArrowOptions.Builder(this).build()
         )
         
-        android.util.Log.d(TAG, "Route line and arrow initialized with vanishing route line enabled (transparent style)")
+        android.util.Log.d(TAG, "Route line and arrow initialized with vanishing route line enabled")
     }
     
     private fun setupUI() {
-        // End Navigation Button
-        binding.endNavigationButton.setOnClickListener {
+        // Stop/End Navigation Button (官方组件)
+        binding.stop?.setOnClickListener {
             stopNavigation()
         }
         
-        // Recenter Button
-        binding.recenterButton.setOnClickListener {
-            recenterCamera()
+        // Recenter Button (官方组件)
+        binding.recenter?.setOnClickListener {
+            navigationCamera.requestNavigationCameraToFollowing()
+            binding.routeOverview?.showTextAndExtend(1500L)
         }
         
-        // Initially hide control panel and recenter button
-        binding.navigationControlPanel.visibility = View.GONE
-        binding.recenterButton.visibility = View.GONE
+        // Route Overview Button (官方组件)
+        binding.routeOverview?.setOnClickListener {
+            navigationCamera.requestNavigationCameraToOverview()
+            binding.recenter?.showTextAndExtend(1500L)
+        }
+        
+        // Sound Button (官方组件) - 静音/取消静音语音指令
+        binding.soundButton?.setOnClickListener {
+            isVoiceInstructionsMuted = !isVoiceInstructionsMuted
+        }
+        
+        // 设置初始声音按钮状态
+        binding.soundButton?.unmute()
+        
+        // 初始隐藏官方 UI 组件
+        binding.tripProgressCard?.visibility = View.INVISIBLE
+        binding.maneuverView?.visibility = View.INVISIBLE
+        binding.soundButton?.visibility = View.INVISIBLE
+        binding.routeOverview?.visibility = View.INVISIBLE
+        
+        // 自定义组件
+        binding.gpsWarningPanel?.visibility = View.GONE
+        binding.routeSelectionPanel?.visibility = View.GONE
     }
     
     private fun setupBroadcastReceivers() {
@@ -685,8 +777,11 @@ class NavigationActivity : AppCompatActivity() {
                 android.util.Log.d(TAG, "📷 Camera switched to following mode")
             }, 1500)
             
-            // Show control panel
-            binding.navigationControlPanel.visibility = View.VISIBLE
+            // 显示官方 UI 组件
+            binding.tripProgressCard?.visibility = View.VISIBLE
+            binding.maneuverView?.visibility = View.VISIBLE
+            binding.soundButton?.visibility = View.VISIBLE
+            binding.routeOverview?.visibility = View.VISIBLE
             
             // Start history recording if enabled
             if (FlutterMapboxNavigationPlugin.enableHistoryRecording) {
@@ -713,8 +808,7 @@ class NavigationActivity : AppCompatActivity() {
             // Request camera to follow mode with smooth animation
             navigationCamera.requestNavigationCameraToFollowing()
             
-            // Hide recenter button
-            binding.recenterButton.visibility = View.GONE
+            // 官方 MapboxRecenterButton 会自动处理
             userHasMovedMap = false
             isCameraFollowing = true
             
@@ -747,7 +841,12 @@ class NavigationActivity : AppCompatActivity() {
             
             // Show route selection UI
             binding.routeSelectionPanel.visibility = View.VISIBLE
-            binding.navigationControlPanel.visibility = View.GONE
+            
+            // 隐藏官方 UI 组件
+            binding.tripProgressCard?.visibility = View.GONE
+            binding.maneuverView?.visibility = View.GONE
+            binding.soundButton?.visibility = View.GONE
+            binding.routeOverview?.visibility = View.GONE
             
             // Display route information
             displayRouteInformation(routes)
@@ -897,12 +996,14 @@ class NavigationActivity : AppCompatActivity() {
     }
     
     /**
-     * Calculate distance from point to route (simplified)
+     * Calculate distance from point to route
+     * Note: This is a simplified placeholder implementation
+     * For production use, consider using Mapbox's geometry libraries or Turf.js equivalent
      */
     private fun calculateDistanceToRoute(point: Point, geometry: String): Double {
-        // Simplified distance calculation
-        // In production, use proper geometry libraries
-        return 0.0005 // Placeholder
+        // TODO: Implement proper distance calculation using geometry libraries
+        // For now, return a small threshold value for basic functionality
+        return 0.0005 // ~50m threshold
     }
     
     /**
@@ -999,8 +1100,11 @@ class NavigationActivity : AppCompatActivity() {
             
             isNavigationInProgress = false
             
-            // Hide control panel
-            binding.navigationControlPanel.visibility = View.GONE
+            // 隐藏官方 UI 组件
+            binding.tripProgressCard?.visibility = View.GONE
+            binding.maneuverView?.visibility = View.GONE
+            binding.soundButton?.visibility = View.GONE
+            binding.routeOverview?.visibility = View.GONE
             
             android.util.Log.d(TAG, "Navigation stopped successfully")
             sendEvent(MapBoxEvents.NAVIGATION_CANCELLED)
@@ -1031,6 +1135,8 @@ class NavigationActivity : AppCompatActivity() {
     private val GPS_SIGNAL_TIMEOUT_MS = 10000L // 10 seconds without update = weak signal
     
     private val locationObserver = object : LocationObserver {
+        var firstLocationUpdateReceived = false
+        
         override fun onNewRawLocation(rawLocation: com.mapbox.common.location.Location) {
             // Required by SDK v3 - receives raw location updates
             android.util.Log.d(TAG, "📍 Raw location: lat=${rawLocation.latitude}, lng=${rawLocation.longitude}")
@@ -1055,6 +1161,12 @@ class NavigationActivity : AppCompatActivity() {
             // Convert to android.location.Location for compatibility
             val enhancedLocation = locationMatcherResult.enhancedLocation
             android.util.Log.d(TAG, "📍 Location update: lat=${enhancedLocation.latitude}, lng=${enhancedLocation.longitude}, bearing=${enhancedLocation.bearing}, speed=${enhancedLocation.speed}, isNavigationInProgress=$isNavigationInProgress")
+            
+            // 更新位置 puck 的位置 (官方示例模式)
+            navigationLocationProvider.changePosition(
+                location = enhancedLocation,
+                keyPoints = locationMatcherResult.keyPoints,
+            )
             
             lastLocation = android.location.Location("").apply {
                 latitude = enhancedLocation.latitude
@@ -1085,13 +1197,39 @@ class NavigationActivity : AppCompatActivity() {
             viewportDataSource.onLocationChanged(enhancedLocation)
             viewportDataSource.evaluate()
             
+            // 如果是第一次收到位置更新，立即移动相机到当前位置
+            if (!firstLocationUpdateReceived) {
+                firstLocationUpdateReceived = true
+                navigationCamera.requestNavigationCameraToOverview(
+                    stateTransitionOptions = com.mapbox.navigation.ui.maps.camera.transition.NavigationCameraTransitionOptions.Builder()
+                        .maxDuration(0) // instant transition
+                        .build()
+                )
+            }
+            
             android.util.Log.d(TAG, "📷 ViewportDataSource updated with location")
         }
     }
     
     private val routeProgressObserver = RouteProgressObserver { routeProgress ->
-        // Update UI
-        updateNavigationUI(routeProgress)
+        // 更新官方 Trip Progress View (SDK v3 官方方式)
+        binding.tripProgressView?.render(
+            tripProgressApi.getTripProgress(routeProgress)
+        )
+        
+        // 更新官方 Maneuver View (SDK v3 官方方式)
+        val maneuvers = maneuverApi.getManeuvers(routeProgress)
+        maneuvers.fold(
+            { error ->
+                android.util.Log.e(TAG, "Maneuver error: ${error.errorMessage}")
+                Unit
+            },
+            {
+                binding.maneuverView?.visibility = View.VISIBLE
+                binding.maneuverView?.renderManeuvers(maneuvers)
+                Unit
+            }
+        )
         
         // Send progress event to Flutter
         val progressEvent = MapBoxRouteProgressEvent(routeProgress)
@@ -1099,18 +1237,20 @@ class NavigationActivity : AppCompatActivity() {
         FlutterMapboxNavigationPlugin.durationRemaining = routeProgress.durationRemaining
         sendEvent(progressEvent)
         
-        // Update viewport data source with route progress (official Turn-by-Turn pattern)
+        // Update viewport data source with route progress (SDK v3 official pattern)
+        // This ensures the camera follows the route progress automatically
         viewportDataSource.onRouteProgressChanged(routeProgress)
         viewportDataSource.evaluate()
         
-        // Update route line with progress
+        // Update route line with progress (vanishing route line feature)
+        // This makes the traveled portion of the route transparent
         routeLineApi.updateWithRouteProgress(routeProgress) { result ->
             binding.mapView.mapboxMap.style?.let { style ->
                 routeLineView.renderRouteLineUpdate(style, result)
             }
         }
         
-        // Update route arrow (show upcoming maneuver arrow)
+        // Update route arrow to show upcoming maneuver (SDK v3 official pattern)
         val arrowUpdate = routeArrowApi.addUpcomingManeuverArrow(routeProgress)
         binding.mapView.mapboxMap.style?.let { style ->
             routeArrowView.renderManeuverUpdate(style, arrowUpdate)
@@ -1145,6 +1285,26 @@ class NavigationActivity : AppCompatActivity() {
         override fun onFinalDestinationArrival(routeProgress: RouteProgress) {
             android.util.Log.d(TAG, "🏁 Final destination arrival")
             isNavigationInProgress = false
+            
+            // 显示到达 UI (官方示例模式)
+            runOnUiThread {
+                // 隐藏导航 UI
+                binding.maneuverView?.visibility = View.INVISIBLE
+                binding.tripProgressCard?.visibility = View.INVISIBLE
+                binding.soundButton?.visibility = View.INVISIBLE
+                binding.routeOverview?.visibility = View.INVISIBLE
+                
+                // 显示到达消息
+                android.widget.Toast.makeText(
+                    this@NavigationActivity,
+                    "🏁 You have arrived at your destination!",
+                    android.widget.Toast.LENGTH_LONG
+                ).show()
+                
+                // 切换相机到概览模式
+                navigationCamera.requestNavigationCameraToOverview()
+            }
+            
             sendEvent(MapBoxEvents.ON_ARRIVAL)
             
             // Send detailed arrival information
@@ -1155,10 +1315,25 @@ class NavigationActivity : AppCompatActivity() {
                 "durationRemaining" to routeProgress.durationRemaining
             )
             sendEvent(MapBoxEvents.ON_ARRIVAL, org.json.JSONObject(arrivalData).toString())
+            
+            // 延迟 3 秒后自动结束导航并关闭 Activity
+            binding.mapView.postDelayed({
+                android.util.Log.d(TAG, "🏁 Auto-finishing navigation after arrival")
+                stopNavigation()
+            }, 3000)
         }
 
         override fun onNextRouteLegStart(routeLegProgress: RouteLegProgress) {
             android.util.Log.d(TAG, "🚩 Next route leg started: leg ${routeLegProgress.legIndex}")
+            
+            // 显示下一段路程开始的消息
+            runOnUiThread {
+                android.widget.Toast.makeText(
+                    this@NavigationActivity,
+                    "🚩 Starting next leg of the route",
+                    android.widget.Toast.LENGTH_SHORT
+                ).show()
+            }
             
             // Send waypoint arrival event when moving to next leg
             val waypointData = mapOf(
@@ -1171,6 +1346,15 @@ class NavigationActivity : AppCompatActivity() {
 
         override fun onWaypointArrival(routeProgress: RouteProgress) {
             android.util.Log.d(TAG, "📍 Waypoint arrival: leg ${routeProgress.currentLegProgress?.legIndex}")
+            
+            // 显示途经点到达的消息
+            runOnUiThread {
+                android.widget.Toast.makeText(
+                    this@NavigationActivity,
+                    "📍 Waypoint reached!",
+                    android.widget.Toast.LENGTH_SHORT
+                ).show()
+            }
             
             // Send waypoint arrival event
             val waypointData = mapOf(
@@ -1194,70 +1378,63 @@ class NavigationActivity : AppCompatActivity() {
         val text = bannerInstructions.primary().text()
         sendEvent(MapBoxEvents.BANNER_INSTRUCTION, text)
         
-        // Update maneuver UI using ManeuverApi
-        if (FlutterMapboxNavigationPlugin.bannerInstructionsEnabled) {
-            updateManeuverUI(bannerInstructions)
-        }
+        // MapboxManeuverView 会自动更新，不需要手动调用 updateManeuverUI
+        // 官方组件通过 routeProgressObserver 中的 maneuverApi.getManeuvers() 自动更新
     }
     
+    /*
+    // 已废弃：使用官方 MapboxManeuverView 替代
+    // MapboxManeuverView 通过 maneuverApi.getManeuvers() 自动更新
     private fun updateManeuverUI(bannerInstructions: com.mapbox.api.directions.v5.models.BannerInstructions) {
         try {
-            // Get maneuver data from API
-            val maneuver = maneuverApi.getManeuver(bannerInstructions)
+            // Use ManeuverApi with ManeuverView (SDK v3 official way)
+            // If you have MapboxManeuverView in your layout, use:
+            // val maneuvers = maneuverApi.getManeuvers(routeProgress)
+            // maneuvers.fold(
+            //     { error -> Log.e(TAG, error.errorMessage) },
+            //     { binding.maneuverView?.renderManeuvers(maneuvers) }
+            // )
             
-            maneuver.fold(
-                { error ->
-                    android.util.Log.e(TAG, "Failed to get maneuver: ${error.errorMessage}")
-                },
-                { maneuverData ->
-                    // Update maneuver text
-                    binding.maneuverText.text = maneuverData.primary.text
-                    
-                    // Update maneuver distance
-                    val distance = bannerInstructions.distanceAlongGeometry()
-                    val distanceText = if (distance >= 1000) {
-                        "${java.text.DecimalFormat("#.#").format(distance / 1000)} km"
-                    } else {
-                        "${distance.toInt()} m"
-                    }
-                    binding.maneuverDistance.text = "In $distanceText"
-                    
-                    // Update maneuver icon
-                    maneuverData.primary.maneuverModifier?.let { modifier ->
-                        // Get turn icon based on maneuver type and modifier
-                        val iconResId = getManeuverIconResource(
-                            maneuverData.primary.type,
-                            modifier
-                        )
-                        if (iconResId != 0) {
-                            binding.maneuverIcon.setImageResource(iconResId)
-                            binding.maneuverIcon.visibility = View.VISIBLE
-                        }
-                    }
-                    
-                    // Update next maneuver if available
-                    maneuverData.secondary?.let { secondary ->
-                        binding.nextManeuverText.text = "Then ${secondary.text}"
-                        secondary.maneuverModifier?.let { modifier ->
-                            val iconResId = getManeuverIconResource(secondary.type, modifier)
-                            if (iconResId != 0) {
-                                binding.nextManeuverIcon.setImageResource(iconResId)
-                            }
-                        }
-                        binding.nextManeuverLayout.visibility = View.VISIBLE
-                    } ?: run {
-                        binding.nextManeuverLayout.visibility = View.GONE
-                    }
-                    
-                    // Show maneuver panel
-                    binding.maneuverPanel.visibility = View.VISIBLE
+            // For custom UI without MapboxManeuverView, extract data directly:
+            val primary = bannerInstructions.primary()
+            
+            binding.maneuverText?.text = primary.text()
+            
+            val distance = bannerInstructions.distanceAlongGeometry()
+            val distanceText = if (distance >= 1000) {
+                "${java.text.DecimalFormat("#.#").format(distance / 1000)} km"
+            } else {
+                "${distance.toInt()} m"
+            }
+            binding.maneuverDistance?.text = "In $distanceText"
+            
+            val iconResId = getManeuverIconResource(primary.type(), primary.modifier())
+            if (iconResId != 0) {
+                binding.maneuverIcon?.setImageResource(iconResId)
+                binding.maneuverIcon?.visibility = View.VISIBLE
+            }
+            
+            val secondary = bannerInstructions.secondary()
+            if (secondary != null) {
+                binding.nextManeuverText?.text = "Then ${secondary.text()}"
+                val nextIconResId = getManeuverIconResource(secondary.type(), secondary.modifier())
+                if (nextIconResId != 0) {
+                    binding.nextManeuverIcon?.setImageResource(nextIconResId)
                 }
-            )
+                binding.nextManeuverLayout?.visibility = View.VISIBLE
+            } else {
+                binding.nextManeuverLayout?.visibility = View.GONE
+            }
+            
+            binding.maneuverPanel?.visibility = View.VISIBLE
         } catch (e: Exception) {
             android.util.Log.e(TAG, "Failed to update maneuver UI: ${e.message}", e)
         }
     }
+    */
     
+    /*
+    // 已废弃：官方 MapboxManeuverView 自动处理图标
     private fun getManeuverIconResource(type: String?, modifier: String?): Int {
         // Map maneuver types and modifiers to Android drawable resources
         // Using system icons for now, can be replaced with custom icons
@@ -1281,6 +1458,7 @@ class NavigationActivity : AppCompatActivity() {
             else -> android.R.drawable.ic_menu_directions
         }
     }
+    */
     
     private val voiceInstructionObserver = VoiceInstructionsObserver { voiceInstructions ->
         // Send event to Flutter
@@ -1292,48 +1470,47 @@ class NavigationActivity : AppCompatActivity() {
         }
     }
     
-    // Voice Instructions Observer Implementation
+    // Voice Instructions Observer Implementation (following official example)
     private inner class VoiceInstructionsObserverImpl {
         fun onNewVoiceInstructions(voiceInstructions: com.mapbox.api.directions.v5.models.VoiceInstructions) {
             try {
-                // Generate speech announcement using Speech API
-                speechApi.generate(
-                    voiceInstructions,
-                    object : com.mapbox.navigation.ui.voice.api.MapboxSpeechApi.VoiceCallback {
-                        override fun onAvailable(announcement: com.mapbox.navigation.ui.voice.model.SpeechAnnouncement) {
-                            // Play the speech announcement
-                            voiceInstructionsPlayer.play(
-                                announcement,
-                                object : com.mapbox.navigation.ui.voice.api.VoiceInstructionsPlayerCallback {
-                                    override fun onDone(announcement: com.mapbox.navigation.ui.voice.model.SpeechAnnouncement) {
-                                        android.util.Log.d(TAG, "🔊 Voice instruction played successfully")
-                                    }
-                                }
-                            )
-                        }
-
-                        override fun onError(
-                            error: com.mapbox.navigation.ui.voice.model.SpeechError,
-                            fallback: com.mapbox.navigation.ui.voice.model.SpeechAnnouncement
-                        ) {
-                            android.util.Log.w(TAG, "⚠️ Speech API error: ${error.errorMessage}, using fallback")
-                            // Play fallback announcement (text-to-speech)
-                            voiceInstructionsPlayer.play(
-                                fallback,
-                                object : com.mapbox.navigation.ui.voice.api.VoiceInstructionsPlayerCallback {
-                                    override fun onDone(announcement: com.mapbox.navigation.ui.voice.model.SpeechAnnouncement) {
-                                        android.util.Log.d(TAG, "🔊 Fallback voice instruction played")
-                                    }
-                                }
-                            )
-                        }
-                    }
-                )
+                // Generate speech announcement using Speech API (SDK v3 official pattern)
+                speechApi.generate(voiceInstructions, speechCallback)
             } catch (e: Exception) {
                 android.util.Log.e(TAG, "Failed to play voice instruction: ${e.message}", e)
             }
         }
     }
+    
+    // Speech callback following official example
+    private val speechCallback =
+        MapboxNavigationConsumer<com.mapbox.bindgen.Expected<SpeechError, SpeechValue>> { expected ->
+            expected.fold(
+                { error ->
+                    // play the instruction via fallback text-to-speech engine
+                    voiceInstructionsPlayer.play(
+                        error.fallback,
+                        voiceInstructionsPlayerCallback
+                    )
+                    android.util.Log.w(TAG, "⚠️ Speech API error: ${error.errorMessage}, using fallback")
+                },
+                { value ->
+                    // play the sound file from the external generator
+                    voiceInstructionsPlayer.play(
+                        value.announcement,
+                        voiceInstructionsPlayerCallback
+                    )
+                    android.util.Log.d(TAG, "🔊 Voice instruction played successfully")
+                }
+            )
+        }
+    
+    // Voice instructions player callback following official example
+    private val voiceInstructionsPlayerCallback =
+        MapboxNavigationConsumer<SpeechAnnouncement> { value ->
+            // remove already consumed file to free-up space
+            speechApi.clean(value)
+        }
     
     // ==================== Map Gestures ====================
     
@@ -1357,57 +1534,47 @@ class NavigationActivity : AppCompatActivity() {
     }
     
     // ==================== UI Updates ====================
+    // 注意：使用官方 MapboxTripProgressView 和 MapboxManeuverView 后，
+    // 以下函数不再需要，已在 routeProgressObserver 中直接使用官方组件
     
+    /*
+    // 已废弃：使用官方 MapboxTripProgressView 替代
     private fun updateNavigationUI(routeProgress: RouteProgress) {
         try {
-            // Use TripProgressApi to get formatted progress data
-            val tripProgressUpdate = tripProgressApi.getTripProgress(routeProgress)
+            // Use TripProgressApi with TripProgressView (SDK v3 official way)
+            // If you have MapboxTripProgressView in your layout, use:
+            // binding.tripProgressView?.render(tripProgressApi.getTripProgress(routeProgress))
             
-            // Update distance remaining
-            val distanceRemaining = tripProgressUpdate.distanceRemaining
-            binding.distanceRemainingText.text = distanceRemaining
+            // For custom UI without MapboxTripProgressView, format manually:
+            val distanceRemaining = routeProgress.distanceRemaining
+            val distanceText = if (distanceRemaining >= 1000) {
+                "${DecimalFormat("#.#").format(distanceRemaining / 1000)} km"
+            } else {
+                "${distanceRemaining.toInt()} m"
+            }
+            binding.distanceRemainingText?.text = distanceText
             
-            // Update duration remaining
-            val timeRemaining = tripProgressUpdate.estimatedTimeToArrival
-            binding.durationRemainingText.text = timeRemaining
+            val durationRemaining = routeProgress.durationRemaining
+            val hours = (durationRemaining / 3600).toInt()
+            val minutes = ((durationRemaining % 3600) / 60).toInt()
+            val durationText = if (hours > 0) {
+                "${hours}h ${minutes}min"
+            } else {
+                "${minutes}min"
+            }
+            binding.durationRemainingText?.text = durationText
             
-            // Update ETA (Estimated Time of Arrival)
-            val eta = tripProgressUpdate.currentLegTimeRemaining
-            binding.etaText.text = formatETA(routeProgress.durationRemaining)
+            binding.etaText?.text = formatETA(durationRemaining)
             
-            android.util.Log.d(TAG, "📊 Progress updated: distance=$distanceRemaining, time=$timeRemaining")
+            android.util.Log.d(TAG, "📊 Progress updated: distance=$distanceText, time=$durationText")
         } catch (e: Exception) {
             android.util.Log.e(TAG, "Failed to update navigation UI: ${e.message}", e)
-            // Fallback to manual formatting
-            updateNavigationUIFallback(routeProgress)
         }
     }
+    */
     
-    private fun updateNavigationUIFallback(routeProgress: RouteProgress) {
-        // Fallback: Update distance
-        val distanceRemaining = routeProgress.distanceRemaining
-        val distanceText = if (distanceRemaining >= 1000) {
-            "${DecimalFormat("#.#").format(distanceRemaining / 1000)} km"
-        } else {
-            "${distanceRemaining.toInt()} m"
-        }
-        binding.distanceRemainingText.text = distanceText
-        
-        // Fallback: Update duration
-        val durationRemaining = routeProgress.durationRemaining
-        val hours = (durationRemaining / 3600).toInt()
-        val minutes = ((durationRemaining % 3600) / 60).toInt()
-        val durationText = if (hours > 0) {
-            "${hours}h ${minutes}min"
-        } else {
-            "${minutes}min"
-        }
-        binding.durationRemainingText.text = durationText
-        
-        // Fallback: Update ETA
-        binding.etaText.text = formatETA(durationRemaining)
-    }
-    
+    /*
+    // 已废弃：官方 MapboxTripProgressView 自动格式化 ETA
     private fun formatETA(durationRemaining: Double): String {
         // Calculate ETA based on current time + duration remaining
         val currentTime = System.currentTimeMillis()
@@ -1421,6 +1588,7 @@ class NavigationActivity : AppCompatActivity() {
         
         return String.format("%02d:%02d", hour, minute)
     }
+    */
     
     // ==================== GPS Signal Monitoring ====================
     

@@ -1,209 +1,97 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- 
+  Official Mapbox Navigation SDK v3 Layout
+  Based on: https://github.com/mapbox/mapbox-navigation-android-examples
+  Uses official Mapbox UI components for better integration and maintenance
+-->
 <androidx.constraintlayout.widget.ConstraintLayout 
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <!-- Mapbox MapView - 替代 NavigationView -->
+    <!-- Mapbox MapView -->
     <com.mapbox.maps.MapView
         android:id="@+id/mapView"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        app:layout_constraintTop_toTopOf="parent"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
         app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent" />
+        app:layout_constraintTop_toTopOf="parent" />
 
-    <!-- 导航控制面板 - 底部 -->
-    <LinearLayout
-        android:id="@+id/navigationControlPanel"
-        android:layout_width="match_parent"
+    <!-- Trip Progress Card (Bottom) - Official Mapbox Component -->
+    <androidx.cardview.widget.CardView
+        android:id="@+id/tripProgressCard"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="16dp"
-        android:background="@android:color/white"
-        android:elevation="8dp"
+        android:visibility="invisible"
+        app:cardElevation="8dp"
+        app:cardUseCompatPadding="false"
         app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent">
 
-        <!-- 距离和时间信息 -->
-        <LinearLayout
+        <com.mapbox.navigation.ui.components.tripprogress.view.MapboxTripProgressView
+            android:id="@+id/tripProgressView"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center">
+            android:layout_height="wrap_content" />
 
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:orientation="vertical"
-                android:gravity="center">
-
-                <TextView
-                    android:id="@+id/distanceRemainingLabel"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Distance"
-                    android:textSize="12sp"
-                    android:textColor="@android:color/darker_gray" />
-
-                <TextView
-                    android:id="@+id/distanceRemainingText"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="--"
-                    android:textSize="18sp"
-                    android:textStyle="bold"
-                    android:gravity="center" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:orientation="vertical"
-                android:gravity="center">
-
-                <TextView
-                    android:id="@+id/durationRemainingLabel"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Time"
-                    android:textSize="12sp"
-                    android:textColor="@android:color/darker_gray" />
-
-                <TextView
-                    android:id="@+id/durationRemainingText"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="--"
-                    android:textSize="18sp"
-                    android:textStyle="bold"
-                    android:gravity="center" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:orientation="vertical"
-                android:gravity="center">
-
-                <TextView
-                    android:id="@+id/etaLabel"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="ETA"
-                    android:textSize="12sp"
-                    android:textColor="@android:color/darker_gray" />
-
-                <TextView
-                    android:id="@+id/etaText"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="--"
-                    android:textSize="18sp"
-                    android:textStyle="bold"
-                    android:gravity="center" />
-            </LinearLayout>
-        </LinearLayout>
-
-        <!-- 结束导航按钮 -->
-        <Button
-            android:id="@+id/endNavigationButton"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="End Navigation"
-            android:textColor="@android:color/white"
-            android:background="@android:color/holo_red_dark" />
-    </LinearLayout>
-
-    <!-- 转弯指示面板 - 顶部 -->
-    <LinearLayout
-        android:id="@+id/maneuverPanel"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:padding="16dp"
-        android:background="@android:color/white"
-        android:elevation="8dp"
-        android:visibility="gone"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
-
-        <!-- 转弯图标 -->
+        <!-- Stop/End Navigation Button -->
         <ImageView
-            android:id="@+id/maneuverIcon"
+            android:id="@+id/stop"
             android:layout_width="48dp"
             android:layout_height="48dp"
-            android:layout_gravity="center_vertical"
-            android:contentDescription="Maneuver Icon"
-            android:scaleType="fitCenter" />
+            android:layout_gravity="end|center_vertical"
+            android:layout_marginEnd="12dp"
+            android:contentDescription="Stop Navigation"
+            app:srcCompat="@android:drawable/ic_delete" />
+    </androidx.cardview.widget.CardView>
 
-        <!-- 转弯信息 -->
-        <LinearLayout
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:layout_marginStart="16dp"
-            android:orientation="vertical">
+    <!-- Maneuver View (Top) - Official Mapbox Component -->
+    <com.mapbox.navigation.ui.components.maneuver.view.MapboxManeuverView
+        android:id="@+id/maneuverView"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_margin="4dp"
+        android:visibility="invisible"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
 
-            <!-- 距离信息 -->
-            <TextView
-                android:id="@+id/maneuverDistance"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text=""
-                android:textSize="14sp"
-                android:textColor="@android:color/darker_gray" />
+    <!-- Sound/Voice Button - Official Mapbox Component -->
+    <com.mapbox.navigation.ui.components.voice.view.MapboxSoundButton
+        android:id="@+id/soundButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:layout_marginEnd="16dp"
+        android:visibility="invisible"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/maneuverView" />
 
-            <!-- 转弯指令文本 -->
-            <TextView
-                android:id="@+id/maneuverText"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:text=""
-                android:textSize="16sp"
-                android:textStyle="bold"
-                android:textColor="@android:color/black" />
+    <!-- Route Overview Button - Official Mapbox Component -->
+    <com.mapbox.navigation.ui.components.maps.camera.view.MapboxRouteOverviewButton
+        android:id="@+id/routeOverview"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:layout_marginEnd="16dp"
+        android:visibility="invisible"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/soundButton" />
 
-            <!-- 下一个转弯预览 -->
-            <LinearLayout
-                android:id="@+id/nextManeuverLayout"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:orientation="horizontal"
-                android:visibility="gone">
+    <!-- Recenter Button - Official Mapbox Component -->
+    <com.mapbox.navigation.ui.components.maps.camera.view.MapboxRecenterButton
+        android:id="@+id/recenter"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:layout_marginEnd="16dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/routeOverview" />
 
-                <ImageView
-                    android:id="@+id/nextManeuverIcon"
-                    android:layout_width="24dp"
-                    android:layout_height="24dp"
-                    android:layout_gravity="center_vertical"
-                    android:contentDescription="Next Maneuver Icon"
-                    android:scaleType="fitCenter" />
-
-                <TextView
-                    android:id="@+id/nextManeuverText"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_marginStart="8dp"
-                    android:text=""
-                    android:textSize="12sp"
-                    android:textColor="@android:color/darker_gray" />
-            </LinearLayout>
-        </LinearLayout>
-    </LinearLayout>
-
-    <!-- GPS 警告面板 - 顶部中间 -->
+    <!-- GPS Warning Panel (Custom - not in official example) -->
     <LinearLayout
         android:id="@+id/gpsWarningPanel"
         android:layout_width="match_parent"
@@ -213,7 +101,7 @@
         android:background="@android:color/holo_orange_light"
         android:elevation="10dp"
         android:visibility="gone"
-        app:layout_constraintTop_toBottomOf="@id/maneuverPanel"
+        app:layout_constraintTop_toBottomOf="@id/maneuverView"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
 
@@ -236,20 +124,7 @@
             android:textStyle="bold" />
     </LinearLayout>
 
-    <!-- 重新居中按钮 - 右下角 -->
-    <com.google.android.material.floatingactionbutton.FloatingActionButton
-        android:id="@+id/recenterButton"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_margin="16dp"
-        android:src="@android:drawable/ic_menu_mylocation"
-        android:contentDescription="Recenter Camera"
-        android:visibility="gone"
-        app:layout_constraintBottom_toTopOf="@id/navigationControlPanel"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:fabSize="normal" />
-
-    <!-- 路线选择面板 - 底部 -->
+    <!-- Route Selection Panel (Custom - for alternative routes) -->
     <LinearLayout
         android:id="@+id/routeSelectionPanel"
         android:layout_width="match_parent"
@@ -263,7 +138,6 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
 
-        <!-- 标题 -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -274,7 +148,6 @@
             android:gravity="center"
             android:paddingBottom="12dp" />
 
-        <!-- 路线信息容器 - 滚动视图 -->
         <ScrollView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -287,7 +160,6 @@
                 android:orientation="vertical" />
         </ScrollView>
 
-        <!-- 开始导航按钮 -->
         <Button
             android:id="@+id/startNavigationButton"
             android:layout_width="match_parent"

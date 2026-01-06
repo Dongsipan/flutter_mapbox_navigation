@@ -53,6 +53,11 @@ dependencies {
     // Mapbox Maps SDK (for LocationPuck2D and map rendering)
     implementation("com.mapbox.maps:android:11.4.0")
     
+    // Mapbox Search SDK
+    implementation("com.mapbox.search:mapbox-search-android:2.17.1")
+    implementation("com.mapbox.search:mapbox-search-android-ui:2.17.1")
+    implementation("com.mapbox.search:place-autocomplete:2.17.1")
+    
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
     implementation 'com.jakewharton.timber:timber:4.7.1'
     implementation 'com.google.code.gson:gson:2.10.1'
@@ -62,6 +67,7 @@ dependencies {
     implementation "androidx.appcompat:appcompat:1.6.1"
     implementation "androidx.cardview:cardview:1.0.0"
     implementation "androidx.constraintlayout:constraintlayout:2.1.4"
+    implementation "androidx.coordinatorlayout:coordinatorlayout:1.2.0"
     implementation "com.google.android.gms:play-services-location:21.1.0"
     debugImplementation "com.squareup.leakcanary:leakcanary-android:2.12"
     implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3"

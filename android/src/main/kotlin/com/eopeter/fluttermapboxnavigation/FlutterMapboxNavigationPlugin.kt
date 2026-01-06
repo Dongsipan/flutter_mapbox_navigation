@@ -30,6 +30,7 @@ class FlutterMapboxNavigationPlugin : FlutterPlugin, MethodCallHandler,
     private lateinit var channel: MethodChannel
     private lateinit var progressEventChannel: EventChannel
     private lateinit var stylePickerChannel: MethodChannel
+    private lateinit var searchChannel: MethodChannel
     private var currentActivity: Activity? = null
     private lateinit var currentContext: Context
     private lateinit var historyManager: HistoryManager
@@ -46,6 +47,12 @@ class FlutterMapboxNavigationPlugin : FlutterPlugin, MethodCallHandler,
         stylePickerChannel = MethodChannel(messenger, "flutter_mapbox_navigation/style_picker")
         stylePickerChannel.setMethodCallHandler { call, result ->
             handleStylePickerMethod(call, result)
+        }
+
+        // 注册搜索 channel (Task 9.1)
+        searchChannel = MethodChannel(messenger, "flutter_mapbox_navigation/search")
+        searchChannel.setMethodCallHandler { call, result ->
+            handleSearchMethod(call, result)
         }
 
         platformViewRegistry = binding.platformViewRegistry
@@ -423,6 +430,10 @@ class FlutterMapboxNavigationPlugin : FlutterPlugin, MethodCallHandler,
                 handleStylePickerResult(resultCode, data)
                 return@addActivityResultListener true
             }
+            if (requestCode == SEARCH_REQUEST_CODE) {
+                handleSearchResult(resultCode, data)
+                return@addActivityResultListener true
+            }
             false
         }
         
@@ -606,6 +617,84 @@ class FlutterMapboxNavigationPlugin : FlutterPlugin, MethodCallHandler,
     // 样式选择器请求码
     private val STYLE_PICKER_REQUEST_CODE = 9001
     private var stylePickerResult: Result? = null
+    
+    // 搜索请求码 (Task 9.2)
+    private val SEARCH_REQUEST_CODE = 9002
+    private var searchResult: Result? = null
+    
+    /**
+     * 处理搜索相关的方法调用
+     * Task 9.1 和 9.2
+     */
+    private fun handleSearchMethod(call: MethodCall, result: Result) {
+        when (call.method) {
+            "showSearchView" -> {
+                showSearchView(result)
+            }
+            else -> result.notImplemented()
+        }
+    }
+    
+    /**
+     * 显示搜索界面
+     * Task 9.2
+     */
+    private fun showSearchView(result: Result) {
+        val activity = currentActivity
+        if (activity == null) {
+            result.error("NO_ACTIVITY", "Activity为空", null)
+            return
+        }
+        
+        try {
+            // 启动搜索 Activity
+            val intent = android.content.Intent(
+                activity, 
+                com.eopeter.fluttermapboxnavigation.activity.SearchActivity::class.java
+            )
+            
+            // 保存 result 以便在 Activity 返回时使用
+            searchResult = result
+            activity.startActivityForResult(intent, SEARCH_REQUEST_CODE)
+        } catch (e: Exception) {
+            result.error("SEARCH_ERROR", "启动搜索界面失败: ${e.message}", null)
+        }
+    }
+    
+    /**
+     * 处理搜索 Activity 的返回结果
+     * Task 9.6
+     */
+    private fun handleSearchResult(resultCode: Int, data: android.content.Intent?) {
+        val result = searchResult ?: return
+        searchResult = null
+        
+        when (resultCode) {
+            Activity.RESULT_OK -> {
+                // 用户选择了地点，返回wayPoints
+                if (data != null) {
+                    val wayPoints = data.getSerializableExtra(
+                        com.eopeter.fluttermapboxnavigation.activity.SearchActivity.EXTRA_RESULT_WAYPOINTS
+                    ) as? ArrayList<Map<String, Any>>
+                    
+                    if (wayPoints != null) {
+                        result.success(wayPoints)
+                    } else {
+                        result.error("INVALID_RESULT", "wayPoints数据无效", null)
+                    }
+                } else {
+                    result.error("NO_DATA", "未返回数据", null)
+                }
+            }
+            Activity.RESULT_CANCELED -> {
+                // 用户取消了搜索，返回null (Task 9.5)
+                result.success(null)
+            }
+            else -> {
+                result.error("UNKNOWN_RESULT", "未知的结果码: $resultCode", null)
+            }
+        }
+    }
 }
 
 private const val MAPBOX_ACCESS_TOKEN_PLACEHOLDER = "YOUR_MAPBOX_ACCESS_TOKEN_GOES_HERE"

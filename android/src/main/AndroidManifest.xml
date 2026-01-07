@@ -15,6 +15,10 @@
             android:name="com.eopeter.fluttermapboxnavigation.activity.SearchActivity"
             android:theme="@style/Theme.AppCompat.Light.NoActionBar"
             android:exported="false" />
+        <activity 
+            android:name="com.eopeter.fluttermapboxnavigation.NavigationReplayActivity"
+            android:theme="@style/Theme.AppCompat.Light.NoActionBar"
+            android:exported="false" />
     </application>
 
 </manifest>

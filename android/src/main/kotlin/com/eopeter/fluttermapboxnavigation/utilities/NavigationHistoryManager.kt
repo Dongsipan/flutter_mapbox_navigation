@@ -2,12 +2,12 @@ package com.eopeter.fluttermapboxnavigation.utilities
 
 import android.util.Log
 import com.mapbox.navigation.core.replay.history.ReplayEventBase
+import com.mapbox.navigation.core.replay.history.ReplayHistoryMapper
+import com.mapbox.navigation.core.history.MapboxHistoryReader
 import java.io.File
 
 /**
  * 导航历史管理器 - SDK v3
- * Note: ReplayHistoryDTO API has changed in SDK v3
- * This implementation is temporarily simplified pending proper SDK v3 API verification
  */
 object NavigationHistoryManager {
     
@@ -15,8 +15,7 @@ object NavigationHistoryManager {
     
     /**
      * 加载回放事件
-     * Note: SDK v3 history file format may have changed
-     * This needs to be updated with the correct SDK v3 API
+     * 使用 MapboxHistoryReader 读取历史文件，然后用 ReplayHistoryMapper 转换为回放事件
      */
     fun loadReplayEvents(filePath: String): List<ReplayEventBase> {
         return try {
@@ -26,12 +25,28 @@ object NavigationHistoryManager {
                 return emptyList()
             }
             
-            // TODO: Implement proper SDK v3 history file loading
-            // The ReplayHistoryDTO API has changed or been removed in SDK v3
-            Log.w(TAG, "History file loading temporarily disabled - SDK v3 API needs verification")
-            Log.d(TAG, "History file path: $filePath")
+            Log.d(TAG, "Loading history file: $filePath")
             
-            emptyList()
+            // 使用 MapboxHistoryReader 读取历史文件
+            val historyReader = MapboxHistoryReader(filePath)
+            
+            // 使用 Builder 创建 ReplayHistoryMapper 实例
+            val replayHistoryMapper = ReplayHistoryMapper.Builder()
+                .build()
+            
+            val events = mutableListOf<ReplayEventBase>()
+            
+            // 使用 hasNext() 判断是否还有更多元素，避免在文件末尾抛异常
+            while (historyReader.hasNext()) {
+                val historyEvent = historyReader.next()
+                val replayEvent = replayHistoryMapper.mapToReplayEvent(historyEvent)
+                if (replayEvent != null) {
+                    events.add(replayEvent)
+                }
+            }
+            
+            Log.d(TAG, "Successfully loaded ${events.size} replay events from history file")
+            events
         } catch (e: Exception) {
             Log.e(TAG, "Failed to load replay events: ${e.message}", e)
             emptyList()

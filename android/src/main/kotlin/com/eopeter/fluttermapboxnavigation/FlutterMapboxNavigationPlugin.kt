@@ -219,13 +219,23 @@ class FlutterMapboxNavigationPlugin : FlutterPlugin, MethodCallHandler,
                 return
             }
 
-            // Android端的历史记录回放实现
-            // 注意：这里需要根据Mapbox Android SDK的具体API来实现
-            // 目前Android SDK可能不支持历史记录回放功能，或者API不同
+            if (currentActivity == null) {
+                android.util.Log.e("FlutterMapboxNavigation", "Activity is null, cannot start history replay")
+                result.error("NO_ACTIVITY", "Activity is not available", null)
+                return
+            }
 
-            // 临时返回false，表示Android端暂不支持
-            result.success(false)
+            android.util.Log.d("FlutterMapboxNavigation", "Starting history replay with file: $historyFilePath")
+
+            // Launch NavigationReplayActivity
+            val intent = android.content.Intent(currentActivity, NavigationReplayActivity::class.java)
+            intent.putExtra("replayFilePath", historyFilePath)  // Use "replayFilePath" key expected by the activity
+            intent.putExtra("enableReplayUI", enableReplayUI)
+            currentActivity?.startActivity(intent)
+
+            result.success(true)
         } catch (e: Exception) {
+            android.util.Log.e("FlutterMapboxNavigation", "Failed to start history replay: ${e.message}", e)
             result.error("REPLAY_ERROR", "Failed to start history replay: ${e.message}", null)
         }
     }

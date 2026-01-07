@@ -899,6 +899,9 @@ class NavigationReplayActivity : AppCompatActivity() {
                     style.getSourceAs<GeoJsonSource>("replay-end-source")?.feature(Feature.fromGeometry(endPoint))
 
                     endPointCoord = endPoint
+                    
+                    // 调整相机以显示整个轨迹
+                    adjustCameraToShowRoute()
                 }
 
                 // 应用速度渐变
@@ -913,6 +916,64 @@ class NavigationReplayActivity : AppCompatActivity() {
                 Log.e(TAG, "绘制完整路线失败: ${e.message}", e)
             }
         } ?: Log.w(TAG, "样式未加载，无法绘制路线")
+    }
+    
+    /**
+     * 调整相机以显示整个路线
+     */
+    private fun adjustCameraToShowRoute() {
+        if (traveledPoints.isEmpty()) {
+            Log.w(TAG, "没有轨迹点，无法调整相机")
+            return
+        }
+        
+        try {
+            // 计算所有点的边界
+            var minLat = Double.MAX_VALUE
+            var maxLat = Double.MIN_VALUE
+            var minLng = Double.MAX_VALUE
+            var maxLng = Double.MIN_VALUE
+            
+            for (point in traveledPoints) {
+                minLat = min(minLat, point.latitude())
+                maxLat = max(maxLat, point.latitude())
+                minLng = min(minLng, point.longitude())
+                maxLng = max(maxLng, point.longitude())
+            }
+            
+            // 计算中心点
+            val centerLat = (minLat + maxLat) / 2
+            val centerLng = (minLng + maxLng) / 2
+            val centerPoint = Point.fromLngLat(centerLng, centerLat)
+            
+            // 计算合适的缩放级别
+            val latDiff = maxLat - minLat
+            val lngDiff = maxLng - minLng
+            val maxDiff = max(latDiff, lngDiff)
+            
+            // 根据范围计算缩放级别（简单估算）
+            val zoom = when {
+                maxDiff > 0.1 -> 11.0
+                maxDiff > 0.05 -> 12.0
+                maxDiff > 0.02 -> 13.0
+                maxDiff > 0.01 -> 14.0
+                maxDiff > 0.005 -> 15.0
+                else -> 16.0
+            }
+            
+            // 设置相机
+            binding.mapView.mapboxMap.setCamera(
+                CameraOptions.Builder()
+                    .center(centerPoint)
+                    .zoom(zoom)
+                    .padding(EdgeInsets(100.0, 100.0, 100.0, 100.0))
+                    .build()
+            )
+            
+            Log.d(TAG, "相机已调整到轨迹中心: lat=$centerLat, lng=$centerLng, zoom=$zoom")
+        } catch (e: Exception) {
+            Log.e(TAG, "调整相机失败: ${e.message}", e)
+        }
     }
 
     /**

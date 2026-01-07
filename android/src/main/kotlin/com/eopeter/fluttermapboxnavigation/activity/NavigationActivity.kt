@@ -150,6 +150,7 @@ class NavigationActivity : AppCompatActivity() {
     // History Recording
     private var isRecordingHistory = false
     private var currentHistoryFilePath: String? = null
+    private var navigationStartTime: Long = 0L
     
     // Navigation Camera for automatic camera management (following official Turn-by-Turn pattern)
     private lateinit var navigationCamera: NavigationCamera
@@ -1712,8 +1713,9 @@ class NavigationActivity : AppCompatActivity() {
             mapboxNavigation.historyRecorder.startRecording()
             
             isRecordingHistory = true
+            navigationStartTime = System.currentTimeMillis()
             
-            android.util.Log.d(TAG, "📹 History recording started")
+            android.util.Log.d(TAG, "📹 History recording started at $navigationStartTime")
             sendEvent(MapBoxEvents.HISTORY_RECORDING_STARTED)
         } catch (e: Exception) {
             android.util.Log.e(TAG, "Failed to start history recording: ${e.message}", e)
@@ -1736,6 +1738,39 @@ class NavigationActivity : AppCompatActivity() {
                 if (historyFilePath != null) {
                     android.util.Log.d(TAG, "📹 History recording stopped and saved: $historyFilePath")
                     currentHistoryFilePath = historyFilePath
+                    
+                    // Calculate duration
+                    val duration = if (navigationStartTime > 0) {
+                        ((System.currentTimeMillis() - navigationStartTime) / 1000).toInt()
+                    } else {
+                        0
+                    }
+                    
+                    // Extract origin and destination names from waypoints
+                    val startPointName = waypointSet.getFirstWaypointName()
+                    val endPointName = waypointSet.getLastWaypointName()
+                    
+                    // Save history record to HistoryManager
+                    try {
+                        val historyData = mapOf(
+                            "id" to java.util.UUID.randomUUID().toString(),
+                            "filePath" to historyFilePath,
+                            "startTime" to navigationStartTime,
+                            "duration" to duration.toLong(),
+                            "startPointName" to startPointName,
+                            "endPointName" to endPointName,
+                            "navigationMode" to if (FlutterMapboxNavigationPlugin.simulateRoute) "simulation" else "real"
+                        )
+                        
+                        val saved = FlutterMapboxNavigationPlugin.historyManager.saveHistoryRecord(historyData)
+                        if (saved) {
+                            android.util.Log.d(TAG, "✅ History record saved to database: $startPointName -> $endPointName, duration: ${duration}s")
+                        } else {
+                            android.util.Log.w(TAG, "⚠️ Failed to save history record to database")
+                        }
+                    } catch (e: Exception) {
+                        android.util.Log.e(TAG, "❌ Error saving history record: ${e.message}", e)
+                    }
                     
                     // Send file path to Flutter
                     val eventData = mapOf(

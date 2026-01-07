@@ -160,9 +160,13 @@ class FlutterMapboxNavigationPlugin : FlutterPlugin, MethodCallHandler,
     }
 
     private fun getNavigationHistoryList(result: Result) {
+        android.util.Log.d("FlutterMapboxNavigation", "Calling getNavigationHistoryList method")
         try {
             val historyList = FlutterMapboxNavigationPlugin.historyManager.getHistoryList()
+            android.util.Log.d("FlutterMapboxNavigation", "Retrieved ${historyList.size} history records from database")
+            
             val historyMaps = historyList.map { history ->
+                android.util.Log.d("FlutterMapboxNavigation", "History record: ${history.id}, path: ${history.historyFilePath}")
                 mapOf(
                     "id" to history.id,
                     "historyFilePath" to history.historyFilePath,
@@ -173,8 +177,10 @@ class FlutterMapboxNavigationPlugin : FlutterPlugin, MethodCallHandler,
                     "navigationMode" to history.navigationMode
                 )
             }
+            android.util.Log.d("FlutterMapboxNavigation", "Returning ${historyMaps.size} history records to Flutter")
             result.success(historyMaps)
         } catch (e: Exception) {
+            android.util.Log.e("FlutterMapboxNavigation", "Failed to get history list: ${e.message}", e)
             result.error("HISTORY_ERROR", "Failed to get history list: ${e.message}", null)
         }
     }

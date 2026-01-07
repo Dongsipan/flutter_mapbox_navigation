@@ -53,6 +53,20 @@ class WaypointSet {
         return waypoints.map { it.point }
     }
 
+    /**
+     * Returns the name of the first waypoint, or "Unknown" if empty
+     */
+    fun getFirstWaypointName(): String {
+        return waypoints.firstOrNull()?.name ?: "Unknown"
+    }
+
+    /**
+     * Returns the name of the last waypoint, or "Unknown" if empty
+     */
+    fun getLastWaypointName(): String {
+        return waypoints.lastOrNull()?.name ?: "Unknown"
+    }
+
     private fun List<Waypoint>.isSilentWaypoint(index: Int) =
         //this[index].type == WaypointType.Silent && canWaypointBeSilent(index)
         this[index].isSilent && canWaypointBeSilent(index)

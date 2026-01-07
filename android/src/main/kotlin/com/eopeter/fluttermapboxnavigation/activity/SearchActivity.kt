@@ -18,6 +18,7 @@ import com.eopeter.fluttermapboxnavigation.R
 import com.eopeter.fluttermapboxnavigation.models.WayPointData
 import com.eopeter.fluttermapboxnavigation.utilities.LocationHelper
 import com.eopeter.fluttermapboxnavigation.utilities.PluginUtilities
+import com.eopeter.fluttermapboxnavigation.utilities.StylePreferenceManager
 import com.mapbox.common.MapboxOptions
 import com.mapbox.geojson.Point
 import com.mapbox.maps.CameraOptions
@@ -171,6 +172,17 @@ class SearchActivity : AppCompatActivity() {
     private fun setupMapView() {
         // 创建点标注管理器
         pointAnnotationManager = mapView.annotations.createPointAnnotationManager()
+
+        // Load user's preferred map style
+        val styleUrl = StylePreferenceManager.getMapStyleUrl(this)
+        Log.d(TAG, "Loading saved user preference style: $styleUrl")
+        
+        mapView.mapboxMap.loadStyle(styleUrl) { style ->
+            // Apply Light Preset if the style supports it
+            StylePreferenceManager.applyLightPresetToStyle(this, style)
+            
+            Log.d(TAG, "Map style loaded successfully: $styleUrl")
+        }
 
         // 启用用户位置显示
         mapView.location.updateSettings {

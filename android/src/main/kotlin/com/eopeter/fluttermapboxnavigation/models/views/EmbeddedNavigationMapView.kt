@@ -8,6 +8,7 @@ import com.eopeter.fluttermapboxnavigation.databinding.NavigationActivityBinding
 import com.eopeter.fluttermapboxnavigation.models.MapBoxEvents
 import com.eopeter.fluttermapboxnavigation.utilities.PluginUtilities
 import com.eopeter.fluttermapboxnavigation.utilities.MapStyleManager
+import com.eopeter.fluttermapboxnavigation.utilities.StylePreferenceManager
 import com.mapbox.geojson.Point
 import com.mapbox.maps.MapView
 import com.mapbox.maps.Style
@@ -66,21 +67,40 @@ class EmbeddedNavigationMapView(
         // Register map view with MapStyleManager
         MapStyleManager.registerMapView(binding.mapView)
         
-        // Set day and night styles
-        val dayStyle = arguments?.get("mapStyleUrlDay") as? String ?: Style.MAPBOX_STREETS
+        // Priority: Arguments override > User preference > Default
+        val styleUrl = when {
+            arguments?.get("mapStyleUrlDay") != null -> {
+                // Use arguments override (from Flutter)
+                val argStyle = arguments?.get("mapStyleUrlDay") as String
+                android.util.Log.d("EmbeddedNavigationMapView", "Using arguments override style: $argStyle")
+                argStyle
+            }
+            else -> {
+                // Use saved user preference (new behavior)
+                val savedStyle = StylePreferenceManager.getMapStyleUrl(context)
+                android.util.Log.d("EmbeddedNavigationMapView", "Using saved user preference style: $savedStyle")
+                savedStyle
+            }
+        }
+        
+        // Set day and night styles for MapStyleManager
+        val dayStyle = arguments?.get("mapStyleUrlDay") as? String ?: styleUrl
         val nightStyle = arguments?.get("mapStyleUrlNight") as? String ?: Style.DARK
         MapStyleManager.setDayStyle(dayStyle)
         MapStyleManager.setNightStyle(nightStyle)
         
         // Load map style
-        val styleUrl = dayStyle
-        
-        binding.mapView.mapboxMap.loadStyle(styleUrl) {
+        binding.mapView.mapboxMap.loadStyle(styleUrl) { style ->
+            // Apply Light Preset if the style supports it
+            StylePreferenceManager.applyLightPresetToStyle(context, style)
+            
             // Enable location component
             binding.mapView.location.updateSettings {
                 enabled = true
                 pulsingEnabled = true
             }
+            
+            android.util.Log.d("EmbeddedNavigationMapView", "Map style loaded successfully: $styleUrl")
         }
     }
     

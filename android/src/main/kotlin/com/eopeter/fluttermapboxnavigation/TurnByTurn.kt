@@ -14,6 +14,7 @@ import com.eopeter.fluttermapboxnavigation.models.Waypoint
 import com.eopeter.fluttermapboxnavigation.models.WaypointSet
 import com.eopeter.fluttermapboxnavigation.utilities.CustomInfoPanelEndNavButtonBinder
 import com.eopeter.fluttermapboxnavigation.utilities.PluginUtilities
+import com.eopeter.fluttermapboxnavigation.utilities.StylePreferenceManager
 import com.google.gson.Gson
 import com.mapbox.maps.Style
 import com.mapbox.api.directions.v5.DirectionsCriteria
@@ -334,9 +335,18 @@ open class TurnByTurn(
         this.mapStyleUrlDay = arguments["mapStyleUrlDay"] as? String
         this.mapStyleUrlNight = arguments["mapStyleUrlNight"] as? String
 
-        //Set the style Uri
-        if (this.mapStyleUrlDay == null) this.mapStyleUrlDay = Style.MAPBOX_STREETS
-        if (this.mapStyleUrlNight == null) this.mapStyleUrlNight = Style.DARK
+        // Priority: Arguments override > User preference > Default
+        // Set the style Uri - use saved preference if not provided in arguments
+        if (this.mapStyleUrlDay == null) {
+            this.mapStyleUrlDay = StylePreferenceManager.getMapStyleUrl(context)
+            Log.d(TAG, "Using saved user preference for day style: ${this.mapStyleUrlDay}")
+        } else {
+            Log.d(TAG, "Using arguments override for day style: ${this.mapStyleUrlDay}")
+        }
+        
+        if (this.mapStyleUrlNight == null) {
+            this.mapStyleUrlNight = Style.DARK
+        }
 
         // NavigationView API removed in SDK v3 - needs complete rewrite
         // Temporarily disabled for MVP
@@ -430,7 +440,7 @@ open class TurnByTurn(
         FlutterMapboxNavigationPlugin.eventSink = null
     }
 
-    private val context: Context = ctx
+    protected val context: Context = ctx
     val activity: Activity = act
     private val token: String = accessToken
     open var methodChannel: MethodChannel? = null

@@ -75,6 +75,7 @@ import com.mapbox.navigation.core.replay.history.ReplayEventBase
 import com.eopeter.fluttermapboxnavigation.utilities.StatusBarStyleManager
 import com.eopeter.fluttermapboxnavigation.utilities.MapStyleManager
 import com.eopeter.fluttermapboxnavigation.utilities.NavigationHistoryManager
+import com.eopeter.fluttermapboxnavigation.utilities.StylePreferenceManager
 import com.eopeter.fluttermapboxnavigation.activity.MapStyleSelectorActivity
 
 /**
@@ -202,9 +203,17 @@ class NavigationReplayActivity : AppCompatActivity() {
         // 注册地图视图到样式管理器
         MapStyleManager.registerMapView(binding.mapView)
         
-        // 初始化地图样式
-        val styleUri = MapStyleSelectorActivity.getStyleForUiMode(this)
-        binding.mapView.mapboxMap.loadStyle(styleUri)
+        // Use saved user preference instead of UI mode
+        val styleUri = StylePreferenceManager.getMapStyleUrl(this)
+        Log.d(TAG, "Loading saved user preference style: $styleUri")
+        
+        binding.mapView.mapboxMap.loadStyle(styleUri) { style ->
+            // Apply Light Preset if the style supports it
+            StylePreferenceManager.applyLightPresetToStyle(this, style)
+            
+            Log.d(TAG, "Map style loaded successfully: $styleUri")
+        }
+        
         // 根据地图样式调整状态栏文字颜色
         StatusBarStyleManager.updateStatusBarForMapStyle(this@NavigationReplayActivity, styleUri)
 
@@ -286,7 +295,11 @@ class NavigationReplayActivity : AppCompatActivity() {
             }
         } ?: run {
             // 如果样式还未加载，等待样式加载完成后再初始化
-            binding.mapView.mapboxMap.loadStyle(MapStyleSelectorActivity.getStyleForUiMode(this)) { style ->
+            val styleUri = StylePreferenceManager.getMapStyleUrl(this)
+            binding.mapView.mapboxMap.loadStyle(styleUri) { style ->
+                // Apply Light Preset if the style supports it
+                StylePreferenceManager.applyLightPresetToStyle(this, style)
+                
                 initTravelLineLayer(style)
             }
         }

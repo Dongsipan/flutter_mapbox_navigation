@@ -17,6 +17,7 @@ import com.eopeter.fluttermapboxnavigation.models.WaypointSet
 import com.eopeter.fluttermapboxnavigation.utilities.PluginUtilities
 import com.eopeter.fluttermapboxnavigation.utilities.PluginUtilities.Companion.sendEvent
 import com.eopeter.fluttermapboxnavigation.utilities.MapStyleManager
+import com.eopeter.fluttermapboxnavigation.utilities.StylePreferenceManager
 import com.google.gson.Gson
 import com.mapbox.api.directions.v5.models.RouteOptions
 import com.mapbox.geojson.Point
@@ -315,16 +316,33 @@ class NavigationActivity : AppCompatActivity() {
             // Register map view with MapStyleManager
             MapStyleManager.registerMapView(binding.mapView)
             
-            // Set day and night styles
-            val dayStyle = FlutterMapboxNavigationPlugin.mapStyleUrlDay ?: Style.MAPBOX_STREETS
+            // Priority: Plugin override > User preference > Default
+            // This maintains backward compatibility while supporting user preferences
+            val styleUrl = when {
+                FlutterMapboxNavigationPlugin.mapStyleUrlDay != null -> {
+                    // Use plugin override (backward compatibility)
+                    android.util.Log.d(TAG, "Using plugin override style: ${FlutterMapboxNavigationPlugin.mapStyleUrlDay}")
+                    FlutterMapboxNavigationPlugin.mapStyleUrlDay!!
+                }
+                else -> {
+                    // Use saved user preference (new behavior)
+                    val savedStyle = StylePreferenceManager.getMapStyleUrl(this)
+                    android.util.Log.d(TAG, "Using saved user preference style: $savedStyle")
+                    savedStyle
+                }
+            }
+            
+            // Set day and night styles for MapStyleManager
+            val dayStyle = FlutterMapboxNavigationPlugin.mapStyleUrlDay ?: styleUrl
             val nightStyle = FlutterMapboxNavigationPlugin.mapStyleUrlNight ?: Style.DARK
             MapStyleManager.setDayStyle(dayStyle)
             MapStyleManager.setNightStyle(nightStyle)
             
             // Load map style
-            val styleUrl = FlutterMapboxNavigationPlugin.mapStyleUrlDay ?: Style.MAPBOX_STREETS
-            
             binding.mapView.mapboxMap.loadStyle(styleUrl) { style ->
+                // Apply Light Preset if the style supports it
+                StylePreferenceManager.applyLightPresetToStyle(this, style)
+                
                 // 初始化路线层级 (官方示例模式)
                 // 先初始化路线层，这样它们会在 location puck 下方
                 routeLineView.initializeLayers(style)

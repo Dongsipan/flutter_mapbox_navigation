@@ -33,7 +33,6 @@ class FlutterMapboxNavigationPlugin : FlutterPlugin, MethodCallHandler,
     private lateinit var searchChannel: MethodChannel
     private var currentActivity: Activity? = null
     private lateinit var currentContext: Context
-    private lateinit var historyManager: HistoryManager
 
     override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         val messenger = binding.binaryMessenger
@@ -92,6 +91,7 @@ class FlutterMapboxNavigationPlugin : FlutterPlugin, MethodCallHandler,
         var platformViewRegistry: PlatformViewRegistry? = null
         var binaryMessenger: BinaryMessenger? = null
         var enableHistoryRecording = false
+        lateinit var historyManager: HistoryManager
 
         var viewId = "FlutterMapboxNavigationView"
     }
@@ -161,7 +161,7 @@ class FlutterMapboxNavigationPlugin : FlutterPlugin, MethodCallHandler,
 
     private fun getNavigationHistoryList(result: Result) {
         try {
-            val historyList = historyManager.getHistoryList()
+            val historyList = FlutterMapboxNavigationPlugin.historyManager.getHistoryList()
             val historyMaps = historyList.map { history ->
                 mapOf(
                     "id" to history.id,
@@ -184,7 +184,7 @@ class FlutterMapboxNavigationPlugin : FlutterPlugin, MethodCallHandler,
         val historyId = arguments?.get("historyId") as? String
         if (historyId != null) {
             try {
-                val success = historyManager.deleteHistoryRecord(historyId)
+                val success = FlutterMapboxNavigationPlugin.historyManager.deleteHistoryRecord(historyId)
                 result.success(success)
             } catch (e: Exception) {
                 result.error("HISTORY_ERROR", "Failed to delete history: ${e.message}", null)
@@ -196,7 +196,7 @@ class FlutterMapboxNavigationPlugin : FlutterPlugin, MethodCallHandler,
 
     private fun clearAllNavigationHistory(result: Result) {
         try {
-            val success = historyManager.clearAllHistory()
+            val success = FlutterMapboxNavigationPlugin.historyManager.clearAllHistory()
             result.success(success)
         } catch (e: Exception) {
             result.error("HISTORY_ERROR", "Failed to clear history: ${e.message}", null)

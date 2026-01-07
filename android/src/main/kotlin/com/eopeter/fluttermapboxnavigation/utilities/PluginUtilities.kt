@@ -44,7 +44,7 @@ class PluginUtilities {
 
         fun sendEvent(event: MapBoxEvents, data: String = "") {
             val jsonString =
-                if (MapBoxEvents.MILESTONE_EVENT == event || event == MapBoxEvents.USER_OFF_ROUTE || event == MapBoxEvents.ROUTE_BUILT || event == MapBoxEvents.ON_MAP_TAP) "{" +
+                if (MapBoxEvents.MILESTONE_EVENT == event || event == MapBoxEvents.USER_OFF_ROUTE || event == MapBoxEvents.ROUTE_BUILT || event == MapBoxEvents.ON_MAP_TAP || event == MapBoxEvents.HISTORY_RECORDING_STARTED || event == MapBoxEvents.HISTORY_RECORDING_STOPPED) "{" +
                         "  \"eventType\": \"${event.value}\"," +
                         "  \"data\": $data" +
                         "}" else "{" +

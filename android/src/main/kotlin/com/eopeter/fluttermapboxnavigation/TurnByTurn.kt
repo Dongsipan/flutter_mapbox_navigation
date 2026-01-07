@@ -407,6 +407,13 @@ open class TurnByTurn(
         if (onMapTap != null) {
             this.enableOnMapTapCallback = onMapTap
         }
+        
+        // Handle history recording setting
+        val historyRecording = arguments["enableHistoryRecording"] as? Boolean
+        if (historyRecording != null) {
+            FlutterMapboxNavigationPlugin.enableHistoryRecording = historyRecording
+            Log.d(TAG, "History recording enabled: $historyRecording")
+        }
     }
 
     open fun registerObservers() {
@@ -488,6 +495,9 @@ open class TurnByTurn(
     // History recording functionality needs to be implemented differently
     private var isRecordingHistory = false
     private var currentHistoryFilePath: String? = null
+    private var navigationStartTime: Long = 0
+    private var navigationStartPointName: String? = null
+    private var navigationEndPointName: String? = null
 
     /**
      * Bindings to the example layout.
@@ -647,24 +657,21 @@ open class TurnByTurn(
                 return
             }
             
-            // Create history file path
-            val historyDir = context.getExternalFilesDir("navigation_history")
-            if (historyDir != null && !historyDir.exists()) {
-                historyDir.mkdirs()
-            }
+            // Record navigation start time and waypoint info
+            navigationStartTime = System.currentTimeMillis()
             
-            val timestamp = System.currentTimeMillis()
-            val historyFile = java.io.File(historyDir, "history_$timestamp.json")
-            currentHistoryFilePath = historyFile.absolutePath
+            // Use simple default names for now
+            navigationStartPointName = "Start Point"
+            navigationEndPointName = "End Point"
             
-            // Start history recording using SDK v3 API
-            // Note: In SDK v3, history recording is managed through NavigationOptions
-            // and HistoryRecordingStateHandler
-            mapboxNavigation.historyRecorder.startRecording()
+            // v3: startRecording() 有返回值 List<String>，可选接收
+            val paths = mapboxNavigation.historyRecorder.startRecording()
+            Log.d(TAG, "History recording started, will write to: $paths")
             
             isRecordingHistory = true
             
-            Log.d(TAG, "History recording started: $currentHistoryFilePath")
+            Log.d(TAG, "History recording started at $navigationStartTime")
+            Log.d(TAG, "Start point: $navigationStartPointName, End point: $navigationEndPointName")
             PluginUtilities.sendEvent(MapBoxEvents.HISTORY_RECORDING_STARTED)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start history recording: ${e.message}", e)
@@ -692,9 +699,39 @@ open class TurnByTurn(
                     Log.d(TAG, "History recording stopped and saved: $historyFilePath")
                     currentHistoryFilePath = historyFilePath
                     
+                    // Calculate navigation duration
+                    val navigationEndTime = System.currentTimeMillis()
+                    val duration = ((navigationEndTime - navigationStartTime) / 1000).toInt() // in seconds
+                    
+                    // Save history record to HistoryManager
+                    val historyData = mapOf(
+                        "id" to java.util.UUID.randomUUID().toString(),
+                        "filePath" to historyFilePath,
+                        "startTime" to navigationStartTime,
+                        "duration" to duration.toLong(),
+                        "startPointName" to (navigationStartPointName ?: "Unknown Start"),
+                        "endPointName" to (navigationEndPointName ?: "Unknown End"),
+                        "navigationMode" to when (navigationMode) {
+                            com.mapbox.api.directions.v5.DirectionsCriteria.PROFILE_DRIVING -> "driving"
+                            com.mapbox.api.directions.v5.DirectionsCriteria.PROFILE_WALKING -> "walking"
+                            com.mapbox.api.directions.v5.DirectionsCriteria.PROFILE_CYCLING -> "cycling"
+                            else -> "driving"
+                        }
+                    )
+                    
+                    val saved = FlutterMapboxNavigationPlugin.historyManager.saveHistoryRecord(historyData)
+                    if (saved) {
+                        Log.d(TAG, "✅ History record saved to HistoryManager")
+                    } else {
+                        Log.e(TAG, "❌ Failed to save history record to HistoryManager")
+                    }
+                    
                     // Send file path to Flutter
                     val eventData = mapOf(
-                        "historyFilePath" to historyFilePath
+                        "historyFilePath" to historyFilePath,
+                        "duration" to duration,
+                        "startPointName" to (navigationStartPointName ?: "Unknown Start"),
+                        "endPointName" to (navigationEndPointName ?: "Unknown End")
                     )
                     PluginUtilities.sendEvent(
                         MapBoxEvents.HISTORY_RECORDING_STOPPED,
@@ -707,6 +744,10 @@ open class TurnByTurn(
             }
             
             isRecordingHistory = false
+            // Reset navigation tracking variables
+            navigationStartTime = 0
+            navigationStartPointName = null
+            navigationEndPointName = null
         } catch (e: Exception) {
             Log.e(TAG, "Failed to stop history recording: ${e.message}", e)
             isRecordingHistory = false

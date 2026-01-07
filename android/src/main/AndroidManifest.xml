@@ -10,7 +10,7 @@
         <activity android:name="com.eopeter.fluttermapboxnavigation.activity.NavigationActivity" />
         <activity 
             android:name="com.eopeter.fluttermapboxnavigation.activity.StylePickerActivity"
-            android:theme="@style/Theme.AppCompat.Light" />
+            android:theme="@style/StylePickerTheme" />
         <activity 
             android:name="com.eopeter.fluttermapboxnavigation.activity.SearchActivity"
             android:theme="@style/Theme.AppCompat.Light.NoActionBar"

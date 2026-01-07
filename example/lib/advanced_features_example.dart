@@ -593,23 +593,73 @@ class _AdvancedFeaturesExampleState extends State<AdvancedFeaturesExample> {
 
   // 验证路径点
   bool _validateWayPoints(List<WayPoint> wayPoints) {
+    debugPrint('🔍 验证路径点，数量: ${wayPoints.length}');
+
     if (wayPoints.length < 2) {
+      final message = "至少需要2个路径点才能开始导航";
+      debugPrint('❌ $message');
       setState(() {
-        _statusMessage = "至少需要2个路径点才能开始导航";
+        _statusMessage = message;
       });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(message),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
       return false;
     }
 
     for (int i = 0; i < wayPoints.length; i++) {
       final wayPoint = wayPoints[i];
+      debugPrint('  检查路径点 $i: ${wayPoint.name}');
+      debugPrint('    纬度: ${wayPoint.latitude}');
+      debugPrint('    经度: ${wayPoint.longitude}');
+
       if (wayPoint.latitude == null || wayPoint.longitude == null) {
+        final message = "路径点${i + 1}的坐标无效";
+        debugPrint('❌ $message');
         setState(() {
-          _statusMessage = "路径点${i + 1}的坐标无效";
+          _statusMessage = message;
+        });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(message),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+        return false;
+      }
+
+      // 验证坐标范围
+      if (wayPoint.latitude! < -90 || wayPoint.latitude! > 90) {
+        final message = "路径点${i + 1}的纬度超出范围: ${wayPoint.latitude}";
+        debugPrint('❌ $message');
+        setState(() {
+          _statusMessage = message;
+        });
+        return false;
+      }
+
+      if (wayPoint.longitude! < -180 || wayPoint.longitude! > 180) {
+        final message = "路径点${i + 1}的经度超出范围: ${wayPoint.longitude}";
+        debugPrint('❌ $message');
+        setState(() {
+          _statusMessage = message;
         });
         return false;
       }
     }
 
+    debugPrint('✅ 所有路径点验证通过');
     return true;
   }
 
@@ -839,11 +889,26 @@ class _AdvancedFeaturesExampleState extends State<AdvancedFeaturesExample> {
 
   // 开始导航
   Future<void> _startNavigation() async {
+    debugPrint('🚀 开始导航，路径点数量: ${_currentWayPoints.length}');
+
     if (!_validateWayPoints(_currentWayPoints)) {
+      debugPrint('❌ 路径点验证失败');
       return;
     }
 
+    debugPrint('✅ 路径点验证通过');
+
+    // 打印所有路径点信息
+    for (int i = 0; i < _currentWayPoints.length; i++) {
+      final wp = _currentWayPoints[i];
+      debugPrint('  路径点 $i: ${wp.name} (${wp.latitude}, ${wp.longitude})');
+    }
+
     try {
+      setState(() {
+        _statusMessage = "正在启动导航...";
+      });
+
       final options = MapBoxOptions(
           mode: MapBoxNavigationMode.cycling,
           simulateRoute: _simulateRoute,
@@ -853,14 +918,40 @@ class _AdvancedFeaturesExampleState extends State<AdvancedFeaturesExample> {
           bannerInstructionsEnabled: true,
           enableHistoryRecording: true);
 
-      await MapBoxNavigation.instance.startNavigation(
+      debugPrint('📍 调用 startNavigation...');
+      final result = await MapBoxNavigation.instance.startNavigation(
         wayPoints: _currentWayPoints,
         options: options,
       );
-    } catch (e) {
+
+      debugPrint('✅ startNavigation 返回: $result');
+
+      if (result == true) {
+        setState(() {
+          _statusMessage = "导航已启动";
+        });
+      } else {
+        setState(() {
+          _statusMessage = "导航启动失败: 返回值为 $result";
+        });
+      }
+    } catch (e, stackTrace) {
+      debugPrint('❌ 导航启动异常: $e');
+      debugPrint('堆栈跟踪: $stackTrace');
       setState(() {
         _statusMessage = "导航启动失败: $e";
       });
+
+      // 显示错误提示
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('导航启动失败: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
     }
   }
 

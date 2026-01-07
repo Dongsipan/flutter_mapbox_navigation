@@ -3,10 +3,13 @@ package com.eopeter.fluttermapboxnavigation.activity
 import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
+import android.view.MenuItem
 import android.view.View
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import com.eopeter.fluttermapboxnavigation.R
+import com.google.android.material.button.MaterialButton
+import com.google.android.material.switchmaterial.SwitchMaterial
 import com.mapbox.maps.Style
 
 /**
@@ -46,9 +49,12 @@ class StylePickerActivity : AppCompatActivity() {
     }
     
     private fun setupUI() {
-        // 设置标题
-        supportActionBar?.title = "地图样式设置"
-        supportActionBar?.setDisplayHomeAsUpEnabled(true)
+        // 设置标题和返回按钮
+        supportActionBar?.apply {
+            title = "地图样式设置"
+            setDisplayHomeAsUpEnabled(true)
+            elevation = 4f
+        }
         
         // 地图样式选择
         val styleSpinner = findViewById<Spinner>(R.id.styleSpinner)
@@ -95,15 +101,20 @@ class StylePickerActivity : AppCompatActivity() {
             override fun onNothingSelected(parent: AdapterView<*>?) {}
         }
         
-        // 自动调整开关
-        val autoAdjustSwitch = findViewById<Switch>(R.id.autoAdjustSwitch)
+        // 自动调整开关 - 使用 Material Switch
+        val autoAdjustSwitch = findViewById<SwitchMaterial>(R.id.autoAdjustSwitch)
         autoAdjustSwitch.isChecked = lightPresetMode == "automatic"
         autoAdjustSwitch.setOnCheckedChangeListener { _, isChecked ->
             lightPresetMode = if (isChecked) "automatic" else "manual"
+            // 当开启自动模式时，禁用手动选择
+            lightPresetSpinner.isEnabled = !isChecked
         }
         
-        // 应用按钮
-        findViewById<Button>(R.id.applyButton).setOnClickListener {
+        // 初始化 spinner 状态
+        lightPresetSpinner.isEnabled = lightPresetMode != "automatic"
+        
+        // 应用按钮 - 使用 Material Button
+        findViewById<MaterialButton>(R.id.applyButton).setOnClickListener {
             val resultIntent = Intent().apply {
                 putExtra(RESULT_STYLE, selectedStyle)
                 putExtra(RESULT_LIGHT_PRESET, selectedLightPreset)
@@ -113,8 +124,8 @@ class StylePickerActivity : AppCompatActivity() {
             finish()
         }
         
-        // 取消按钮
-        findViewById<Button>(R.id.cancelButton).setOnClickListener {
+        // 取消按钮 - 使用 Material Button
+        findViewById<MaterialButton>(R.id.cancelButton).setOnClickListener {
             setResult(Activity.RESULT_CANCELED)
             finish()
         }
@@ -178,8 +189,19 @@ class StylePickerActivity : AppCompatActivity() {
         }
     }
     
-    override fun onSupportNavigateUp(): Boolean {
-        onBackPressed()
-        return true
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        return when (item.itemId) {
+            android.R.id.home -> {
+                setResult(Activity.RESULT_CANCELED)
+                finish()
+                true
+            }
+            else -> super.onOptionsItemSelected(item)
+        }
+    }
+    
+    override fun onBackPressed() {
+        setResult(Activity.RESULT_CANCELED)
+        super.onBackPressed()
     }
 }

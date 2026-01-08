@@ -148,6 +148,9 @@ class FlutterMapboxNavigationPlugin : FlutterPlugin, MethodCallHandler,
             "setHistoryReplaySpeed" -> {
                 setHistoryReplaySpeed(call, result)
             }
+            "getNavigationHistoryEvents" -> {
+                getNavigationHistoryEvents(call, result)
+            }
             else -> result.notImplemented()
         }
     }
@@ -283,6 +286,72 @@ class FlutterMapboxNavigationPlugin : FlutterPlugin, MethodCallHandler,
             result.success(false)
         } catch (e: Exception) {
             result.error("REPLAY_ERROR", "Failed to set history replay speed: ${e.message}", null)
+        }
+    }
+
+    private fun getNavigationHistoryEvents(call: MethodCall, result: Result) {
+        android.util.Log.d("FlutterMapboxNavigation", "📞 getNavigationHistoryEvents called")
+        
+        try {
+            val historyId = call.argument<String>("historyId")
+            
+            if (historyId.isNullOrEmpty()) {
+                android.util.Log.e("FlutterMapboxNavigation", "❌ INVALID_ARGUMENT: historyId is required")
+                result.error("INVALID_ARGUMENT", "historyId is required", null)
+                return
+            }
+            
+            android.util.Log.d("FlutterMapboxNavigation", "🔍 Fetching events for history ID: $historyId")
+            
+            // 根据 historyId 查找历史记录
+            val historyList = FlutterMapboxNavigationPlugin.historyManager.getHistoryList()
+            android.util.Log.d("FlutterMapboxNavigation", "📋 Found ${historyList.size} history records in database")
+            
+            val historyRecord = historyList.find { it.id == historyId }
+            if (historyRecord == null) {
+                android.util.Log.e("FlutterMapboxNavigation", "❌ HISTORY_NOT_FOUND: History record with id $historyId not found")
+                android.util.Log.e("FlutterMapboxNavigation", "❌ Available history IDs: ${historyList.map { it.id }}")
+                result.error("HISTORY_NOT_FOUND", "History record with id $historyId not found", null)
+                return
+            }
+            
+            val filePath = historyRecord.historyFilePath
+            android.util.Log.d("FlutterMapboxNavigation", "📁 History file path: $filePath")
+            
+            // 检查文件是否存在
+            val file = java.io.File(filePath)
+            if (!file.exists()) {
+                android.util.Log.e("FlutterMapboxNavigation", "❌ FILE_NOT_FOUND: History file not found at path $filePath")
+                result.error("FILE_NOT_FOUND", "History file not found at path $filePath", null)
+                return
+            }
+            
+            android.util.Log.d("FlutterMapboxNavigation", "✅ File exists, starting parsing")
+            
+            // 在后台线程解析历史文件
+            Thread {
+                try {
+                    val parser = com.eopeter.fluttermapboxnavigation.utilities.HistoryEventsParser()
+                    val eventsData = parser.parseHistoryFile(filePath, historyId)
+                    
+                    android.util.Log.d("FlutterMapboxNavigation", "✅ Successfully parsed history events")
+                    
+                    // 在主线程返回结果
+                    currentActivity?.runOnUiThread {
+                        result.success(eventsData)
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("FlutterMapboxNavigation", "❌ Failed to parse history file: ${e.message}", e)
+                    
+                    currentActivity?.runOnUiThread {
+                        result.error("PARSE_ERROR", "Failed to parse history file: ${e.message}", null)
+                    }
+                }
+            }.start()
+            
+        } catch (e: Exception) {
+            android.util.Log.e("FlutterMapboxNavigation", "❌ Unexpected error: ${e.message}", e)
+            result.error("UNKNOWN_ERROR", "An unexpected error occurred: ${e.message}", null)
         }
     }
 

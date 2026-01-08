@@ -8,6 +8,7 @@ A comprehensive Flutter plugin for Mapbox Navigation SDK that brings professiona
 
 - **[API Documentation](./API_DOCUMENTATION.md)** - Complete API reference and usage examples
 - **[Development Guide](./DEVELOPMENT_GUIDE.md)** - Setup and development instructions
+- **[Android Customization Guide](./docs/ANDROID_CUSTOMIZATION_GUIDE.md)** - Customize Android colors, styles, and resources
 - **[Changelog](./CHANGELOG.md)** - Version history and updates
 - **[Technical Documentation](./docs/README.md)** - Detailed implementation docs and guides
 

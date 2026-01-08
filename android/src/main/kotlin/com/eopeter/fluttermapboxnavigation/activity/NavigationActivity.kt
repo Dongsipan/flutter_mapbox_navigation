@@ -189,6 +189,10 @@ class NavigationActivity : AppCompatActivity() {
             }
         }
     
+    // 存储待处理的路线请求
+    private var pendingWaypointSet: WaypointSet? = null
+    private var isNavigationReady = false
+    
     // MapboxNavigation observer for lifecycle management
     private val mapboxNavigationObserver = object : MapboxNavigationObserver {
         override fun onAttached(mapboxNavigation: MapboxNavigation) {
@@ -202,10 +206,21 @@ class NavigationActivity : AppCompatActivity() {
             mapboxNavigation.registerBannerInstructionsObserver(bannerInstructionObserver)
             mapboxNavigation.registerVoiceInstructionsObserver(voiceInstructionObserver)
             android.util.Log.d(TAG, "✅ All observers registered successfully")
+            
+            // 标记导航已准备好
+            isNavigationReady = true
+            
+            // 处理待处理的路线请求
+            pendingWaypointSet?.let { waypointSet ->
+                android.util.Log.d(TAG, "🚀 Processing pending route request")
+                requestRoutes(waypointSet)
+                pendingWaypointSet = null
+            }
         }
 
         override fun onDetached(mapboxNavigation: MapboxNavigation) {
             android.util.Log.d(TAG, "🔌 MapboxNavigationObserver onDetached - unregistering observers")
+            isNavigationReady = false
             // Unregister observers when navigation is detached
             mapboxNavigation.unregisterLocationObserver(locationObserver)
             mapboxNavigation.unregisterRouteProgressObserver(routeProgressObserver)
@@ -271,12 +286,20 @@ class NavigationActivity : AppCompatActivity() {
             return
         }
         
-        // Get waypoints from intent and request routes
+        // Get waypoints from intent
         val p = intent.getSerializableExtra("waypoints") as? MutableList<Waypoint>
         if (p != null) {
             points = p
             points.map { waypointSet.add(it) }
-            requestRoutes(waypointSet)
+            
+            // 如果导航已经准备好，立即请求路线；否则存储待处理
+            if (isNavigationReady) {
+                android.util.Log.d(TAG, "🚀 Navigation ready, requesting routes immediately")
+                requestRoutes(waypointSet)
+            } else {
+                pendingWaypointSet = waypointSet
+                android.util.Log.d(TAG, "📦 Waypoints stored, waiting for MapboxNavigationApp to be ready")
+            }
         }
     }
     
@@ -646,7 +669,52 @@ class NavigationActivity : AppCompatActivity() {
     private fun requestRoutesWithRetry(waypointSet: WaypointSet, maxRetries: Int, currentAttempt: Int) {
         android.util.Log.d(TAG, "🔄 Requesting routes (attempt $currentAttempt/$maxRetries)")
         
-        MapboxNavigationApp.current()?.requestRoutes(
+        // 检查 MapboxNavigationApp 是否已初始化
+        val mapboxNavigation = MapboxNavigationApp.current()
+        if (mapboxNavigation == null) {
+            android.util.Log.e(TAG, "❌ MapboxNavigationApp.current() is null!")
+            val errorData = mapOf(
+                "message" to "MapboxNavigation not initialized",
+                "type" to "INITIALIZATION_ERROR"
+            )
+            sendEvent(MapBoxEvents.ROUTE_BUILD_FAILED, org.json.JSONObject(errorData).toString())
+            return
+        }
+        
+        android.util.Log.d(TAG, "✅ MapboxNavigationApp is initialized")
+        
+        // 添加超时检测
+        val timeoutHandler = android.os.Handler(android.os.Looper.getMainLooper())
+        var isCallbackReceived = false
+        
+        val timeoutRunnable = Runnable {
+            if (!isCallbackReceived) {
+                android.util.Log.e(TAG, "⏱️ Route request timeout after 30 seconds")
+                
+                if (currentAttempt < maxRetries) {
+                    val delayMs = (1000 * currentAttempt).toLong()
+                    android.util.Log.d(TAG, "🔄 Retrying due to timeout in ${delayMs}ms...")
+                    
+                    android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                        requestRoutesWithRetry(waypointSet, maxRetries, currentAttempt + 1)
+                    }, delayMs)
+                } else {
+                    val errorData = mapOf(
+                        "message" to "Route request timed out after $maxRetries attempts",
+                        "type" to "TIMEOUT_ERROR",
+                        "attempts" to currentAttempt
+                    )
+                    sendEvent(MapBoxEvents.ROUTE_BUILD_FAILED, org.json.JSONObject(errorData).toString())
+                }
+            }
+        }
+        
+        // 设置 30 秒超时
+        timeoutHandler.postDelayed(timeoutRunnable, 30000)
+        
+        android.util.Log.d(TAG, "📡 Calling MapboxNavigationApp.requestRoutes()...")
+        
+        mapboxNavigation.requestRoutes(
             routeOptions = RouteOptions.builder()
                 .applyDefaultNavigationOptions()
                 .applyLanguageAndVoiceUnitOptions(this)
@@ -662,11 +730,27 @@ class NavigationActivity : AppCompatActivity() {
                 .build(),
             callback = object : NavigationRouterCallback {
                 override fun onCanceled(routeOptions: RouteOptions, routerOrigin: String) {
+                    isCallbackReceived = true
+                    timeoutHandler.removeCallbacks(timeoutRunnable)
                     android.util.Log.w(TAG, "⚠️ Route request canceled")
                     sendEvent(MapBoxEvents.ROUTE_BUILD_CANCELLED)
                 }
 
                 override fun onFailure(reasons: List<RouterFailure>, routeOptions: RouteOptions) {
+                    isCallbackReceived = true
+                    timeoutHandler.removeCallbacks(timeoutRunnable)
+                    
+                    // Log detailed failure information
+                    android.util.Log.e(TAG, "❌ Route request failed:")
+                    android.util.Log.e(TAG, "   Attempt: $currentAttempt/$maxRetries")
+                    android.util.Log.e(TAG, "   Number of failures: ${reasons.size}")
+                    reasons.forEachIndexed { index, failure ->
+                        android.util.Log.e(TAG, "   Failure #${index + 1}:")
+                        android.util.Log.e(TAG, "     Message: ${failure.message}")
+                        android.util.Log.e(TAG, "     Throwable: ${failure.throwable?.message}")
+                        android.util.Log.e(TAG, "     Stack trace: ${failure.throwable?.stackTraceToString()}")
+                    }
+                    
                     // Improved error handling with detailed error messages
                     val errorMessage = reasons.joinToString("; ") { failure ->
                         when {
@@ -684,7 +768,7 @@ class NavigationActivity : AppCompatActivity() {
                         }
                     }
                     
-                    android.util.Log.e(TAG, "❌ Route build failed: $errorMessage")
+                    android.util.Log.e(TAG, "❌ Processed error message: $errorMessage")
                     
                     // Check if we should retry
                     val shouldRetry = reasons.any { failure ->
@@ -716,6 +800,8 @@ class NavigationActivity : AppCompatActivity() {
                     routes: List<NavigationRoute>,
                     routerOrigin: String
                 ) {
+                    isCallbackReceived = true
+                    timeoutHandler.removeCallbacks(timeoutRunnable)
                     if (routes.isEmpty()) {
                         sendEvent(MapBoxEvents.ROUTE_BUILD_NO_ROUTES_FOUND)
                         return
@@ -758,6 +844,12 @@ class NavigationActivity : AppCompatActivity() {
             // Set routes for navigation
             mapboxNavigation.setNavigationRoutes(routes)
             android.util.Log.d(TAG, "Routes set, count: ${routes.size}")
+            
+            // Update viewport data source with the route BEFORE requesting camera overview
+            // This is critical for the camera to know where to position itself
+            viewportDataSource.onRouteChanged(routes.first())
+            viewportDataSource.evaluate()
+            android.util.Log.d(TAG, "📍 Viewport data source updated with route")
             
             // Start trip session based on simulation mode
             if (FlutterMapboxNavigationPlugin.simulateRoute) {
@@ -857,6 +949,11 @@ class NavigationActivity : AppCompatActivity() {
             isShowingRouteSelection = true
             selectedRouteIndex = 0
             
+            // Update viewport data source with the first route BEFORE requesting camera overview
+            viewportDataSource.onRouteChanged(routes.first())
+            viewportDataSource.evaluate()
+            android.util.Log.d(TAG, "📍 Viewport data source updated with route for selection")
+            
             // Draw all routes on map with different styles
             routeLineApi.setNavigationRoutes(routes) { result ->
                 binding.mapView.mapboxMap.style?.let { style ->
@@ -867,6 +964,7 @@ class NavigationActivity : AppCompatActivity() {
             
             // Show route overview camera
             navigationCamera.requestNavigationCameraToOverview()
+            android.util.Log.d(TAG, "📷 Requested camera overview for route selection")
             
             // Show route selection UI
             binding.routeSelectionPanel.visibility = View.VISIBLE

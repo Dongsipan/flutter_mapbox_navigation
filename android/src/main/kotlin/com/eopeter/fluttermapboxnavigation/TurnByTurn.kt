@@ -38,6 +38,9 @@ import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import java.util.*
 import java.io.File
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 open class TurnByTurn(
     ctx: Context,
@@ -498,6 +501,8 @@ open class TurnByTurn(
     private var navigationStartTime: Long = 0
     private var navigationStartPointName: String? = null
     private var navigationEndPointName: String? = null
+    private var navigationInitialDistance: Float? = null  // 初始路线总距离
+    private var navigationDistanceTraveled: Float = 0f    // 已行驶距离
 
     /**
      * Bindings to the example layout.
@@ -556,6 +561,12 @@ open class TurnByTurn(
             try {
                 this.distanceRemaining = routeProgress.distanceRemaining
                 this.durationRemaining = routeProgress.durationRemaining
+
+                // Track distance traveled for history recording
+                if (isRecordingHistory) {
+                    // 使用 distanceTraveled 来追踪已行驶距离
+                    navigationDistanceTraveled = routeProgress.distanceTraveled
+                }
 
                 val progressEvent = MapBoxRouteProgressEvent(routeProgress)
                 PluginUtilities.sendEvent(progressEvent)
@@ -664,6 +675,12 @@ open class TurnByTurn(
             navigationStartPointName = "Start Point"
             navigationEndPointName = "End Point"
             
+            // Record initial route distance
+            navigationInitialDistance = currentRoutes?.firstOrNull()?.directionsRoute?.distance()?.toFloat()
+            navigationDistanceTraveled = 0f
+            
+            Log.d(TAG, "Initial route distance: ${navigationInitialDistance}m")
+            
             // v3: startRecording() 有返回值 List<String>，可选接收
             val paths = mapboxNavigation.historyRecorder.startRecording()
             Log.d(TAG, "History recording started, will write to: $paths")
@@ -693,6 +710,17 @@ open class TurnByTurn(
                 return
             }
             
+            // ✅ 立即捕获必要数据，防止异步回调时被重置
+            val capturedHistoryId = java.util.UUID.randomUUID().toString()
+            val capturedStartTime = navigationStartTime
+            val capturedStartPointName = navigationStartPointName
+            val capturedEndPointName = navigationEndPointName
+            val capturedNavigationMode = navigationMode
+            val capturedMapStyle = StylePreferenceManager.getMapStyle(context)
+            val capturedLightPreset = StylePreferenceManager.getLightPreset(context)
+            val capturedDistanceTraveled = navigationDistanceTraveled
+            val capturedInitialDistance = navigationInitialDistance
+            
             // Stop history recording
             mapboxNavigation.historyRecorder.stopRecording { historyFilePath ->
                 if (historyFilePath != null) {
@@ -701,17 +729,30 @@ open class TurnByTurn(
                     
                     // Calculate navigation duration
                     val navigationEndTime = System.currentTimeMillis()
-                    val duration = ((navigationEndTime - navigationStartTime) / 1000).toInt() // in seconds
+                    val duration = ((navigationEndTime - capturedStartTime) / 1000).toInt() // in seconds
                     
-                    // Save history record to HistoryManager
-                    val historyData = mapOf(
-                        "id" to java.util.UUID.randomUUID().toString(),
+                    // Calculate total distance traveled
+                    // 使用实际行驶距离（distanceTraveled）
+                    val totalDistance: Double? = if (capturedDistanceTraveled > 0) {
+                        capturedDistanceTraveled.toDouble()
+                    } else {
+                        // 如果没有追踪到距离，尝试使用初始距离
+                        capturedInitialDistance?.toDouble()
+                    }
+                    
+                    Log.d(TAG, "Navigation completed - Distance traveled: ${totalDistance}m")
+                    
+                    // Save history record to HistoryManager (without cover first)
+                    val historyData: Map<String, Any?> = mapOf(
+                        "id" to capturedHistoryId,
                         "filePath" to historyFilePath,
-                        "startTime" to navigationStartTime,
+                        "startTime" to capturedStartTime,
+                        "endTime" to navigationEndTime,
+                        "distance" to totalDistance,
                         "duration" to duration.toLong(),
-                        "startPointName" to (navigationStartPointName ?: "Unknown Start"),
-                        "endPointName" to (navigationEndPointName ?: "Unknown End"),
-                        "navigationMode" to when (navigationMode) {
+                        "startPointName" to (capturedStartPointName ?: "Unknown Start"),
+                        "endPointName" to (capturedEndPointName ?: "Unknown End"),
+                        "navigationMode" to when (capturedNavigationMode) {
                             com.mapbox.api.directions.v5.DirectionsCriteria.PROFILE_DRIVING -> "driving"
                             com.mapbox.api.directions.v5.DirectionsCriteria.PROFILE_WALKING -> "walking"
                             com.mapbox.api.directions.v5.DirectionsCriteria.PROFILE_CYCLING -> "cycling"
@@ -722,6 +763,26 @@ open class TurnByTurn(
                     val saved = FlutterMapboxNavigationPlugin.historyManager.saveHistoryRecord(historyData)
                     if (saved) {
                         Log.d(TAG, "✅ History record saved to HistoryManager")
+                        
+                        // 异步生成封面（不阻塞历史记录保存）
+                        CoroutineScope(Dispatchers.Main).launch {
+                            com.eopeter.fluttermapboxnavigation.utilities.HistoryCoverGenerator.generateHistoryCover(
+                                context,
+                                historyFilePath,
+                                capturedHistoryId,
+                                capturedMapStyle,
+                                capturedLightPreset,
+                                object : com.eopeter.fluttermapboxnavigation.utilities.HistoryCoverGenerator.HistoryCoverCallback {
+                                    override fun onSuccess(coverPath: String) {
+                                        Log.d(TAG, "✅ 封面生成成功: $coverPath")
+                                    }
+                                    
+                                    override fun onFailure(error: String) {
+                                        Log.w(TAG, "⚠️ 封面生成失败: $error")
+                                    }
+                                }
+                            )
+                        }
                     } else {
                         Log.e(TAG, "❌ Failed to save history record to HistoryManager")
                     }
@@ -730,8 +791,8 @@ open class TurnByTurn(
                     val eventData = mapOf(
                         "historyFilePath" to historyFilePath,
                         "duration" to duration,
-                        "startPointName" to (navigationStartPointName ?: "Unknown Start"),
-                        "endPointName" to (navigationEndPointName ?: "Unknown End")
+                        "startPointName" to (capturedStartPointName ?: "Unknown Start"),
+                        "endPointName" to (capturedEndPointName ?: "Unknown End")
                     )
                     PluginUtilities.sendEvent(
                         MapBoxEvents.HISTORY_RECORDING_STOPPED,

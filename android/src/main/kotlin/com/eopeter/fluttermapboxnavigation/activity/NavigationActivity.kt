@@ -78,6 +78,9 @@ import com.mapbox.navigation.tripdata.progress.model.EstimatedTimeToArrivalForma
 import com.mapbox.navigation.tripdata.progress.model.PercentDistanceTraveledFormatter
 import com.mapbox.navigation.tripdata.progress.model.TimeRemainingFormatter
 import com.mapbox.navigation.tripdata.progress.model.TripProgressUpdateFormatter
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import com.mapbox.navigation.base.formatter.DistanceFormatterOptions
 import com.mapbox.navigation.core.formatter.MapboxDistanceFormatter
 import com.mapbox.navigation.base.TimeFormat
@@ -151,6 +154,8 @@ class NavigationActivity : AppCompatActivity() {
     private var isRecordingHistory = false
     private var currentHistoryFilePath: String? = null
     private var navigationStartTime: Long = 0L
+    private var navigationInitialDistance: Float? = null  // 初始路线总距离
+    private var navigationDistanceTraveled: Float = 0f    // 已行驶距离
     
     // Navigation Camera for automatic camera management (following official Turn-by-Turn pattern)
     private lateinit var navigationCamera: NavigationCamera
@@ -802,6 +807,11 @@ class NavigationActivity : AppCompatActivity() {
             binding.soundButton?.visibility = View.VISIBLE
             binding.routeOverview?.visibility = View.VISIBLE
             
+            // Capture initial route distance for history recording
+            navigationInitialDistance = routes.firstOrNull()?.directionsRoute?.distance()?.toFloat()
+            navigationDistanceTraveled = 0f
+            android.util.Log.d(TAG, "Initial route distance: ${navigationInitialDistance}m")
+            
             // Start history recording if enabled
             if (FlutterMapboxNavigationPlugin.enableHistoryRecording) {
                 startHistoryRecording()
@@ -1231,6 +1241,11 @@ class NavigationActivity : AppCompatActivity() {
     }
     
     private val routeProgressObserver = RouteProgressObserver { routeProgress ->
+        // Track distance traveled for history recording
+        if (isRecordingHistory) {
+            navigationDistanceTraveled = routeProgress.distanceTraveled
+        }
+        
         // 更新官方 Trip Progress View (SDK v3 官方方式)
         binding.tripProgressView?.render(
             tripProgressApi.getTripProgress(routeProgress)
@@ -1696,8 +1711,6 @@ class NavigationActivity : AppCompatActivity() {
         }
     }
     
-    // ==================== Lifecycle ====================
-    
     // ==================== History Recording ====================
     
     private fun startHistoryRecording() {
@@ -1715,7 +1728,10 @@ class NavigationActivity : AppCompatActivity() {
             isRecordingHistory = true
             navigationStartTime = System.currentTimeMillis()
             
-            android.util.Log.d(TAG, "📹 History recording started at $navigationStartTime")
+            // Reset distance tracking (initial distance already captured in startNavigation)
+            navigationDistanceTraveled = 0f
+            
+            android.util.Log.d(TAG, "📹 History recording started at $navigationStartTime, initial distance: ${navigationInitialDistance}m")
             sendEvent(MapBoxEvents.HISTORY_RECORDING_STARTED)
         } catch (e: Exception) {
             android.util.Log.e(TAG, "Failed to start history recording: ${e.message}", e)
@@ -1733,6 +1749,17 @@ class NavigationActivity : AppCompatActivity() {
                 return
             }
             
+            // ✅ 立即捕获必要数据，防止异步回调时被重置
+            val capturedHistoryId = java.util.UUID.randomUUID().toString()
+            val capturedStartTime = navigationStartTime
+            val capturedStartPointName = waypointSet.getFirstWaypointName()
+            val capturedEndPointName = waypointSet.getLastWaypointName()
+            val capturedNavigationMode = if (FlutterMapboxNavigationPlugin.simulateRoute) "simulation" else "real"
+            val capturedMapStyle = com.eopeter.fluttermapboxnavigation.utilities.StylePreferenceManager.getMapStyle(this)
+            val capturedLightPreset = com.eopeter.fluttermapboxnavigation.utilities.StylePreferenceManager.getLightPreset(this)
+            val capturedDistanceTraveled = navigationDistanceTraveled
+            val capturedInitialDistance = navigationInitialDistance
+            
             // Stop history recording
             mapboxNavigation.historyRecorder.stopRecording { historyFilePath ->
                 if (historyFilePath != null) {
@@ -1740,31 +1767,70 @@ class NavigationActivity : AppCompatActivity() {
                     currentHistoryFilePath = historyFilePath
                     
                     // Calculate duration
-                    val duration = if (navigationStartTime > 0) {
-                        ((System.currentTimeMillis() - navigationStartTime) / 1000).toInt()
+                    val navigationEndTime = System.currentTimeMillis()
+                    val duration = if (capturedStartTime > 0) {
+                        ((navigationEndTime - capturedStartTime) / 1000).toInt()
                     } else {
                         0
                     }
                     
-                    // Extract origin and destination names from waypoints
-                    val startPointName = waypointSet.getFirstWaypointName()
-                    val endPointName = waypointSet.getLastWaypointName()
+                    // Calculate total distance using actual distance traveled
+                    val totalDistance: Double? = if (capturedDistanceTraveled > 0) {
+                        capturedDistanceTraveled.toDouble()
+                    } else {
+                        capturedInitialDistance?.toDouble()
+                    }
                     
-                    // Save history record to HistoryManager
+                    android.util.Log.d(TAG, "📊 Navigation Summary:")
+                    android.util.Log.d(TAG, "  - Start Time: $capturedStartTime")
+                    android.util.Log.d(TAG, "  - End Time: $navigationEndTime")
+                    android.util.Log.d(TAG, "  - Duration: ${duration}s")
+                    android.util.Log.d(TAG, "  - Initial Distance: ${capturedInitialDistance}m")
+                    android.util.Log.d(TAG, "  - Distance Traveled: ${capturedDistanceTraveled}m")
+                    android.util.Log.d(TAG, "  - Total Distance: ${totalDistance}m")
+                    android.util.Log.d(TAG, "  - Start Point: $capturedStartPointName")
+                    android.util.Log.d(TAG, "  - End Point: $capturedEndPointName")
+                    android.util.Log.d(TAG, "  - Mode: $capturedNavigationMode")
+                    
+                    // Save history record to HistoryManager (without cover first)
                     try {
-                        val historyData = mapOf(
-                            "id" to java.util.UUID.randomUUID().toString(),
+                        val historyData: Map<String, Any?> = mapOf(
+                            "id" to capturedHistoryId,
                             "filePath" to historyFilePath,
-                            "startTime" to navigationStartTime,
+                            "startTime" to capturedStartTime,
+                            "endTime" to navigationEndTime,
+                            "distance" to totalDistance,
                             "duration" to duration.toLong(),
-                            "startPointName" to startPointName,
-                            "endPointName" to endPointName,
-                            "navigationMode" to if (FlutterMapboxNavigationPlugin.simulateRoute) "simulation" else "real"
+                            "startPointName" to capturedStartPointName,
+                            "endPointName" to capturedEndPointName,
+                            "navigationMode" to capturedNavigationMode
                         )
+                        
+                        android.util.Log.d(TAG, "💾 Saving history data: $historyData")
                         
                         val saved = FlutterMapboxNavigationPlugin.historyManager.saveHistoryRecord(historyData)
                         if (saved) {
-                            android.util.Log.d(TAG, "✅ History record saved to database: $startPointName -> $endPointName, duration: ${duration}s")
+                            android.util.Log.d(TAG, "✅ History record saved to database: $capturedStartPointName -> $capturedEndPointName, duration: ${duration}s")
+                            
+                            // 异步生成封面（不阻塞历史记录保存）
+                            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+                                com.eopeter.fluttermapboxnavigation.utilities.HistoryCoverGenerator.generateHistoryCover(
+                                    this@NavigationActivity,
+                                    historyFilePath,
+                                    capturedHistoryId,
+                                    capturedMapStyle,
+                                    capturedLightPreset,
+                                    object : com.eopeter.fluttermapboxnavigation.utilities.HistoryCoverGenerator.HistoryCoverCallback {
+                                        override fun onSuccess(coverPath: String) {
+                                            android.util.Log.d(TAG, "✅ 封面生成成功: $coverPath")
+                                        }
+                                        
+                                        override fun onFailure(error: String) {
+                                            android.util.Log.w(TAG, "⚠️ 封面生成失败: $error")
+                                        }
+                                    }
+                                )
+                            }
                         } else {
                             android.util.Log.w(TAG, "⚠️ Failed to save history record to database")
                         }

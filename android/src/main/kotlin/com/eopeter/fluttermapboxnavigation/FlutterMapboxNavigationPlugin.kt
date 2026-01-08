@@ -166,11 +166,14 @@ class FlutterMapboxNavigationPlugin : FlutterPlugin, MethodCallHandler,
             android.util.Log.d("FlutterMapboxNavigation", "Retrieved ${historyList.size} history records from database")
             
             val historyMaps = historyList.map { history ->
-                android.util.Log.d("FlutterMapboxNavigation", "History record: ${history.id}, path: ${history.historyFilePath}")
+                android.util.Log.d("FlutterMapboxNavigation", "History record: ${history.id}, path: ${history.historyFilePath}, cover: ${history.cover}")
                 mapOf(
                     "id" to history.id,
                     "historyFilePath" to history.historyFilePath,
+                    "cover" to history.cover,
                     "startTime" to history.startTime.time,
+                    "endTime" to history.endTime?.time,
+                    "distance" to history.distance,
                     "duration" to history.duration,
                     "startPointName" to history.startPointName,
                     "endPointName" to history.endPointName,

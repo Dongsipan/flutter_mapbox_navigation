@@ -13,11 +13,11 @@
             android:theme="@style/StylePickerTheme" />
         <activity 
             android:name="com.eopeter.fluttermapboxnavigation.activity.SearchActivity"
-            android:theme="@style/Theme.AppCompat.Light.NoActionBar"
+            android:theme="@style/KtMaterialTheme"
             android:exported="false" />
         <activity 
-            android:name="com.eopeter.fluttermapboxnavigation.NavigationReplayActivity"
-            android:theme="@style/Theme.AppCompat.Light.NoActionBar"
+            android:name="com.eopeter.fluttermapboxnavigation.activity.NavigationReplayActivity"
+            android:theme="@style/KtMaterialTheme"
             android:exported="false" />
     </application>
 

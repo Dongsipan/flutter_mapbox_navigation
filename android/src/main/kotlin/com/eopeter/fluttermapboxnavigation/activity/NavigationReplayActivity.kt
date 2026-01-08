@@ -1,4 +1,4 @@
-package com.eopeter.fluttermapboxnavigation
+package com.eopeter.fluttermapboxnavigation.activity
 
 import android.os.Bundle
 import android.util.Log
@@ -6,6 +6,7 @@ import android.view.View
 import android.view.WindowManager
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
+import com.eopeter.fluttermapboxnavigation.R
 import com.eopeter.fluttermapboxnavigation.databinding.MapboxActivityReplayViewBinding
 import com.mapbox.maps.CameraOptions
 import com.mapbox.maps.EdgeInsets
@@ -58,18 +59,16 @@ class NavigationReplayActivity : AppCompatActivity() {
     private val traveledCumDistMeters = mutableListOf<Double>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        setTheme(R.style.KtMaterialTheme_NoActionBar)
+        // 使用带 ActionBar 的主题（与 StylePickerActivity 一致）
+        setTheme(R.style.KtMaterialTheme)
         super.onCreate(savedInstanceState)
-
-        // 设置透明状态栏和全屏显示
-        StatusBarStyleManager.setupTransparentStatusBar(this)
 
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         binding = MapboxActivityReplayViewBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // 设置标题栏
-        setupTitleBar()
+        // 设置标题栏（使用 supportActionBar）
+        setupActionBar()
 
         // 注册地图视图到样式管理器
         MapStyleManager.registerMapView(binding.mapView)
@@ -89,9 +88,6 @@ class NavigationReplayActivity : AppCompatActivity() {
             adjustMapComponentsForStatusBar()
             handleReplayFile()
         }
-        
-        // 根据地图样式调整状态栏文字颜色
-        StatusBarStyleManager.updateStatusBarForMapStyle(this@NavigationReplayActivity, styleUri)
     }
 
     private fun handleReplayFile() {
@@ -223,83 +219,68 @@ class NavigationReplayActivity : AppCompatActivity() {
 
 
     /**
-     * 设置标题栏
+     * 设置 ActionBar（与 StylePickerActivity 一致）
      */
-    private fun setupTitleBar() {
+    private fun setupActionBar() {
         try {
-            // 设置 Toolbar
-            setSupportActionBar(binding.toolbar)
-            
             // 从Intent获取标题参数
             val customTitle = intent.getStringExtra("title")
-            if (!customTitle.isNullOrEmpty()) {
-                supportActionBar?.title = customTitle
-                Log.d(TAG, "设置自定义标题: $customTitle")
-            } else {
-                // 使用默认标题
-                supportActionBar?.title = getString(R.string.navigation_replay_title)
-                Log.d(TAG, "使用默认标题")
+            
+            supportActionBar?.apply {
+                if (!customTitle.isNullOrEmpty()) {
+                    title = customTitle
+                    Log.d(TAG, "设置自定义标题: $customTitle")
+                } else {
+                    title = getString(R.string.navigation_replay_title)
+                    Log.d(TAG, "使用默认标题")
+                }
+                
+                setDisplayHomeAsUpEnabled(true)
+                elevation = 4f
             }
-
-            // 设置返回按钮点击事件
-            binding.toolbar.setNavigationOnClickListener {
+        } catch (e: Exception) {
+            Log.e(TAG, "设置 ActionBar 失败: ${e.message}", e)
+        }
+    }
+    
+    override fun onOptionsItemSelected(item: android.view.MenuItem): Boolean {
+        return when (item.itemId) {
+            android.R.id.home -> {
                 Log.d(TAG, "返回按钮被点击")
                 onBackPressedDispatcher.onBackPressed()
+                true
             }
-
-            // 调整 AppBar 位置以适配状态栏
-            adjustAppBarForStatusBar()
-
-        } catch (e: Exception) {
-            Log.e(TAG, "设置标题栏失败: ${e.message}", e)
+            else -> super.onOptionsItemSelected(item)
         }
     }
 
-    /**
-     * 调整 AppBar 位置以适配状态栏
-     */
-    private fun adjustAppBarForStatusBar() {
-        val statusBarHeight = getStatusBarHeight()
-        Log.d(TAG, "调整 AppBar 位置，状态栏高度: ${statusBarHeight}px")
-
-        // 设置 AppBar 的上边距为状态栏高度
-        val layoutParams = binding.appBarLayout.layoutParams as androidx.coordinatorlayout.widget.CoordinatorLayout.LayoutParams
-        layoutParams.topMargin = statusBarHeight.toInt()
-        binding.appBarLayout.layoutParams = layoutParams
-    }
-
 
 
     /**
-     * 调整地图组件位置以避免 AppBar 和状态栏遮挡
+     * 调整地图组件位置
      */
     private fun adjustMapComponentsForStatusBar() {
-        // 获取状态栏高度和 AppBar 高度
-        val statusBarHeight = getStatusBarHeight()
-        val appBarHeight = binding.appBarLayout.height.toFloat()
-        val totalTopMargin = statusBarHeight + appBarHeight + 16f // 状态栏 + AppBar + 16dp 间距
-        
-        Log.d(TAG, "状态栏高度: ${statusBarHeight}px, AppBar高度: ${appBarHeight}px")
+        Log.d(TAG, "调整地图组件位置")
 
         // 隐藏比例尺
         binding.mapView.scalebar.updateSettings {
             enabled = false
         }
 
-        // 调整罗盘位置 - 在 AppBar 下方
+        // 调整罗盘位置 - 右上角，留出适当边距
         binding.mapView.compass.updateSettings {
-            marginTop = totalTopMargin
+            marginTop = 16f
             marginRight = 16f
         }
         
         // 隐藏全览按钮（不需要模式切换）
         binding.routeOverview.visibility = View.GONE
 
-        Log.d(TAG, "已调整地图组件位置，避免 AppBar 遮挡")
+        Log.d(TAG, "已调整地图组件位置")
     }
 
     /**
-     * 获取状态栏高度
+     * 获取状态栏高度（保留用于其他可能的用途）
      */
     private fun getStatusBarHeight(): Float {
         val resourceId = resources.getIdentifier("status_bar_height", "dimen", "android")

@@ -2,16 +2,15 @@ package com.eopeter.fluttermapboxnavigation.activity
 
 import android.app.Activity
 import android.content.Intent
-import android.graphics.Color
 import android.os.Bundle
 import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
+import android.widget.FrameLayout
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.SearchView
-import androidx.appcompat.widget.Toolbar
-import androidx.core.content.res.ResourcesCompat
+import androidx.core.view.ViewCompat
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
 import com.eopeter.fluttermapboxnavigation.R
@@ -71,7 +70,6 @@ class SearchActivity : AppCompatActivity() {
 
     // UI组件
     private lateinit var mapView: MapView
-    private lateinit var toolbar: Toolbar
     private lateinit var searchView: SearchView
     private lateinit var searchResultsView: SearchResultsView
     private lateinit var searchPlaceView: SearchPlaceBottomSheetView
@@ -125,7 +123,23 @@ class SearchActivity : AppCompatActivity() {
         searchResultsView = findViewById(R.id.search_results_view)
         searchPlaceView = findViewById(R.id.search_place_view)
         
-        // 初始化底部抽屉 - 完全按照示例
+        // 设置 ActionBar（与 StylePickerActivity 一致）
+        supportActionBar?.apply {
+            title = getString(R.string.simple_ui_toolbar_title)
+            setDisplayHomeAsUpEnabled(true)
+            elevation = 4f
+        }
+        
+        // 使用 OnApplyWindowInsetsListener 精确对齐 SearchResultsView
+        ViewCompat.setOnApplyWindowInsetsListener(searchResultsView) { view, insets ->
+            val actionBarHeight = supportActionBar?.height ?: 0
+            val params = view.layoutParams as FrameLayout.LayoutParams
+            params.topMargin = actionBarHeight
+            view.layoutParams = params
+            insets
+        }
+        
+        // 初始化底部抽屉
         searchPlaceView.apply {
             initialize(CommonSearchViewConfiguration(DistanceUnitType.IMPERIAL))
             addOnCloseClickListener {
@@ -133,26 +147,7 @@ class SearchActivity : AppCompatActivity() {
             }
         }
         
-        // 初始化 Toolbar - 完全按照示例
-        toolbar = findViewById<Toolbar>(R.id.toolbar).apply {
-            title = getString(R.string.simple_ui_toolbar_title)
-            setSupportActionBar(this)
-            
-            // 设置导航图标和颜色 - 完全按照示例
-            ResourcesCompat.getDrawable(
-                resources,
-                com.mapbox.search.ui.R.drawable.mapbox_search_sdk_close_drawable,
-                theme
-            )?.let { drawable ->
-                drawable.setTint(Color.parseColor("#4F6530"))
-                setNavigationIcon(drawable)
-                setNavigationOnClickListener { 
-                    this@SearchActivity.finish() 
-                }
-            }
-        }
-        
-        // 初始化搜索结果视图 - 完全按照示例
+        // 初始化搜索结果视图
         searchResultsView.apply {
             initialize(
                 SearchResultsView.Configuration(
@@ -318,11 +313,12 @@ class SearchActivity : AppCompatActivity() {
     }
 
     /**
-     * 关闭搜索视图 - 完全按照示例
+     * 关闭搜索视图
      */
     private fun closeSearchView() {
-        toolbar.collapseActionView()
         searchView.setQuery("", false)
+        searchView.clearFocus()
+        searchResultsView.isVisible = false
     }
 
     /**
@@ -444,5 +440,15 @@ class SearchActivity : AppCompatActivity() {
         }
         setResult(Activity.RESULT_OK, resultIntent)
         finish()
+    }
+    
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        return when (item.itemId) {
+            android.R.id.home -> {
+                finish()
+                true
+            }
+            else -> super.onOptionsItemSelected(item)
+        }
     }
 }

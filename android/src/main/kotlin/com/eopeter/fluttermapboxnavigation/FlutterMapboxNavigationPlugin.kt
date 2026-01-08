@@ -231,7 +231,7 @@ class FlutterMapboxNavigationPlugin : FlutterPlugin, MethodCallHandler,
             android.util.Log.d("FlutterMapboxNavigation", "Starting history replay with file: $historyFilePath")
 
             // Launch NavigationReplayActivity
-            val intent = android.content.Intent(currentActivity, NavigationReplayActivity::class.java)
+            val intent = android.content.Intent(currentActivity, com.eopeter.fluttermapboxnavigation.activity.NavigationReplayActivity::class.java)
             intent.putExtra("replayFilePath", historyFilePath)  // Use "replayFilePath" key expected by the activity
             intent.putExtra("enableReplayUI", enableReplayUI)
             currentActivity?.startActivity(intent)

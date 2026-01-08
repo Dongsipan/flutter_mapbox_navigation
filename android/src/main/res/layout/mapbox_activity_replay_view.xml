@@ -9,29 +9,7 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
-    <!-- Material AppBar with Toolbar -->
-    <com.google.android.material.appbar.AppBarLayout
-        android:id="@+id/appBarLayout"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:background="@android:color/transparent"
-        android:elevation="0dp"
-        app:elevation="0dp">
-
-        <com.google.android.material.appbar.MaterialToolbar
-            android:id="@+id/toolbar"
-            android:layout_width="match_parent"
-            android:layout_height="?attr/actionBarSize"
-            android:background="#80000000"
-            app:navigationIcon="@android:drawable/ic_menu_close_clear_cancel"
-            app:navigationIconTint="@android:color/white"
-            app:title="@string/navigation_replay_title"
-            app:titleTextColor="@android:color/white"
-            app:titleTextAppearance="@style/TextAppearance.Material3.TitleLarge" />
-
-    </com.google.android.material.appbar.AppBarLayout>
-
-    <!-- Route Overview Button -->
+    <!-- Route Overview Button (隐藏，不需要) -->
     <com.google.android.material.floatingactionbutton.FloatingActionButton
         android:id="@+id/routeOverview"
         android:layout_width="wrap_content"
@@ -40,6 +18,7 @@
         android:layout_marginEnd="16dp"
         android:layout_marginBottom="16dp"
         android:src="@android:drawable/ic_menu_mapmode"
-        android:contentDescription="@string/route_overview" />
+        android:contentDescription="@string/route_overview"
+        android:visibility="gone" />
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

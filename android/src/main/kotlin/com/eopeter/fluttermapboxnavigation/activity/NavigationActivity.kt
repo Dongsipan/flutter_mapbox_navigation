@@ -1344,6 +1344,34 @@ class NavigationActivity : AppCompatActivity() {
             navigationDistanceTraveled = routeProgress.distanceTraveled
         }
         
+        // 📊 Log detailed route progress information
+        android.util.Log.d(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        android.util.Log.d(TAG, "📍 Route Progress Update:")
+        android.util.Log.d(TAG, "   Distance Remaining: ${String.format("%.1f", routeProgress.distanceRemaining)}m")
+        android.util.Log.d(TAG, "   Duration Remaining: ${String.format("%.1f", routeProgress.durationRemaining)}s")
+        android.util.Log.d(TAG, "   Distance Traveled: ${String.format("%.1f", routeProgress.distanceTraveled)}m")
+        android.util.Log.d(TAG, "   Leg Index: ${routeProgress.currentLegProgress?.legIndex}")
+        android.util.Log.d(TAG, "   Step Index: ${routeProgress.currentLegProgress?.currentStepProgress?.stepIndex}")
+        android.util.Log.d(TAG, "   Current Step Distance Remaining: ${String.format("%.1f", routeProgress.currentLegProgress?.currentStepProgress?.distanceRemaining ?: 0f)}m")
+        
+        // Log banner instructions
+        routeProgress.bannerInstructions?.let { banner ->
+            android.util.Log.d(TAG, "   📢 Banner Instruction:")
+            android.util.Log.d(TAG, "      Primary: ${banner.primary()?.text()}")
+            android.util.Log.d(TAG, "      Type: ${banner.primary()?.type()}")
+            android.util.Log.d(TAG, "      Modifier: ${banner.primary()?.modifier()}")
+            banner.secondary()?.let { secondary ->
+                android.util.Log.d(TAG, "      Secondary: ${secondary.text()}")
+            }
+        }
+        
+        // Log voice instructions
+        routeProgress.voiceInstructions?.let { voice ->
+            android.util.Log.d(TAG, "   🔊 Voice Instruction: ${voice.announcement()}")
+        }
+        
+        android.util.Log.d(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        
         // 更新官方 Trip Progress View (SDK v3 官方方式)
         binding.tripProgressView?.render(
             tripProgressApi.getTripProgress(routeProgress)
@@ -1367,6 +1395,10 @@ class NavigationActivity : AppCompatActivity() {
         val progressEvent = MapBoxRouteProgressEvent(routeProgress)
         FlutterMapboxNavigationPlugin.distanceRemaining = routeProgress.distanceRemaining
         FlutterMapboxNavigationPlugin.durationRemaining = routeProgress.durationRemaining
+        
+        // Log the JSON being sent to Flutter
+        android.util.Log.v(TAG, "📤 Sending to Flutter: ${progressEvent.toJson()}")
+        
         sendEvent(progressEvent)
         
         // Update viewport data source with route progress (SDK v3 official pattern)

@@ -132,7 +132,6 @@ class SearchActivity : AppCompatActivity() {
         // 初始化底部抽屉 - 参照官方示例
         searchPlaceView.apply {
             initialize(CommonSearchViewConfiguration(DistanceUnitType.IMPERIAL))
-            isShareButtonVisible = false
             addOnCloseClickListener {
                 mapMarkersManager.clearMarkers()
                 hide()
@@ -140,6 +139,9 @@ class SearchActivity : AppCompatActivity() {
                 if (::searchView.isInitialized && !searchView.isIconified) {
                     searchResultsView.isVisible = true
                 }
+            }
+            addOnShareClickListener { searchPlace ->
+                startActivity(shareIntent(searchPlace))
             }
         }
         
@@ -408,6 +410,27 @@ class SearchActivity : AppCompatActivity() {
         )
         
         return listOf(startPoint.toMap(), endPoint.toMap())
+    }
+
+    /**
+     * 创建分享 Intent
+     */
+    private fun shareIntent(searchPlace: SearchPlace): Intent {
+        val shareText = buildString {
+            append(searchPlace.name)
+            searchPlace.address?.formattedAddress()?.let { address ->
+                append("\n")
+                append(address)
+            }
+            append("\n")
+            append("https://www.google.com/maps/search/?api=1&query=${searchPlace.coordinate.latitude()},${searchPlace.coordinate.longitude()}")
+        }
+        
+        return Intent().apply {
+            action = Intent.ACTION_SEND
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TEXT, shareText)
+        }
     }
 
     /**

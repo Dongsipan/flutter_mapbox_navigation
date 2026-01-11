@@ -236,6 +236,9 @@ class NavigationActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setTheme(R.style.AppTheme)
         
+        // Keep screen on during navigation to prevent auto-sleep
+        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        
         // Initialize View Binding
         binding = NavigationActivityBinding.inflate(layoutInflater)
         setContentView(binding.root)

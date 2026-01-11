@@ -23,10 +23,12 @@ import com.mapbox.geojson.Point
 import com.mapbox.maps.CameraOptions
 import com.mapbox.maps.MapView
 import com.mapbox.maps.plugin.annotation.annotations
-import com.mapbox.maps.plugin.annotation.generated.PointAnnotationManager
-import com.mapbox.maps.plugin.annotation.generated.PointAnnotationOptions
-import com.mapbox.maps.plugin.annotation.generated.createPointAnnotationManager
+import com.mapbox.maps.EdgeInsets
+import com.mapbox.maps.plugin.annotation.generated.CircleAnnotationOptions
+import com.mapbox.maps.plugin.annotation.generated.createCircleAnnotationManager
+import com.mapbox.maps.plugin.locationcomponent.OnIndicatorPositionChangedListener
 import com.mapbox.maps.plugin.locationcomponent.location
+import com.mapbox.android.gestures.Utils.dpToPx
 import com.mapbox.search.ApiType
 import com.mapbox.search.ResponseInfo
 import com.mapbox.search.SearchEngine
@@ -76,7 +78,7 @@ class SearchActivity : AppCompatActivity() {
 
     // Mapbox组件
     private lateinit var searchEngineUiAdapter: SearchEngineUiAdapter
-    private lateinit var pointAnnotationManager: PointAnnotationManager
+    private lateinit var mapMarkersManager: MapMarkersManager
 
     // 辅助类
     private lateinit var locationHelper: LocationHelper
@@ -110,9 +112,6 @@ class SearchActivity : AppCompatActivity() {
         
         // 设置导航监听器
         setupNavigationListener()
-
-        // 检查位置权限
-        checkLocationPermission()
     }
 
     /**
@@ -130,20 +129,17 @@ class SearchActivity : AppCompatActivity() {
             elevation = 4f
         }
         
-        // 使用 OnApplyWindowInsetsListener 精确对齐 SearchResultsView
-        ViewCompat.setOnApplyWindowInsetsListener(searchResultsView) { view, insets ->
-            val actionBarHeight = supportActionBar?.height ?: 0
-            val params = view.layoutParams as FrameLayout.LayoutParams
-            params.topMargin = actionBarHeight
-            view.layoutParams = params
-            insets
-        }
-        
-        // 初始化底部抽屉
+        // 初始化底部抽屉 - 参照官方示例
         searchPlaceView.apply {
             initialize(CommonSearchViewConfiguration(DistanceUnitType.IMPERIAL))
+            isShareButtonVisible = false
             addOnCloseClickListener {
+                mapMarkersManager.clearMarkers()
                 hide()
+                // 如果搜索框是展开状态，重新显示搜索结果列表
+                if (::searchView.isInitialized && !searchView.isIconified) {
+                    searchResultsView.isVisible = true
+                }
             }
         }
         
@@ -162,11 +158,11 @@ class SearchActivity : AppCompatActivity() {
     }
 
     /**
-     * 设置地图视图
+     * 设置地图视图 - 参照官方示例
      */
     private fun setupMapView() {
-        // 创建点标注管理器
-        pointAnnotationManager = mapView.annotations.createPointAnnotationManager()
+        // 创建标记管理器
+        mapMarkersManager = MapMarkersManager(mapView)
 
         // Load user's preferred map style
         val styleUrl = StylePreferenceManager.getMapStyleUrl(this)
@@ -179,11 +175,27 @@ class SearchActivity : AppCompatActivity() {
             Log.d(TAG, "Map style loaded successfully: $styleUrl")
         }
 
-        // 启用用户位置显示
+        // 启用用户位置显示并自动定位 - 参照官方示例
         mapView.location.updateSettings {
             enabled = true
             pulsingEnabled = true
         }
+        
+        // 添加位置监听器，在获取到第一个位置后自动移动相机
+        mapView.location.addOnIndicatorPositionChangedListener(object : OnIndicatorPositionChangedListener {
+            override fun onIndicatorPositionChanged(point: Point) {
+                currentLocation = point
+                mapView.mapboxMap.setCamera(
+                    CameraOptions.Builder()
+                        .center(point)
+                        .zoom(14.0)
+                        .build()
+                )
+                // 只在第一次获取位置时移动相机，然后移除监听器
+                mapView.location.removeOnIndicatorPositionChangedListener(this)
+                Log.d(TAG, "自动定位到当前位置: $point")
+            }
+        })
 
         Log.d(TAG, "地图视图初始化完成")
     }
@@ -220,7 +232,8 @@ class SearchActivity : AppCompatActivity() {
                 results: List<SearchResult>,
                 responseInfo: ResponseInfo
             ) {
-                // Nothing to do
+                closeSearchView()
+                mapMarkersManager.showMarkers(results.map { it.coordinate })
             }
 
             override fun onOfflineSearchResultsShown(
@@ -240,6 +253,7 @@ class SearchActivity : AppCompatActivity() {
             ) {
                 closeSearchView()
                 searchPlaceView.open(SearchPlace.createFromSearchResult(searchResult, responseInfo))
+                mapMarkersManager.showMarker(searchResult.coordinate)
             }
 
             override fun onOfflineSearchResultSelected(
@@ -248,6 +262,7 @@ class SearchActivity : AppCompatActivity() {
             ) {
                 closeSearchView()
                 searchPlaceView.open(SearchPlace.createFromOfflineSearchResult(searchResult))
+                mapMarkersManager.showMarker(searchResult.coordinate)
             }
 
             override fun onError(e: Exception) {
@@ -259,6 +274,7 @@ class SearchActivity : AppCompatActivity() {
                 searchPlaceView.open(
                     SearchPlace.createFromIndexableRecord(historyRecord, distanceMeters = null)
                 )
+                mapMarkersManager.showMarker(historyRecord.coordinate)
             }
 
             override fun onPopulateQueryClick(
@@ -322,42 +338,6 @@ class SearchActivity : AppCompatActivity() {
     }
 
     /**
-     * 移动到当前位置
-     */
-    private fun moveToCurrentLocation() {
-        lifecycleScope.launch {
-            val location = locationHelper.getCurrentLocation()
-            if (location != null) {
-                currentLocation = location
-                mapView.mapboxMap.setCamera(
-                    CameraOptions.Builder()
-                        .center(location)
-                        .zoom(15.0)
-                        .build()
-                )
-                Log.d(TAG, "移动到当前位置: $location")
-            } else {
-                Toast.makeText(
-                    this@SearchActivity,
-                    R.string.location_service_disabled,
-                    Toast.LENGTH_SHORT
-                ).show()
-            }
-        }
-    }
-
-    /**
-     * 检查位置权限
-     */
-    private fun checkLocationPermission() {
-        if (!locationHelper.hasLocationPermission()) {
-            locationHelper.requestLocationPermission(this)
-        } else {
-            moveToCurrentLocation()
-        }
-    }
-
-    /**
      * 处理权限请求结果
      */
     override fun onRequestPermissionsResult(
@@ -368,15 +348,14 @@ class SearchActivity : AppCompatActivity() {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         
         if (requestCode == LocationHelper.LOCATION_PERMISSION_REQUEST_CODE) {
-            if (locationHelper.hasLocationPermission()) {
-                moveToCurrentLocation()
-            } else {
+            if (!locationHelper.hasLocationPermission()) {
                 Toast.makeText(
                     this,
                     R.string.location_permission_required,
                     Toast.LENGTH_LONG
                 ).show()
             }
+            // 位置监听器会自动处理定位
         }
     }
 
@@ -450,5 +429,85 @@ class SearchActivity : AppCompatActivity() {
             }
             else -> super.onOptionsItemSelected(item)
         }
+    }
+}
+
+/**
+ * 地图标记管理器 - 参照官方示例
+ * 管理搜索结果在地图上的标记显示
+ */
+private class MapMarkersManager(mapView: MapView) {
+    private val mapboxMap = mapView.mapboxMap
+    private val circleAnnotationManager = mapView.annotations.createCircleAnnotationManager(null)
+    private val markers = mutableMapOf<String, Point>()
+
+    val hasMarkers: Boolean
+        get() = markers.isNotEmpty()
+
+    fun clearMarkers() {
+        markers.clear()
+        circleAnnotationManager.deleteAll()
+    }
+
+    fun showMarker(coordinate: Point) {
+        showMarkers(listOf(coordinate))
+    }
+
+    fun showMarkers(coordinates: List<Point>) {
+        clearMarkers()
+        if (coordinates.isEmpty()) {
+            return
+        }
+
+        coordinates.forEach { coordinate ->
+            val circleAnnotationOptions = CircleAnnotationOptions()
+                .withPoint(coordinate)
+                .withCircleRadius(8.0)
+                .withCircleColor("#ee4e8b")
+                .withCircleStrokeWidth(2.0)
+                .withCircleStrokeColor("#ffffff")
+
+            val annotation = circleAnnotationManager.create(circleAnnotationOptions)
+            markers[annotation.id] = coordinate
+        }
+
+        val onOptionsReadyCallback: (CameraOptions) -> Unit = {
+            mapboxMap.setCamera(it)
+        }
+
+        if (coordinates.size == 1) {
+            val options = CameraOptions.Builder()
+                .center(coordinates.first())
+                .padding(MARKERS_INSETS_OPEN_CARD)
+                .zoom(14.0)
+                .build()
+            onOptionsReadyCallback(options)
+        } else {
+            mapboxMap.cameraForCoordinates(
+                coordinates,
+                CameraOptions.Builder().build(),
+                MARKERS_INSETS,
+                null,
+                null,
+                onOptionsReadyCallback,
+            )
+        }
+    }
+
+    companion object {
+        private val MARKERS_EDGE_OFFSET = dpToPx(64f).toDouble()
+        private val PLACE_CARD_HEIGHT = dpToPx(300f).toDouble()
+        private val MARKERS_INSETS = EdgeInsets(
+            MARKERS_EDGE_OFFSET,
+            MARKERS_EDGE_OFFSET,
+            MARKERS_EDGE_OFFSET,
+            MARKERS_EDGE_OFFSET
+        )
+        private val MARKERS_INSETS_OPEN_CARD = EdgeInsets(
+            MARKERS_EDGE_OFFSET,
+            MARKERS_EDGE_OFFSET,
+            PLACE_CARD_HEIGHT,
+            MARKERS_EDGE_OFFSET
+        )
     }
 }

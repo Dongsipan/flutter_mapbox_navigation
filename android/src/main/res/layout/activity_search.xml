@@ -1,10 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout
+<androidx.coordinatorlayout.widget.CoordinatorLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/search_container_view"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:fitsSystemWindows="true"
     tools:context=".activity.SearchActivity">
 
     <!-- 地图视图 -->
@@ -20,21 +22,12 @@
         android:layout_height="match_parent"
         android:background="@android:color/white" />
 
-    <!-- CoordinatorLayout 包裹 SearchPlaceBottomSheetView -->
-    <androidx.coordinatorlayout.widget.CoordinatorLayout
-        android:id="@+id/search_container_view"
+    <!-- 底部抽屉 - 必须直接放在 CoordinatorLayout 内 -->
+    <com.mapbox.search.ui.view.place.SearchPlaceBottomSheetView
+        android:id="@+id/search_place_view"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:layout_marginTop="?actionBarSize">
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:elevation="8dp"/>
 
-        <!-- 底部抽屉 - 显式添加 BottomSheetBehavior -->
-        <com.mapbox.search.ui.view.place.SearchPlaceBottomSheetView
-            android:id="@+id/search_place_view"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center_horizontal"
-            android:elevation="8dp"/>
-
-    </androidx.coordinatorlayout.widget.CoordinatorLayout>
-
-</FrameLayout>
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

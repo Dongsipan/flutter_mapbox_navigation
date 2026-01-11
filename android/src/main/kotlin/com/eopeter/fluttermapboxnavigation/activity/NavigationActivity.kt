@@ -722,7 +722,7 @@ class NavigationActivity : AppCompatActivity() {
                 .waypointIndicesList(waypointSet.waypointsIndices())
                 .waypointNamesList(waypointSet.waypointsNames())
                 .language(FlutterMapboxNavigationPlugin.navigationLanguage)
-                .alternatives(FlutterMapboxNavigationPlugin.showAlternateRoutes)
+                .alternatives(FlutterMapboxNavigationPlugin.alternatives)
                 .voiceUnits(FlutterMapboxNavigationPlugin.navigationVoiceUnits)
                 .bannerInstructions(FlutterMapboxNavigationPlugin.bannerInstructionsEnabled)
                 .voiceInstructions(FlutterMapboxNavigationPlugin.voiceInstructionsEnabled)
@@ -814,11 +814,12 @@ class NavigationActivity : AppCompatActivity() {
                     
                     currentRoutes = routes
                     
-                    // If alternative routes are enabled and we have multiple routes, show route selection
-                    if (FlutterMapboxNavigationPlugin.showAlternateRoutes && routes.size > 1) {
+                    // Check autoBuildRoute parameter (consistent with iOS behavior)
+                    if (!FlutterMapboxNavigationPlugin.autoBuildRoute) {
+                        // When autoBuildRoute is false, always show route selection UI
                         showRouteSelection(routes)
                     } else {
-                        // Start navigation immediately with the first route
+                        // When autoBuildRoute is true, start navigation immediately
                         startNavigation(routes)
                     }
                 }

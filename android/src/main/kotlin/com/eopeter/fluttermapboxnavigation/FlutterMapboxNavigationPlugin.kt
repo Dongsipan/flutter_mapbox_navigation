@@ -70,7 +70,8 @@ class FlutterMapboxNavigationPlugin : FlutterPlugin, MethodCallHandler,
         private var currentRoute: DirectionsRoute? = null
         val wayPoints: MutableList<Waypoint> = mutableListOf()
 
-        var showAlternateRoutes: Boolean = true
+        var alternatives: Boolean = true
+        var autoBuildRoute: Boolean = true
         var longPressDestinationEnabled: Boolean = true
         var allowsUTurnsAtWayPoints: Boolean = false
         var enableOnMapTapCallback: Boolean = false
@@ -371,7 +372,12 @@ class FlutterMapboxNavigationPlugin : FlutterPlugin, MethodCallHandler,
 
         val alternateRoutes = arguments?.get("alternatives") as? Boolean
         if (alternateRoutes != null) {
-            showAlternateRoutes = alternateRoutes
+            alternatives = alternateRoutes
+        }
+
+        val autoBuild = arguments?.get("autoBuildRoute") as? Boolean
+        if (autoBuild != null) {
+            autoBuildRoute = autoBuild
         }
 
         val simulated = arguments?.get("simulateRoute") as? Boolean

@@ -21,7 +21,7 @@ class MethodChannelFlutterMapboxNavigation
   final eventChannel = const EventChannel('flutter_mapbox_navigation/events');
 
   late StreamSubscription<RouteEvent> _routeEventSubscription;
-  late ValueSetter<RouteEvent>? _onRouteEvent;
+  ValueSetter<RouteEvent>? _onRouteEvent;
 
   @override
   Future<String?> getPlatformVersion() async {
@@ -113,11 +113,159 @@ class MethodChannelFlutterMapboxNavigation
     _onRouteEvent = listener;
   }
 
+  @override
+  Future<List<NavigationHistory>> getNavigationHistoryList() async {
+    try {
+      log('Calling getNavigationHistoryList method');
+      final result = await methodChannel
+          .invokeMethod<List<dynamic>>('getNavigationHistoryList');
+      log('Received result from native: $result');
+
+      if (result != null) {
+        log('Result is not null, processing ${result.length} items');
+        final historyList = result.map(
+          (item) {
+            log('Processing item: $item');
+            try {
+              // 安全地转换 Map<Object?, Object?> 到 Map<String, dynamic>
+              final itemMap = Map<String, dynamic>.from(item as Map);
+              log('Converted item map: $itemMap');
+              final history = NavigationHistory.fromMap(itemMap);
+              log('Successfully created NavigationHistory: ${history}');
+              return history;
+            } catch (e, stackTrace) {
+              log('Error creating NavigationHistory from item: $item');
+              log('Error: $e');
+              log('StackTrace: $stackTrace');
+              rethrow;
+            }
+          },
+        ).toList();
+        log('Successfully created ${historyList.length} NavigationHistory objects');
+        return historyList;
+      }
+      log('Result is null, returning empty list');
+      return [];
+    } catch (e) {
+      log('Error getting navigation history list: $e');
+      return [];
+    }
+  }
+
+  @override
+  Future<bool> deleteNavigationHistory(String historyId) async {
+    try {
+      final result =
+          await methodChannel.invokeMethod<bool>('deleteNavigationHistory', {
+        'historyId': historyId,
+      });
+      return result ?? false;
+    } catch (e) {
+      log('Error deleting navigation history: $e');
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> clearAllNavigationHistory() async {
+    try {
+      final result =
+          await methodChannel.invokeMethod<bool>('clearAllNavigationHistory');
+      return result ?? false;
+    } catch (e) {
+      log('Error clearing all navigation history: $e');
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> startHistoryReplay({
+    required String historyFilePath,
+    bool enableReplayUI = true,
+  }) async {
+    try {
+      log('Starting history replay with file: $historyFilePath');
+      final result = await methodChannel.invokeMethod<bool>(
+        'startHistoryReplay',
+        {
+          'historyFilePath': historyFilePath,
+          'enableReplayUI': enableReplayUI,
+        },
+      );
+      return result ?? false;
+    } catch (e) {
+      log('Error starting history replay: $e');
+      return false;
+    }
+  }
+
+  @override
+  Future<String?> generateHistoryCover({
+    required String historyFilePath,
+    String? historyId,
+  }) async {
+    try {
+      final result = await methodChannel.invokeMethod<String>(
+        'generateHistoryCover',
+        {
+          'historyFilePath': historyFilePath,
+          'historyId': historyId,
+        },
+      );
+      return result;
+    } catch (e) {
+      log('Error generating history cover: $e');
+      return null;
+    }
+  }
+
+  @override
+  Future<NavigationHistoryEvents> getNavigationHistoryEvents(
+    String historyId,
+  ) async {
+    // 参数验证
+    if (historyId.isEmpty) {
+      throw ArgumentError('historyId cannot be empty');
+    }
+
+    try {
+      log('Calling getNavigationHistoryEvents with historyId: $historyId');
+      final result = await methodChannel.invokeMethod<Map<dynamic, dynamic>>(
+        'getNavigationHistoryEvents',
+        {'historyId': historyId},
+      );
+
+      if (result == null) {
+        throw Exception('Failed to get navigation history events: null result');
+      }
+
+      log('Received result from native: $result');
+      // 安全地转换 Map<dynamic, dynamic> 到 Map<String, dynamic>
+      final resultMap = Map<String, dynamic>.from(result);
+      return NavigationHistoryEvents.fromMap(resultMap);
+    } on PlatformException catch (e) {
+      log('Platform error getting navigation history events: ${e.code} - ${e.message}');
+      throw Exception(
+        'Failed to get navigation history events: ${e.message ?? e.code}',
+      );
+    } catch (e) {
+      log('Error getting navigation history events: $e');
+      rethrow;
+    }
+  }
+
   /// Events Handling
   Stream<RouteEvent>? get routeEventsListener {
-    return eventChannel
-        .receiveBroadcastStream()
-        .map((dynamic event) => _parseRouteEvent(event as String));
+    return eventChannel.receiveBroadcastStream().map((dynamic event) {
+      if (event == null) {
+        // 如果事件为空，返回一个默认的事件
+        return RouteEvent(
+          eventType: MapBoxEvent.map_ready,
+          data: 'null event received',
+        );
+      }
+      return _parseRouteEvent(event as String);
+    });
   }
 
   void _onProgressData(RouteEvent event) {
@@ -133,19 +281,32 @@ class MethodChannelFlutterMapboxNavigation
   }
 
   RouteEvent _parseRouteEvent(String jsonString) {
-    RouteEvent event;
-    final map = json.decode(jsonString);
-    final progressEvent =
-        RouteProgressEvent.fromJson(map as Map<String, dynamic>);
-    if (progressEvent.isProgressEvent!) {
-      event = RouteEvent(
-        eventType: MapBoxEvent.progress_change,
-        data: progressEvent,
+    try {
+      if (jsonString.isEmpty) {
+        return RouteEvent(
+          eventType: MapBoxEvent.map_ready,
+          data: 'empty json string',
+        );
+      }
+
+      final map = json.decode(jsonString);
+      if (map == null) {
+        return RouteEvent(
+          eventType: MapBoxEvent.map_ready,
+          data: 'null json data',
+        );
+      }
+
+      // 直接使用 RouteEvent.fromJson 来解析，它会根据 eventType 正确处理不同类型的事件
+      return RouteEvent.fromJson(map as Map<String, dynamic>);
+    } catch (e) {
+      // 如果解析失败，返回一个错误事件
+      debugPrint('Error parsing route event: $e, jsonString: $jsonString');
+      return RouteEvent(
+        eventType: MapBoxEvent.map_ready,
+        data: 'parse error: $e',
       );
-    } else {
-      event = RouteEvent.fromJson(map);
     }
-    return event;
   }
 
   List<Map<String, Object?>> _getPointListFromWayPoints(

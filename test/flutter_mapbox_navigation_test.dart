@@ -42,6 +42,42 @@ class MockFlutterMapboxNavigationPlatform
     ValueSetter<RouteEvent> listener,
   ) =>
       Future.value();
+
+  @override
+  Future<List<NavigationHistory>> getNavigationHistoryList() =>
+      Future.value([]);
+
+  @override
+  Future<bool> deleteNavigationHistory(String historyId) => Future.value(true);
+
+  @override
+  Future<bool> clearAllNavigationHistory() => Future.value(true);
+
+  @override
+  Future<bool> startHistoryReplay({
+    required String historyFilePath,
+    bool enableReplayUI = true,
+  }) =>
+      Future.value(true);
+
+  @override
+  Future<String?> generateHistoryCover({
+    required String historyFilePath,
+    String? historyId,
+  }) =>
+      Future.value(null);
+
+  @override
+  Future<NavigationHistoryEvents> getNavigationHistoryEvents(
+    String historyId,
+  ) =>
+      Future.value(
+        NavigationHistoryEvents(
+          historyId: historyId,
+          events: [],
+          rawLocations: [],
+        ),
+      );
 }
 
 void main() {

@@ -1,6 +1,6 @@
-import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_mapbox_navigation/flutter_mapbox_navigation.dart';
 import 'package:flutter_mapbox_navigation/src/extensions/navigation_extensions.dart';
+import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('NavigationExtensions Tests', () {
@@ -22,8 +22,9 @@ void main() {
         const lat2 = 39.9163;
         const lon2 = 116.3972;
 
-        final distance = NavigationExtensions.calculateDistance(lat1, lon1, lat2, lon2);
-        
+        final distance =
+            NavigationExtensions.calculateDistance(lat1, lon1, lat2, lon2);
+
         // 验证距离在合理范围内（1000-1700米）
         expect(distance, greaterThan(1000));
         expect(distance, lessThan(1700));
@@ -33,8 +34,9 @@ void main() {
         const lat = 39.9042;
         const lon = 116.4074;
 
-        final distance = NavigationExtensions.calculateDistance(lat, lon, lat, lon);
-        
+        final distance =
+            NavigationExtensions.calculateDistance(lat, lon, lat, lon);
+
         expect(distance, equals(0));
       });
     });
@@ -47,7 +49,7 @@ void main() {
         ];
 
         final optimized = extensions.optimizeRoute(wayPoints);
-        
+
         expect(optimized.length, equals(2));
         expect(optimized[0].name, equals('Start'));
         expect(optimized[1].name, equals('End'));
@@ -55,18 +57,19 @@ void main() {
 
       test('should optimize route with multiple waypoints', () {
         final wayPoints = [
-          WayPoint(name: 'Start', latitude: 39.9042, longitude: 116.4074), // 天安门
-          WayPoint(name: 'Far', latitude: 39.9500, longitude: 116.4500),   // 远点
-          WayPoint(name: 'Near', latitude: 39.9100, longitude: 116.4100),  // 近点
-          WayPoint(name: 'End', latitude: 39.9163, longitude: 116.3972),   // 故宫
+          WayPoint(
+              name: 'Start', latitude: 39.9042, longitude: 116.4074,), // 天安门
+          WayPoint(name: 'Far', latitude: 39.9500, longitude: 116.4500), // 远点
+          WayPoint(name: 'Near', latitude: 39.9100, longitude: 116.4100), // 近点
+          WayPoint(name: 'End', latitude: 39.9163, longitude: 116.3972), // 故宫
         ];
 
         final optimized = extensions.optimizeRoute(wayPoints);
-        
+
         expect(optimized.length, equals(4));
         expect(optimized[0].name, equals('Start')); // 起点不变
-        expect(optimized[3].name, equals('End'));   // 终点不变
-        
+        expect(optimized[3].name, equals('End')); // 终点不变
+
         // 验证中间点被重新排序（近点应该在远点之前）
         final nearIndex = optimized.indexWhere((wp) => wp.name == 'Near');
         final farIndex = optimized.indexWhere((wp) => wp.name == 'Far');
@@ -82,7 +85,7 @@ void main() {
         ];
 
         final isValid = extensions.validateWayPoints(wayPoints);
-        
+
         expect(isValid, isTrue);
       });
 
@@ -92,7 +95,7 @@ void main() {
         ];
 
         final isValid = extensions.validateWayPoints(wayPoints);
-        
+
         expect(isValid, isFalse);
       });
 
@@ -103,7 +106,7 @@ void main() {
         ];
 
         final isValid = extensions.validateWayPoints(wayPoints);
-        
+
         expect(isValid, isFalse);
       });
     });
@@ -134,10 +137,12 @@ void main() {
 
         for (final wayPoint in wayPoints) {
           final distance = NavigationExtensions.calculateDistance(
-            centerLat, centerLon,
-            wayPoint.latitude!, wayPoint.longitude!,
+            centerLat,
+            centerLon,
+            wayPoint.latitude!,
+            wayPoint.longitude!,
           );
-          
+
           // 验证距离在半径范围内（加上一些容差）
           expect(distance, lessThanOrEqualTo(radiusKm * 1000 + 100));
         }
@@ -153,19 +158,23 @@ void main() {
         ];
 
         final totalDistance = extensions.calculateTotalDistance(wayPoints);
-        
+
         expect(totalDistance, greaterThan(0));
-        
+
         // 验证总距离等于各段距离之和
         final distanceAB = NavigationExtensions.calculateDistance(
-          wayPoints[0].latitude!, wayPoints[0].longitude!,
-          wayPoints[1].latitude!, wayPoints[1].longitude!,
+          wayPoints[0].latitude!,
+          wayPoints[0].longitude!,
+          wayPoints[1].latitude!,
+          wayPoints[1].longitude!,
         );
         final distanceBC = NavigationExtensions.calculateDistance(
-          wayPoints[1].latitude!, wayPoints[1].longitude!,
-          wayPoints[2].latitude!, wayPoints[2].longitude!,
+          wayPoints[1].latitude!,
+          wayPoints[1].longitude!,
+          wayPoints[2].latitude!,
+          wayPoints[2].longitude!,
         );
-        
+
         expect(totalDistance, closeTo(distanceAB + distanceBC, 1.0));
       });
 
@@ -175,7 +184,7 @@ void main() {
         ];
 
         final totalDistance = extensions.calculateTotalDistance(wayPoints);
-        
+
         expect(totalDistance, equals(0));
       });
     });
@@ -188,9 +197,9 @@ void main() {
         ];
 
         extensions.saveRouteToHistory(wayPoints);
-        
+
         final history = extensions.getRouteHistory();
-        
+
         expect(history.length, equals(1));
         expect(history[0].length, equals(2));
         expect(history[0][0].name, equals('Start'));
@@ -252,7 +261,8 @@ void main() {
         await Future.delayed(const Duration(milliseconds: 10));
 
         expect(receivedEvent, isNotNull);
-        expect(receivedEvent!.type, equals(NavigationExtensionEventType.routeSaved));
+        expect(receivedEvent!.type,
+            equals(NavigationExtensionEventType.routeSaved),);
         expect(receivedEvent!.data, equals(wayPoints));
 
         await subscription.cancel();

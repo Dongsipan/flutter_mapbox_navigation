@@ -1,4 +1,4 @@
-// ignore_for_file: constant_identifier_names, public_member_api_docs
+// ignore_for_file: constant_identifier_names
 
 /// All possible events that could occur in the course of navigation
 enum MapBoxEvent {
@@ -20,5 +20,8 @@ enum MapBoxEvent {
   on_arrival,
   failed_to_reroute,
   reroute_along,
-  on_map_tap
+  on_map_tap,
+  history_recording_started,
+  history_recording_stopped,
+  history_recording_error
 }

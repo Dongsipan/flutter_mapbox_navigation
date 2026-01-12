@@ -1,5 +1,3 @@
-// ignore_for_file: public_member_api_docs
-
 import 'package:flutter_mapbox_navigation/src/helpers.dart';
 
 ///A RouteStep object represents a single distinct maneuver along a route and

@@ -22,7 +22,14 @@ class RouteEvent {
 
     final dataJson = json['data'];
     if (eventType == MapBoxEvent.progress_change) {
-      data = RouteProgressEvent.fromJson(dataJson as Map<String, dynamic>);
+      // 进度事件的data是JSON字符串，需要先解析
+      if (dataJson is String) {
+        final progressData = jsonDecode(dataJson) as Map<String, dynamic>;
+        data = RouteProgressEvent.fromJson(progressData);
+      } else {
+        // 如果已经是Map，直接使用
+        data = RouteProgressEvent.fromJson(dataJson as Map<String, dynamic>);
+      }
     } else if (eventType == MapBoxEvent.navigation_finished &&
         (dataJson as String).isNotEmpty) {
       data =

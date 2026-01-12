@@ -102,4 +102,60 @@ abstract class FlutterMapboxNavigationPlatform extends PlatformInterface {
       'registerEventListener() has not been implemented.',
     );
   }
+
+  /// 获取所有导航历史记录列表
+  Future<List<NavigationHistory>> getNavigationHistoryList() async {
+    throw UnimplementedError(
+      'getNavigationHistoryList() has not been implemented.',
+    );
+  }
+
+  /// 删除指定的导航历史记录
+  Future<bool> deleteNavigationHistory(String historyId) async {
+    throw UnimplementedError(
+      'deleteNavigationHistory() has not been implemented.',
+    );
+  }
+
+  /// 清除所有导航历史记录
+  Future<bool> clearAllNavigationHistory() async {
+    throw UnimplementedError(
+      'clearAllNavigationHistory() has not been implemented.',
+    );
+  }
+
+  /// 开始历史记录回放
+  /// [historyFilePath] 历史记录文件路径
+  /// [enableReplayUI] 是否启用回放UI界面
+  Future<bool> startHistoryReplay({
+    required String historyFilePath,
+    bool enableReplayUI = true,
+  }) async {
+    throw UnimplementedError(
+      'startHistoryReplay() has not been implemented.',
+    );
+  }
+
+  /// 手动生成封面（仅调试用途）
+  /// 返回生成的封面本地路径，失败返回 null
+  Future<String?> generateHistoryCover({
+    required String historyFilePath,
+    String? historyId,
+  }) async {
+    throw UnimplementedError(
+      'generateHistoryCover() has not been implemented.',
+    );
+  }
+
+  /// 根据历史记录 ID 获取导航历史的详细事件数据
+  /// [historyId] 历史记录的唯一标识符
+  /// 返回包含所有事件、原始位置数据和初始路线信息的 NavigationHistoryEvents 对象
+  /// 如果历史记录不存在或解析失败，将抛出异常
+  Future<NavigationHistoryEvents> getNavigationHistoryEvents(
+    String historyId,
+  ) async {
+    throw UnimplementedError(
+      'getNavigationHistoryEvents() has not been implemented.',
+    );
+  }
 }

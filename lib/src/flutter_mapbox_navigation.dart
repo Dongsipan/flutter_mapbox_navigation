@@ -23,12 +23,13 @@ class MapBoxNavigation {
     voiceInstructionsEnabled: true,
     bannerInstructionsEnabled: true,
     allowsUTurnAtWayPoints: true,
-    mode: MapBoxNavigationMode.drivingWithTraffic,
-    units: VoiceUnits.imperial,
+    mode: MapBoxNavigationMode.cycling,
+    units: VoiceUnits.metric,
     simulateRoute: false,
     animateBuildRoute: true,
     longPressDestinationEnabled: true,
     language: 'en',
+    autoBuildRoute: true,
   );
 
   /// setter to set default options
@@ -110,5 +111,57 @@ class MapBoxNavigation {
   ) async {
     return FlutterMapboxNavigationPlatform.instance
         .registerRouteEventListener(listener);
+  }
+
+  /// 获取所有导航历史记录列表
+  Future<List<NavigationHistory>> getNavigationHistoryList() async {
+    return FlutterMapboxNavigationPlatform.instance.getNavigationHistoryList();
+  }
+
+  /// 获取导航历史记录的详细事件数据
+  /// [historyId] 历史记录ID
+  /// 返回包含所有事件、原始位置和初始路线的详细数据
+  /// 如果历史记录不存在或解析失败，将抛出异常
+  Future<NavigationHistoryEvents> getNavigationHistoryEvents({
+    required String historyId,
+  }) async {
+    return FlutterMapboxNavigationPlatform.instance.getNavigationHistoryEvents(
+      historyId,
+    );
+  }
+
+  /// 删除指定的导航历史记录
+  Future<bool> deleteNavigationHistory(String historyId) async {
+    return FlutterMapboxNavigationPlatform.instance
+        .deleteNavigationHistory(historyId);
+  }
+
+  /// 清除所有导航历史记录
+  Future<bool> clearAllNavigationHistory() async {
+    return FlutterMapboxNavigationPlatform.instance.clearAllNavigationHistory();
+  }
+
+  /// 开始历史记录回放
+  /// [historyFilePath] 历史记录文件路径
+  /// [enableReplayUI] 是否启用回放UI界面，默认为true
+  Future<bool> startHistoryReplay({
+    required String historyFilePath,
+    bool enableReplayUI = true,
+  }) async {
+    return FlutterMapboxNavigationPlatform.instance.startHistoryReplay(
+      historyFilePath: historyFilePath,
+      enableReplayUI: enableReplayUI,
+    );
+  }
+
+  /// 手动生成历史封面（仅调试用，不写入记录）
+  Future<String?> generateHistoryCover({
+    required String historyFilePath,
+    String? historyId,
+  }) async {
+    return FlutterMapboxNavigationPlatform.instance.generateHistoryCover(
+      historyFilePath: historyFilePath,
+      historyId: historyId,
+    );
   }
 }

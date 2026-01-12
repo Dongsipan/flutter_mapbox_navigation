@@ -44,7 +44,7 @@ class PluginUtilities {
 
         fun sendEvent(event: MapBoxEvents, data: String = "") {
             val jsonString =
-                if (MapBoxEvents.MILESTONE_EVENT == event || event == MapBoxEvents.USER_OFF_ROUTE || event == MapBoxEvents.ROUTE_BUILT || event == MapBoxEvents.ON_MAP_TAP) "{" +
+                if (MapBoxEvents.MILESTONE_EVENT == event || event == MapBoxEvents.USER_OFF_ROUTE || event == MapBoxEvents.ROUTE_BUILT || event == MapBoxEvents.ON_MAP_TAP || event == MapBoxEvents.HISTORY_RECORDING_STARTED || event == MapBoxEvents.HISTORY_RECORDING_STOPPED) "{" +
                         "  \"eventType\": \"${event.value}\"," +
                         "  \"data\": $data" +
                         "}" else "{" +
@@ -131,7 +131,9 @@ class PluginUtilities {
                     else -> false
                 }
             } else {
+                @Suppress("DEPRECATION")
                 val nwInfo = connectivityManager.activeNetworkInfo ?: return false
+                @Suppress("DEPRECATION")
                 return nwInfo.isConnected
             }
         }
@@ -144,6 +146,7 @@ class PluginUtilities {
             return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
                 activity.intent.getSerializableExtra(name, clazz)!!
             else
+                @Suppress("DEPRECATION")
                 activity.intent.getSerializableExtra(name) as T
         }
     }

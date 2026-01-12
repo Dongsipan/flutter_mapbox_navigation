@@ -25,23 +25,60 @@ class HistoryManager(private val context: Context) {
     /**
      * 保存历史记录
      */
-    fun saveHistoryRecord(historyData: Map<String, Any>): Boolean {
+    fun saveHistoryRecord(historyData: Map<String, Any?>): Boolean {
         return try {
             val historyList = getHistoryList().toMutableList()
             val historyRecord = HistoryRecord(
                 id = historyData["id"] as? String ?: UUID.randomUUID().toString(),
                 historyFilePath = historyData["filePath"] as? String ?: "",
+                cover = historyData["cover"] as? String,
                 startTime = (historyData["startTime"] as? Long)?.let { Date(it) } ?: Date(),
-                duration = (historyData["duration"] as? Long)?.toInt() ?: 0,
+                endTime = (historyData["endTime"] as? Long)?.let { Date(it) },
+                distance = (historyData["distance"] as? Number)?.toDouble(),
+                duration = (historyData["duration"] as? Number)?.toInt(),
                 startPointName = historyData["startPointName"] as? String,
                 endPointName = historyData["endPointName"] as? String,
                 navigationMode = historyData["navigationMode"] as? String
             )
             
+            android.util.Log.d("HistoryManager", "💾 Saving history record: id=${historyRecord.id}, endTime=${historyRecord.endTime?.time}, distance=${historyRecord.distance}")
+            
             historyList.add(historyRecord)
             saveHistoryList(historyList)
             true
         } catch (e: Exception) {
+            android.util.Log.e("HistoryManager", "❌ Failed to save history record: ${e.message}", e)
+            false
+        }
+    }
+    
+    /**
+     * 更新现有历史记录（用于更新 endTime 和 distance）
+     */
+    fun updateHistoryRecord(historyId: String, updates: Map<String, Any?>): Boolean {
+        return try {
+            val historyList = getHistoryList().toMutableList()
+            val index = historyList.indexOfFirst { it.id == historyId }
+            if (index != -1) {
+                val oldRecord = historyList[index]
+                val updatedRecord = oldRecord.copy(
+                    endTime = (updates["endTime"] as? Long)?.let { Date(it) } ?: oldRecord.endTime,
+                    distance = (updates["distance"] as? Number)?.toDouble() ?: oldRecord.distance,
+                    duration = (updates["duration"] as? Number)?.toInt() ?: oldRecord.duration,
+                    cover = updates["cover"] as? String ?: oldRecord.cover
+                )
+                
+                android.util.Log.d("HistoryManager", "🔄 Updating history record: id=$historyId, endTime=${updatedRecord.endTime?.time}, distance=${updatedRecord.distance}")
+                
+                historyList[index] = updatedRecord
+                saveHistoryList(historyList)
+                true
+            } else {
+                android.util.Log.w("HistoryManager", "⚠️ History record not found: $historyId")
+                false
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("HistoryManager", "❌ Failed to update history record: ${e.message}", e)
             false
         }
     }
@@ -67,14 +104,43 @@ class HistoryManager(private val context: Context) {
             val historyList = getHistoryList().toMutableList()
             val record = historyList.find { it.id == historyId }
             if (record != null) {
-                // 删除文件
+                // 删除历史文件
                 val file = File(record.historyFilePath)
                 if (file.exists()) {
                     file.delete()
                 }
                 
+                // 删除封面文件
+                record.cover?.let { coverPath ->
+                    val coverFile = File(coverPath)
+                    if (coverFile.exists()) {
+                        coverFile.delete()
+                    }
+                }
+                
                 // 从列表中移除
                 historyList.remove(record)
+                saveHistoryList(historyList)
+                true
+            } else {
+                false
+            }
+        } catch (e: Exception) {
+            false
+        }
+    }
+    
+    /**
+     * 更新历史记录的封面路径
+     */
+    fun updateHistoryCover(historyId: String, coverPath: String?): Boolean {
+        return try {
+            val historyList = getHistoryList().toMutableList()
+            val index = historyList.indexOfFirst { it.id == historyId }
+            if (index != -1) {
+                val oldRecord = historyList[index]
+                val updatedRecord = oldRecord.copy(cover = coverPath)
+                historyList[index] = updatedRecord
                 saveHistoryList(historyList)
                 true
             } else {
@@ -93,9 +159,18 @@ class HistoryManager(private val context: Context) {
             val historyList = getHistoryList()
             // 删除所有文件
             historyList.forEach { record ->
+                // 删除历史文件
                 val file = File(record.historyFilePath)
                 if (file.exists()) {
                     file.delete()
+                }
+                
+                // 删除封面文件
+                record.cover?.let { coverPath ->
+                    val coverFile = File(coverPath)
+                    if (coverFile.exists()) {
+                        coverFile.delete()
+                    }
                 }
             }
             
@@ -135,12 +210,16 @@ class HistoryManager(private val context: Context) {
 
 /**
  * 历史记录数据类
+ * 字段与 Flutter NavigationHistory model 保持一致
  */
 data class HistoryRecord(
     val id: String,
     val historyFilePath: String,
+    val cover: String?,              // 封面图片路径
     val startTime: Date,
-    val duration: Int,
+    val endTime: Date?,              // 导航结束时间
+    val distance: Double?,           // 导航距离（米）
+    val duration: Int?,              // 导航持续时间（秒）
     val startPointName: String?,
     val endPointName: String?,
     val navigationMode: String?

@@ -5,4 +5,38 @@
     <string name="back_button">Back</string>
     <string name="navigation_replay_title">Navigation Replay</string>
     <string name="route_overview">Route Overview</string>
+    
+    <!-- Map Styles -->
+    <string-array name="map_styles">
+        <item>Standard（标准）</item>
+        <item>Standard Satellite（卫星）</item>
+        <item>Faded（褪色）</item>
+        <item>Monochrome（单色）</item>
+        <item>Light（浅色）</item>
+        <item>Dark（深色）</item>
+        <item>Outdoors（户外）</item>
+    </string-array>
+    
+    <!-- Light Presets -->
+    <string-array name="light_presets">
+        <item>🌅 Dawn（黎明）</item>
+        <item>☀️ Day（白天）</item>
+        <item>🌇 Dusk（黄昏）</item>
+        <item>🌙 Night（夜晚）</item>
+    </string-array>
+    
+    <!-- Search Activity -->
+    <string name="simple_ui_toolbar_title">搜索地点</string>
+    <string name="query_hint">搜索地点</string>
+    <string name="search_hint">搜索地点</string>
+    <string name="go_to_place">🧭 前往此处</string>
+    <string name="current_location">当前位置</string>
+    <string name="cancel">取消</string>
+    <string name="my_location">我的位置</string>
+    <string name="map_view_description">地图视图</string>
+    <string name="network_error">网络连接失败，请检查网络设置</string>
+    <string name="search_service_error">搜索服务暂时不可用，请稍后重试</string>
+    <string name="location_permission_required">需要位置权限才能使用此功能</string>
+    <string name="location_service_disabled">请开启位置服务</string>
+    <string name="no_results">未找到相关地点</string>
 </resources>

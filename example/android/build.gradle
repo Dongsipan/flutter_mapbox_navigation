@@ -1,6 +1,6 @@
 buildscript {
-    ext.kotlin_version = '1.9.22'
-    ext.android_gradle_version = '8.1.4'
+    ext.kotlin_version = '2.1.0'
+    ext.android_gradle_version = '8.6.0'
     repositories {
         // 阿里云镜像
         maven { url 'https://maven.aliyun.com/repository/google' }
@@ -18,11 +18,18 @@ buildscript {
 
 allprojects {
     repositories {
-        // 阿里云镜像
-        maven { url 'https://maven.aliyun.com/repository/google' }
-        maven { url 'https://maven.aliyun.com/repository/public' }
         google()
         mavenCentral()
+        maven {
+            url 'https://api.mapbox.com/downloads/v2/releases/maven'
+            authentication {
+                basic(BasicAuthentication)
+            }
+            credentials {
+                username = "mapbox"
+                password = project.findProperty('MAPBOX_DOWNLOADS_TOKEN') ?: System.getenv('MAPBOX_DOWNLOADS_TOKEN')
+            }
+        }
     }
 }
 

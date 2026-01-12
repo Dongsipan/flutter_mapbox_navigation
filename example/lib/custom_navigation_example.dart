@@ -5,7 +5,8 @@ class CustomNavigationExample extends StatefulWidget {
   const CustomNavigationExample({super.key});
 
   @override
-  State<CustomNavigationExample> createState() => _CustomNavigationExampleState();
+  State<CustomNavigationExample> createState() =>
+      _CustomNavigationExampleState();
 }
 
 class _CustomNavigationExampleState extends State<CustomNavigationExample> {
@@ -33,30 +34,31 @@ class _CustomNavigationExampleState extends State<CustomNavigationExample> {
       zoom: 15.0,
       bearing: 0.0,
       tilt: 0.0,
-      
+
       // 导航模式设置
       mode: MapBoxNavigationMode.drivingWithTraffic, // 驾驶模式（含交通）
       units: VoiceUnits.metric, // 使用公制单位
       language: "zh-CN", // 中文语音
-      
+
       // 功能开关
       voiceInstructionsEnabled: true, // 启用语音指令
       bannerInstructionsEnabled: true, // 启用横幅指令
       alternatives: true, // 显示替代路线
       allowsUTurnAtWayPoints: false, // 禁止在路径点掉头
-      
+
       // 模拟和调试
       simulateRoute: true, // 模拟路线（开发时使用）
       animateBuildRoute: true, // 动画显示路线构建
-      
+
       // UI定制
       longPressDestinationEnabled: true, // 长按设置目的地
       showReportFeedbackButton: true, // 显示反馈按钮
       showEndOfRouteFeedback: true, // 显示路线结束反馈
-      
-      // 地图样式（可选）
-      mapStyleUrlDay: "mapbox://styles/mapbox/navigation-day-v1",
-      mapStyleUrlNight: "mapbox://styles/mapbox/navigation-night-v1",
+
+      // 地图样式 - 注释掉以使用保存的用户偏好样式
+      // 如果需要覆盖用户设置，可以取消注释下面两行
+      // mapStyleUrlDay: "mapbox://styles/mapbox/navigation-day-v1",
+      // mapStyleUrlNight: "mapbox://styles/mapbox/navigation-night-v1",
     );
   }
 
@@ -76,13 +78,13 @@ class _CustomNavigationExampleState extends State<CustomNavigationExample> {
           _currentInstruction = progressEvent.currentStepInstruction;
         });
         break;
-        
+
       case MapBoxEvent.navigation_running:
         setState(() {
           _isNavigating = true;
         });
         break;
-        
+
       case MapBoxEvent.navigation_finished:
       case MapBoxEvent.navigation_cancelled:
         setState(() {
@@ -90,15 +92,15 @@ class _CustomNavigationExampleState extends State<CustomNavigationExample> {
           _currentInstruction = null;
         });
         break;
-        
+
       case MapBoxEvent.on_arrival:
         _showArrivalDialog();
         break;
-        
+
       default:
         break;
     }
-    
+
     setState(() {});
   }
 
@@ -181,18 +183,21 @@ class _CustomNavigationExampleState extends State<CustomNavigationExample> {
               children: [
                 Text(
                   '导航状态: ${_isNavigating ? "进行中" : "未开始"}',
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
                 Text('当前指令: ${_currentInstruction ?? "无"}'),
                 const SizedBox(height: 4),
-                Text('剩余距离: ${_distanceRemaining != null ? "${(_distanceRemaining! / 1000).toStringAsFixed(1)} 公里" : "---"}'),
+                Text(
+                    '剩余距离: ${_distanceRemaining != null ? "${(_distanceRemaining! / 1000).toStringAsFixed(1)} 公里" : "---"}'),
                 const SizedBox(height: 4),
-                Text('剩余时间: ${_durationRemaining != null ? "${(_durationRemaining! / 60).toStringAsFixed(0)} 分钟" : "---"}'),
+                Text(
+                    '剩余时间: ${_durationRemaining != null ? "${(_durationRemaining! / 60).toStringAsFixed(0)} 分钟" : "---"}'),
               ],
             ),
           ),
-          
+
           // 控制按钮
           Padding(
             padding: const EdgeInsets.all(16),
@@ -204,15 +209,15 @@ class _CustomNavigationExampleState extends State<CustomNavigationExample> {
                   child: const Text('开始导航'),
                 ),
                 ElevatedButton(
-                  onPressed: _isNavigating 
-                    ? () => MapBoxNavigation.instance.finishNavigation()
-                    : null,
+                  onPressed: _isNavigating
+                      ? () => MapBoxNavigation.instance.finishNavigation()
+                      : null,
                   child: const Text('结束导航'),
                 ),
               ],
             ),
           ),
-          
+
           // 嵌入式地图视图
           Expanded(
             child: Container(

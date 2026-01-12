@@ -11,6 +11,7 @@ import com.eopeter.fluttermapboxnavigation.models.Waypoint
 import com.eopeter.fluttermapboxnavigation.utilities.HistoryManager
 import com.mapbox.api.directions.v5.DirectionsCriteria
 import com.mapbox.api.directions.v5.models.DirectionsRoute
+import com.mapbox.maps.Style
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
@@ -28,9 +29,10 @@ class FlutterMapboxNavigationPlugin : FlutterPlugin, MethodCallHandler,
 
     private lateinit var channel: MethodChannel
     private lateinit var progressEventChannel: EventChannel
+    private lateinit var stylePickerChannel: MethodChannel
+    private lateinit var searchChannel: MethodChannel
     private var currentActivity: Activity? = null
     private lateinit var currentContext: Context
-    private lateinit var historyManager: HistoryManager
 
     override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         val messenger = binding.binaryMessenger
@@ -39,6 +41,18 @@ class FlutterMapboxNavigationPlugin : FlutterPlugin, MethodCallHandler,
 
         progressEventChannel = EventChannel(messenger, "flutter_mapbox_navigation/events")
         progressEventChannel.setStreamHandler(this)
+
+        // 注册样式选择器 channel
+        stylePickerChannel = MethodChannel(messenger, "flutter_mapbox_navigation/style_picker")
+        stylePickerChannel.setMethodCallHandler { call, result ->
+            handleStylePickerMethod(call, result)
+        }
+
+        // 注册搜索 channel (Task 9.1)
+        searchChannel = MethodChannel(messenger, "flutter_mapbox_navigation/search")
+        searchChannel.setMethodCallHandler { call, result ->
+            handleSearchMethod(call, result)
+        }
 
         platformViewRegistry = binding.platformViewRegistry
         binaryMessenger = messenger
@@ -56,7 +70,8 @@ class FlutterMapboxNavigationPlugin : FlutterPlugin, MethodCallHandler,
         private var currentRoute: DirectionsRoute? = null
         val wayPoints: MutableList<Waypoint> = mutableListOf()
 
-        var showAlternateRoutes: Boolean = true
+        var alternatives: Boolean = true
+        var autoBuildRoute: Boolean = true
         var longPressDestinationEnabled: Boolean = true
         var allowsUTurnsAtWayPoints: Boolean = false
         var enableOnMapTapCallback: Boolean = false
@@ -77,6 +92,7 @@ class FlutterMapboxNavigationPlugin : FlutterPlugin, MethodCallHandler,
         var platformViewRegistry: PlatformViewRegistry? = null
         var binaryMessenger: BinaryMessenger? = null
         var enableHistoryRecording = false
+        lateinit var historyManager: HistoryManager
 
         var viewId = "FlutterMapboxNavigationView"
     }
@@ -133,6 +149,9 @@ class FlutterMapboxNavigationPlugin : FlutterPlugin, MethodCallHandler,
             "setHistoryReplaySpeed" -> {
                 setHistoryReplaySpeed(call, result)
             }
+            "getNavigationHistoryEvents" -> {
+                getNavigationHistoryEvents(call, result)
+            }
             else -> result.notImplemented()
         }
     }
@@ -145,21 +164,30 @@ class FlutterMapboxNavigationPlugin : FlutterPlugin, MethodCallHandler,
     }
 
     private fun getNavigationHistoryList(result: Result) {
+        android.util.Log.d("FlutterMapboxNavigation", "Calling getNavigationHistoryList method")
         try {
-            val historyList = historyManager.getHistoryList()
+            val historyList = FlutterMapboxNavigationPlugin.historyManager.getHistoryList()
+            android.util.Log.d("FlutterMapboxNavigation", "Retrieved ${historyList.size} history records from database")
+            
             val historyMaps = historyList.map { history ->
+                android.util.Log.d("FlutterMapboxNavigation", "History record: ${history.id}, path: ${history.historyFilePath}, cover: ${history.cover}")
                 mapOf(
                     "id" to history.id,
                     "historyFilePath" to history.historyFilePath,
+                    "cover" to history.cover,
                     "startTime" to history.startTime.time,
+                    "endTime" to history.endTime?.time,
+                    "distance" to history.distance,
                     "duration" to history.duration,
                     "startPointName" to history.startPointName,
                     "endPointName" to history.endPointName,
                     "navigationMode" to history.navigationMode
                 )
             }
+            android.util.Log.d("FlutterMapboxNavigation", "Returning ${historyMaps.size} history records to Flutter")
             result.success(historyMaps)
         } catch (e: Exception) {
+            android.util.Log.e("FlutterMapboxNavigation", "Failed to get history list: ${e.message}", e)
             result.error("HISTORY_ERROR", "Failed to get history list: ${e.message}", null)
         }
     }
@@ -169,7 +197,7 @@ class FlutterMapboxNavigationPlugin : FlutterPlugin, MethodCallHandler,
         val historyId = arguments?.get("historyId") as? String
         if (historyId != null) {
             try {
-                val success = historyManager.deleteHistoryRecord(historyId)
+                val success = FlutterMapboxNavigationPlugin.historyManager.deleteHistoryRecord(historyId)
                 result.success(success)
             } catch (e: Exception) {
                 result.error("HISTORY_ERROR", "Failed to delete history: ${e.message}", null)
@@ -181,7 +209,7 @@ class FlutterMapboxNavigationPlugin : FlutterPlugin, MethodCallHandler,
 
     private fun clearAllNavigationHistory(result: Result) {
         try {
-            val success = historyManager.clearAllHistory()
+            val success = FlutterMapboxNavigationPlugin.historyManager.clearAllHistory()
             result.success(success)
         } catch (e: Exception) {
             result.error("HISTORY_ERROR", "Failed to clear history: ${e.message}", null)
@@ -198,13 +226,23 @@ class FlutterMapboxNavigationPlugin : FlutterPlugin, MethodCallHandler,
                 return
             }
 
-            // Android端的历史记录回放实现
-            // 注意：这里需要根据Mapbox Android SDK的具体API来实现
-            // 目前Android SDK可能不支持历史记录回放功能，或者API不同
+            if (currentActivity == null) {
+                android.util.Log.e("FlutterMapboxNavigation", "Activity is null, cannot start history replay")
+                result.error("NO_ACTIVITY", "Activity is not available", null)
+                return
+            }
 
-            // 临时返回false，表示Android端暂不支持
-            result.success(false)
+            android.util.Log.d("FlutterMapboxNavigation", "Starting history replay with file: $historyFilePath")
+
+            // Launch NavigationReplayActivity
+            val intent = android.content.Intent(currentActivity, com.eopeter.fluttermapboxnavigation.activity.NavigationReplayActivity::class.java)
+            intent.putExtra("replayFilePath", historyFilePath)  // Use "replayFilePath" key expected by the activity
+            intent.putExtra("enableReplayUI", enableReplayUI)
+            currentActivity?.startActivity(intent)
+
+            result.success(true)
         } catch (e: Exception) {
+            android.util.Log.e("FlutterMapboxNavigation", "Failed to start history replay: ${e.message}", e)
             result.error("REPLAY_ERROR", "Failed to start history replay: ${e.message}", null)
         }
     }
@@ -252,6 +290,72 @@ class FlutterMapboxNavigationPlugin : FlutterPlugin, MethodCallHandler,
         }
     }
 
+    private fun getNavigationHistoryEvents(call: MethodCall, result: Result) {
+        android.util.Log.d("FlutterMapboxNavigation", "📞 getNavigationHistoryEvents called")
+        
+        try {
+            val historyId = call.argument<String>("historyId")
+            
+            if (historyId.isNullOrEmpty()) {
+                android.util.Log.e("FlutterMapboxNavigation", "❌ INVALID_ARGUMENT: historyId is required")
+                result.error("INVALID_ARGUMENT", "historyId is required", null)
+                return
+            }
+            
+            android.util.Log.d("FlutterMapboxNavigation", "🔍 Fetching events for history ID: $historyId")
+            
+            // 根据 historyId 查找历史记录
+            val historyList = FlutterMapboxNavigationPlugin.historyManager.getHistoryList()
+            android.util.Log.d("FlutterMapboxNavigation", "📋 Found ${historyList.size} history records in database")
+            
+            val historyRecord = historyList.find { it.id == historyId }
+            if (historyRecord == null) {
+                android.util.Log.e("FlutterMapboxNavigation", "❌ HISTORY_NOT_FOUND: History record with id $historyId not found")
+                android.util.Log.e("FlutterMapboxNavigation", "❌ Available history IDs: ${historyList.map { it.id }}")
+                result.error("HISTORY_NOT_FOUND", "History record with id $historyId not found", null)
+                return
+            }
+            
+            val filePath = historyRecord.historyFilePath
+            android.util.Log.d("FlutterMapboxNavigation", "📁 History file path: $filePath")
+            
+            // 检查文件是否存在
+            val file = java.io.File(filePath)
+            if (!file.exists()) {
+                android.util.Log.e("FlutterMapboxNavigation", "❌ FILE_NOT_FOUND: History file not found at path $filePath")
+                result.error("FILE_NOT_FOUND", "History file not found at path $filePath", null)
+                return
+            }
+            
+            android.util.Log.d("FlutterMapboxNavigation", "✅ File exists, starting parsing")
+            
+            // 在后台线程解析历史文件
+            Thread {
+                try {
+                    val parser = com.eopeter.fluttermapboxnavigation.utilities.HistoryEventsParser()
+                    val eventsData = parser.parseHistoryFile(filePath, historyId)
+                    
+                    android.util.Log.d("FlutterMapboxNavigation", "✅ Successfully parsed history events")
+                    
+                    // 在主线程返回结果
+                    currentActivity?.runOnUiThread {
+                        result.success(eventsData)
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("FlutterMapboxNavigation", "❌ Failed to parse history file: ${e.message}", e)
+                    
+                    currentActivity?.runOnUiThread {
+                        result.error("PARSE_ERROR", "Failed to parse history file: ${e.message}", null)
+                    }
+                }
+            }.start()
+            
+        } catch (e: Exception) {
+            android.util.Log.e("FlutterMapboxNavigation", "❌ Unexpected error: ${e.message}", e)
+            result.error("UNKNOWN_ERROR", "An unexpected error occurred: ${e.message}", null)
+        }
+    }
+
     private fun checkPermissionAndBeginNavigation(
         call: MethodCall
     ) {
@@ -268,7 +372,12 @@ class FlutterMapboxNavigationPlugin : FlutterPlugin, MethodCallHandler,
 
         val alternateRoutes = arguments?.get("alternatives") as? Boolean
         if (alternateRoutes != null) {
-            showAlternateRoutes = alternateRoutes
+            alternatives = alternateRoutes
+        }
+
+        val autoBuild = arguments?.get("autoBuildRoute") as? Boolean
+        if (autoBuild != null) {
+            autoBuildRoute = autoBuild
         }
 
         val simulated = arguments?.get("simulateRoute") as? Boolean
@@ -408,11 +517,77 @@ class FlutterMapboxNavigationPlugin : FlutterPlugin, MethodCallHandler,
     override fun onAttachedToActivity(binding: ActivityPluginBinding) {
         currentActivity = binding.activity
         currentContext = binding.activity.applicationContext
+        
+        // 添加 Activity 结果监听器
+        binding.addActivityResultListener { requestCode, resultCode, data ->
+            if (requestCode == STYLE_PICKER_REQUEST_CODE) {
+                handleStylePickerResult(resultCode, data)
+                return@addActivityResultListener true
+            }
+            if (requestCode == SEARCH_REQUEST_CODE) {
+                handleSearchResult(resultCode, data)
+                return@addActivityResultListener true
+            }
+            false
+        }
+        
         if (platformViewRegistry != null && binaryMessenger != null && currentActivity != null) {
             platformViewRegistry?.registerViewFactory(
                 viewId,
                 EmbeddedNavigationViewFactory(binaryMessenger!!, currentActivity!!)
             )
+        }
+    }
+    
+    /**
+     * 处理样式选择器 Activity 的返回结果
+     */
+    private fun handleStylePickerResult(resultCode: Int, data: android.content.Intent?) {
+        val result = stylePickerResult ?: return
+        stylePickerResult = null
+        
+        if (resultCode == Activity.RESULT_OK && data != null) {
+            val mapStyle = data.getStringExtra(com.eopeter.fluttermapboxnavigation.activity.StylePickerActivity.RESULT_STYLE)
+            val lightPreset = data.getStringExtra(com.eopeter.fluttermapboxnavigation.activity.StylePickerActivity.RESULT_LIGHT_PRESET)
+            val lightPresetMode = data.getStringExtra(com.eopeter.fluttermapboxnavigation.activity.StylePickerActivity.RESULT_LIGHT_PRESET_MODE)
+            
+            // 保存到 SharedPreferences
+            val activity = currentActivity
+            if (activity != null && mapStyle != null) {
+                val prefs = activity.getSharedPreferences("mapbox_style_settings", Context.MODE_PRIVATE)
+                prefs.edit().apply {
+                    putString("map_style", mapStyle)
+                    putString("light_preset", lightPreset ?: "day")
+                    putString("light_preset_mode", lightPresetMode ?: "manual")
+                    apply()
+                }
+                
+                // 更新全局样式设置
+                mapStyleUrlDay = getStyleUrl(mapStyle)
+                mapStyleUrlNight = mapStyleUrlDay
+                
+                result.success(true)
+            } else {
+                result.success(false)
+            }
+        } else {
+            result.success(false)
+        }
+    }
+    
+    /**
+     * 根据样式名称获取样式 URL
+     */
+    private fun getStyleUrl(styleName: String): String {
+        return when (styleName) {
+            "standard" -> Style.MAPBOX_STREETS
+            "standardSatellite" -> Style.SATELLITE_STREETS
+            "faded" -> "mapbox://styles/mapbox/light-v11"
+            "monochrome" -> "mapbox://styles/mapbox/dark-v11"
+            "light" -> Style.LIGHT
+            "dark" -> Style.DARK
+            "outdoors" -> Style.OUTDOORS
+            else -> Style.MAPBOX_STREETS
         }
     }
 
@@ -447,6 +622,172 @@ class FlutterMapboxNavigationPlugin : FlutterPlugin, MethodCallHandler,
             }
         }
         // super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+    }
+
+    /**
+     * 处理样式选择器相关的方法调用
+     */
+    private fun handleStylePickerMethod(call: MethodCall, result: Result) {
+        when (call.method) {
+            "showStylePicker" -> {
+                showStylePicker(result)
+            }
+            "getStoredStyle" -> {
+                getStoredStyle(result)
+            }
+            "clearStoredStyle" -> {
+                clearStoredStyle(result)
+            }
+            else -> result.notImplemented()
+        }
+    }
+    
+    /**
+     * 显示样式选择器
+     */
+    private fun showStylePicker(result: Result) {
+        val activity = currentActivity
+        if (activity == null) {
+            result.error("NO_ACTIVITY", "Activity is null", null)
+            return
+        }
+        
+        // 从 SharedPreferences 读取当前设置
+        val prefs = activity.getSharedPreferences("mapbox_style_settings", Context.MODE_PRIVATE)
+        val currentStyle = prefs.getString("map_style", "standard") ?: "standard"
+        val currentLightPreset = prefs.getString("light_preset", "day") ?: "day"
+        val lightPresetMode = prefs.getString("light_preset_mode", "manual") ?: "manual"
+        
+        // 启动样式选择器 Activity
+        val intent = android.content.Intent(activity, com.eopeter.fluttermapboxnavigation.activity.StylePickerActivity::class.java)
+        intent.putExtra(com.eopeter.fluttermapboxnavigation.activity.StylePickerActivity.EXTRA_CURRENT_STYLE, currentStyle)
+        intent.putExtra(com.eopeter.fluttermapboxnavigation.activity.StylePickerActivity.EXTRA_CURRENT_LIGHT_PRESET, currentLightPreset)
+        intent.putExtra(com.eopeter.fluttermapboxnavigation.activity.StylePickerActivity.EXTRA_LIGHT_PRESET_MODE, lightPresetMode)
+        
+        // 保存 result 以便在 Activity 返回时使用
+        stylePickerResult = result
+        activity.startActivityForResult(intent, STYLE_PICKER_REQUEST_CODE)
+    }
+    
+    /**
+     * 获取存储的样式设置
+     */
+    private fun getStoredStyle(result: Result) {
+        val activity = currentActivity
+        if (activity == null) {
+            result.error("NO_ACTIVITY", "Activity is null", null)
+            return
+        }
+        
+        val prefs = activity.getSharedPreferences("mapbox_style_settings", Context.MODE_PRIVATE)
+        val styleSettings = mapOf(
+            "mapStyle" to (prefs.getString("map_style", "standard") ?: "standard"),
+            "lightPreset" to (prefs.getString("light_preset", "day") ?: "day"),
+            "lightPresetMode" to (prefs.getString("light_preset_mode", "manual") ?: "manual")
+        )
+        result.success(styleSettings)
+    }
+    
+    /**
+     * 清除存储的样式设置
+     */
+    private fun clearStoredStyle(result: Result) {
+        val activity = currentActivity
+        if (activity == null) {
+            result.error("NO_ACTIVITY", "Activity is null", null)
+            return
+        }
+        
+        val prefs = activity.getSharedPreferences("mapbox_style_settings", Context.MODE_PRIVATE)
+        prefs.edit().clear().apply()
+        
+        // 重置为默认值
+        mapStyleUrlDay = null
+        mapStyleUrlNight = null
+        
+        result.success(true)
+    }
+    
+    // 样式选择器请求码
+    private val STYLE_PICKER_REQUEST_CODE = 9001
+    private var stylePickerResult: Result? = null
+    
+    // 搜索请求码 (Task 9.2)
+    private val SEARCH_REQUEST_CODE = 9002
+    private var searchResult: Result? = null
+    
+    /**
+     * 处理搜索相关的方法调用
+     * Task 9.1 和 9.2
+     */
+    private fun handleSearchMethod(call: MethodCall, result: Result) {
+        when (call.method) {
+            "showSearchView" -> {
+                showSearchView(result)
+            }
+            else -> result.notImplemented()
+        }
+    }
+    
+    /**
+     * 显示搜索界面
+     * Task 9.2
+     */
+    private fun showSearchView(result: Result) {
+        val activity = currentActivity
+        if (activity == null) {
+            result.error("NO_ACTIVITY", "Activity为空", null)
+            return
+        }
+        
+        try {
+            // 启动搜索 Activity
+            val intent = android.content.Intent(
+                activity, 
+                com.eopeter.fluttermapboxnavigation.activity.SearchActivity::class.java
+            )
+            
+            // 保存 result 以便在 Activity 返回时使用
+            searchResult = result
+            activity.startActivityForResult(intent, SEARCH_REQUEST_CODE)
+        } catch (e: Exception) {
+            result.error("SEARCH_ERROR", "启动搜索界面失败: ${e.message}", null)
+        }
+    }
+    
+    /**
+     * 处理搜索 Activity 的返回结果
+     * Task 9.6
+     */
+    private fun handleSearchResult(resultCode: Int, data: android.content.Intent?) {
+        val result = searchResult ?: return
+        searchResult = null
+        
+        when (resultCode) {
+            Activity.RESULT_OK -> {
+                // 用户选择了地点，返回wayPoints
+                if (data != null) {
+                    val wayPoints = data.getSerializableExtra(
+                        com.eopeter.fluttermapboxnavigation.activity.SearchActivity.EXTRA_RESULT_WAYPOINTS
+                    ) as? ArrayList<Map<String, Any>>
+                    
+                    if (wayPoints != null) {
+                        result.success(wayPoints)
+                    } else {
+                        result.error("INVALID_RESULT", "wayPoints数据无效", null)
+                    }
+                } else {
+                    result.error("NO_DATA", "未返回数据", null)
+                }
+            }
+            Activity.RESULT_CANCELED -> {
+                // 用户取消了搜索，返回null (Task 9.5)
+                result.success(null)
+            }
+            else -> {
+                result.error("UNKNOWN_RESULT", "未知的结果码: $resultCode", null)
+            }
+        }
     }
 }
 

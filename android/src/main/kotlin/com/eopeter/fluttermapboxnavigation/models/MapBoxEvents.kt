@@ -17,10 +17,14 @@ enum class MapBoxEvents(val value: String) {
     SPEECH_ANNOUNCEMENT("speech_announcement"),
     BANNER_INSTRUCTION("banner_instruction"),
     ON_ARRIVAL("on_arrival"),
+    WAYPOINT_ARRIVAL("waypoint_arrival"),
     FAILED_TO_REROUTE("failed_to_reroute"),
     REROUTE_ALONG("reroute_along"),
     ON_MAP_TAP("on_map_tap"),
     HISTORY_RECORDING_STARTED("history_recording_started"),
     HISTORY_RECORDING_STOPPED("history_recording_stopped"),
-    HISTORY_RECORDING_ERROR("history_recording_error")
+    HISTORY_RECORDING_ERROR("history_recording_error"),
+    GPS_SIGNAL_WEAK("gps_signal_weak"),
+    GPS_SIGNAL_LOST("gps_signal_lost"),
+    GPS_SIGNAL_RECOVERED("gps_signal_recovered")
 }

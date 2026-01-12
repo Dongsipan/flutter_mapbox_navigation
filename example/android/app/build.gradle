@@ -24,7 +24,7 @@ if (flutterVersionName == null) {
 
 android {
     compileSdkVersion 34
-    ndkVersion "26.1.10909125"  // 使用已安装的 NDK 26
+    ndkVersion flutter.ndkVersion
 
     sourceSets {
         main.java.srcDirs += 'src/main/kotlin'

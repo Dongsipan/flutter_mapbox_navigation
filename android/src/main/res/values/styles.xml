@@ -1,56 +1,101 @@
 <resources>
-    <!-- Base application theme. -->
-    <style name="AppTheme" parent="Theme.MaterialComponents.Light.NoActionBar">
+    <!-- Base application theme - 深色主题匹配 Flutter Brightness.dark -->
+    <style name="AppTheme" parent="Theme.MaterialComponents.DayNight.NoActionBar">
         <item name="windowNoTitle">true</item>
         <item name="android:windowNoTitle">true</item>
-        <!-- Customize your theme here. -->
+        <!-- 主题色配置 - 用于按钮、图标等交互元素 -->
         <item name="colorPrimary">@color/colorPrimary</item>
         <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
         <item name="colorAccent">@color/colorAccent</item>
+        <!-- 背景色配置 -->
+        <item name="android:windowBackground">@color/colorBackground</item>
+        <item name="android:colorBackground">@color/colorBackground</item>
+        <item name="colorSurface">@color/colorSurface</item>
+        <!-- 文字颜色配置 -->
+        <item name="android:textColorPrimary">@color/textPrimary</item>
+        <item name="android:textColorSecondary">@color/textSecondary</item>
+        <!-- 状态栏和导航栏 - 使用背景色而非主题色 -->
+        <item name="android:statusBarColor">@color/colorBackground</item>
+        <item name="android:navigationBarColor">@color/colorBackground</item>
+        <item name="android:windowLightStatusBar">false</item>
     </style>
 
     <style name="MapboxCustomTripProgressStyle" parent="MapboxStyleTripProgressView">
-        <item name="tripProgressTextColor">#7B3CEA</item>
-        <item name="tripProgressViewBackgroundColor">#EEEEEE</item>
+        <item name="tripProgressTextColor">@color/textPrimary</item>
+        <item name="tripProgressViewBackgroundColor">@color/colorSurface</item>
     </style>
 
     <style name="MapboxCustomManeuverTurnIconStyle" parent="MapboxStyleTurnIconManeuver">
-        <item name="maneuverTurnIconColor">#FFEB3B</item>
-        <item name="maneuverTurnIconShadowColor">#7A6E03</item>
+        <item name="maneuverTurnIconColor">@color/colorPrimary</item>
+        <item name="maneuverTurnIconShadowColor">@color/colorPrimaryDark</item>
     </style>
 
     <style name="MapboxCustomManeuverStyle" parent="MapboxStyleManeuverView">
-        <item name="maneuverViewBackgroundColor">#058A0A</item>
-        <item name="subManeuverViewBackgroundColor">#046808</item>
-        <item name="upcomingManeuverViewBackgroundColor">#046808</item>
+        <item name="maneuverViewBackgroundColor">@color/colorSurface</item>
+        <item name="subManeuverViewBackgroundColor">@color/colorSurface</item>
+        <item name="upcomingManeuverViewBackgroundColor">@color/colorSurface</item>
         <item name="maneuverViewIconStyle">@style/MapboxCustomManeuverTurnIconStyle</item>
         <item name="laneGuidanceManeuverIconStyle">@style/MapboxCustomManeuverTurnIconStyle</item>
     </style>
 
-    <style name="KtMaterialTheme_NoActionBar" parent="Theme.MaterialComponents.Light.NoActionBar">
+    <!-- 深色主题 - 无 ActionBar -->
+    <style name="KtMaterialTheme_NoActionBar" parent="Theme.MaterialComponents.DayNight.NoActionBar">
         <item name="windowNoTitle">true</item>
         <item name="android:windowNoTitle">true</item>
         <item name="colorPrimary">@color/colorPrimary</item>
         <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
         <item name="colorAccent">@color/colorAccent</item>
+        <item name="android:windowBackground">@color/colorBackground</item>
+        <item name="android:colorBackground">@color/colorBackground</item>
+        <item name="android:textColorPrimary">@color/textPrimary</item>
+        <item name="android:statusBarColor">@color/colorBackground</item>
+        <item name="android:navigationBarColor">@color/colorBackground</item>
+        <item name="android:windowLightStatusBar">false</item>
     </style>
 
-    <!-- Theme with ActionBar for activities that need it -->
-    <style name="KtMaterialTheme" parent="Theme.MaterialComponents.Light.DarkActionBar">
+    <!-- 深色主题 - 带 ActionBar（ActionBar 背景使用深色而非主题色）-->
+    <style name="KtMaterialTheme" parent="Theme.MaterialComponents.DayNight.DarkActionBar">
+        <!-- 主题色用于按钮、图标等交互元素 -->
         <item name="colorPrimary">@color/colorPrimary</item>
         <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
         <item name="colorAccent">@color/colorAccent</item>
-        <item name="android:windowBackground">@android:color/white</item>
+        <!-- 背景色配置 -->
+        <item name="android:windowBackground">@color/colorBackground</item>
+        <item name="android:colorBackground">@color/colorBackground</item>
+        <!-- ActionBar 背景色 - 使用深色背景而非主题色 -->
+        <item name="colorPrimarySurface">@color/colorBackground</item>
+        <item name="colorOnPrimary">@color/textPrimary</item>
+        <!-- 文字颜色 -->
+        <item name="android:textColorPrimary">@color/textPrimary</item>
+        <item name="android:textColorSecondary">@color/textSecondary</item>
+        <!-- ActionBar 配置 -->
         <item name="actionBarSize">56dp</item>
         <item name="android:windowContentOverlay">@null</item>
+        <!-- 状态栏和导航栏 -->
+        <item name="android:statusBarColor">@color/colorBackground</item>
+        <item name="android:navigationBarColor">@color/colorBackground</item>
+        <item name="android:windowLightStatusBar">false</item>
     </style>
 
-    <!-- StylePicker Activity Theme -->
-    <style name="StylePickerTheme" parent="Theme.MaterialComponents.Light.DarkActionBar">
+    <!-- StylePicker Activity Theme - 深色主题，ActionBar 使用深色背景 -->
+    <style name="StylePickerTheme" parent="Theme.MaterialComponents.DayNight.DarkActionBar">
+        <!-- 主题色用于按钮、图标等交互元素 -->
         <item name="colorPrimary">@color/colorPrimary</item>
         <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
         <item name="colorAccent">@color/colorAccent</item>
-        <item name="android:windowBackground">@android:color/white</item>
+        <!-- 背景色配置 -->
+        <item name="android:windowBackground">@color/colorBackground</item>
+        <item name="android:colorBackground">@color/colorBackground</item>
+        <!-- ActionBar 背景色 - 使用深色背景而非主题色 -->
+        <item name="colorPrimarySurface">@color/colorBackground</item>
+        <item name="colorOnPrimary">@color/textPrimary</item>
+        <!-- 文字颜色 -->
+        <item name="android:textColorPrimary">@color/textPrimary</item>
+        <item name="android:textColorSecondary">@color/textSecondary</item>
+        <!-- 其他配置 -->
         <item name="materialCardViewStyle">@style/Widget.MaterialComponents.CardView</item>
+        <item name="android:statusBarColor">@color/colorBackground</item>
+        <item name="android:navigationBarColor">@color/colorBackground</item>
+        <item name="android:windowLightStatusBar">false</item>
     </style>
 </resources>

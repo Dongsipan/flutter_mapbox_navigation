@@ -36,7 +36,7 @@ public class FlutterMapboxNavigationView : NavigationFactory, FlutterPlatformVie
 
         // Initialize persistent container
         self.containerView = UIView(frame: frame)
-        self.containerView.backgroundColor = UIColor.lightGray
+        self.containerView.backgroundColor = .appBackground
 
         self.messenger = messenger
         self.channel = FlutterMethodChannel(name: "flutter_mapbox_navigation/\(viewId)", binaryMessenger: messenger)

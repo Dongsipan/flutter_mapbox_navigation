@@ -108,16 +108,16 @@ class StylePickerViewController: UIViewController {
     // MARK: - UI Setup
     
     private func setupUI() {
-        view.backgroundColor = .systemGroupedBackground
+        view.backgroundColor = .appBackground
         
         // ========== 地图容器 ==========
         mapContainerView.translatesAutoresizingMaskIntoConstraints = false
-        mapContainerView.backgroundColor = .systemGray6
+        mapContainerView.backgroundColor = .appCardBackground
         mapContainerView.layer.cornerRadius = 16
         mapContainerView.layer.masksToBounds = true
         // iOS 风格阴影
         mapContainerView.layer.shadowColor = UIColor.black.cgColor
-        mapContainerView.layer.shadowOpacity = 0.1
+        mapContainerView.layer.shadowOpacity = 0.3
         mapContainerView.layer.shadowOffset = CGSize(width: 0, height: 2)
         mapContainerView.layer.shadowRadius = 8
         view.addSubview(mapContainerView)
@@ -146,7 +146,7 @@ class StylePickerViewController: UIViewController {
         
         // ========== 底部按钮容器（固定在底部）==========
         bottomButtonContainer.translatesAutoresizingMaskIntoConstraints = false
-        bottomButtonContainer.backgroundColor = .systemBackground
+        bottomButtonContainer.backgroundColor = .appBackground
         // 顶部添加细线分隔
         let separatorLine = UIView()
         separatorLine.backgroundColor = .separator
@@ -317,14 +317,14 @@ class StylePickerViewController: UIViewController {
     private func createStyleButton(value: String, title: String, description: String) -> UIView {
         let container = UIView()
         container.translatesAutoresizingMaskIntoConstraints = false
-        container.backgroundColor = .secondarySystemGroupedBackground
+        container.backgroundColor = .appCardBackground
         container.layer.cornerRadius = 12
         container.layer.masksToBounds = true
         
         // 选中状态边框
         if value == selectedStyle {
             container.layer.borderWidth = 2
-            container.layer.borderColor = UIColor.systemBlue.cgColor
+            container.layer.borderColor = UIColor.appPrimary.cgColor
         }
         
         let stackView = UIStackView()
@@ -336,12 +336,12 @@ class StylePickerViewController: UIViewController {
         let titleLabel = UILabel()
         titleLabel.text = title
         titleLabel.font = .systemFont(ofSize: 17, weight: .semibold)
-        titleLabel.textColor = .label
+        titleLabel.textColor = .appTextPrimary
         
         let descLabel = UILabel()
         descLabel.text = description
         descLabel.font = .systemFont(ofSize: 13)
-        descLabel.textColor = .secondaryLabel
+        descLabel.textColor = .appTextSecondary
         descLabel.numberOfLines = 0
         
         stackView.addArrangedSubview(titleLabel)
@@ -350,7 +350,7 @@ class StylePickerViewController: UIViewController {
         // 选中指示器
         if value == selectedStyle {
             let checkmark = UIImageView(image: UIImage(systemName: "checkmark.circle.fill"))
-            checkmark.tintColor = .systemBlue
+            checkmark.tintColor = .appPrimary
             checkmark.translatesAutoresizingMaskIntoConstraints = false
             container.addSubview(checkmark)
             
@@ -645,10 +645,10 @@ class StylePickerViewController: UIViewController {
     // MARK: - Action Buttons Setup
     
     private func setupActionButtons() {
-        // 应用按钮 - iOS 标准蓝色
+        // 应用按钮 - 使用主题色
         applyButton.setTitle("应用", for: .normal)
         applyButton.titleLabel?.font = .systemFont(ofSize: 17, weight: .semibold)
-        applyButton.backgroundColor = .systemBlue
+        applyButton.backgroundColor = .appPrimary
         applyButton.setTitleColor(.white, for: .normal)
         applyButton.layer.cornerRadius = 12
         applyButton.translatesAutoresizingMaskIntoConstraints = false

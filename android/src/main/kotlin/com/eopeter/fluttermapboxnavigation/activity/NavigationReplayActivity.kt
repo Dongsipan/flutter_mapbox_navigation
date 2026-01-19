@@ -237,6 +237,12 @@ class NavigationReplayActivity : AppCompatActivity() {
                 
                 setDisplayHomeAsUpEnabled(true)
                 elevation = 4f
+                // 设置 ActionBar 背景为深色
+                setBackgroundDrawable(
+                    android.graphics.drawable.ColorDrawable(
+                        resources.getColor(R.color.colorBackground, null)
+                    )
+                )
             }
         } catch (e: Exception) {
             Log.e(TAG, "设置 ActionBar 失败: ${e.message}", e)

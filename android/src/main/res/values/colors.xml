@@ -1,9 +1,49 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="colorPrimary">#2D4E73</color>
-    <color name="colorPrimaryDark">#2D4E73</color>
-    <color name="colorAccent">#2D4E73</color>
-    <color name="ic_launcher_background">#2D4E73</color>
-    <color name="red">#FF0000</color>
+    <!-- 主题色 - 对应 Flutter 的 seedColor/primary -->
+    <color name="colorPrimary">#01E47C</color>
+    <color name="colorPrimaryDark">#00B35F</color>
+    <color name="colorAccent">#01E47C</color>
+    
+    <!-- 背景色 - 对应 Flutter 的 surface/scaffoldBackgroundColor -->
+    <color name="colorBackground">#040608</color>
+    <color name="colorSurface">#040608</color>
+    
+    <!-- 卡片背景色 - 稍亮的深色 -->
+    <color name="colorCardBackground">#191A21</color>
+    
+    <!-- 底部卡片背景色 - 更深的颜色 -->
+    <color name="colorBottomCard">#0C1010</color>
+    
+    <!-- 文字颜色 -->
+    <color name="textPrimary">#FFFFFF</color>
+    <color name="textSecondary">#8AFFFFFF</color> <!-- 54% 不透明度的白色 -->
+    <color name="textDisabled">#61FFFFFF</color> <!-- 38% 不透明度的白色 -->
+    
+    <!-- 通用颜色 -->
     <color name="white">#FFFFFF</color>
+    <color name="black">#000000</color>
+    <color name="red">#FF0000</color>
+    <color name="transparent">#00000000</color>
+    
+    <!-- 启动器图标背景 -->
+    <color name="ic_launcher_background">#040608</color>
+    
+    <!-- Material 3 颜色系统 -->
+    <color name="md_theme_primary">#01E47C</color>
+    <color name="md_theme_onPrimary">#FFFFFF</color>
+    <color name="md_theme_primaryContainer">#00B35F</color>
+    <color name="md_theme_onPrimaryContainer">#FFFFFF</color>
+    
+    <color name="md_theme_secondary">#01E47C</color>
+    <color name="md_theme_onSecondary">#FFFFFF</color>
+    
+    <color name="md_theme_background">#040608</color>
+    <color name="md_theme_onBackground">#FFFFFF</color>
+    
+    <color name="md_theme_surface">#040608</color>
+    <color name="md_theme_onSurface">#FFFFFF</color>
+    
+    <color name="md_theme_error">#FF0000</color>
+    <color name="md_theme_onError">#FFFFFF</color>
 </resources>

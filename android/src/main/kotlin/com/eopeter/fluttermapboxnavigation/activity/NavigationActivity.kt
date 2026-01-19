@@ -1052,17 +1052,19 @@ class NavigationActivity : AppCompatActivity() {
                         text = if (index == 0) "Fastest Route" else "Alternative ${index}"
                         textSize = 16f
                         setTypeface(null, android.graphics.Typeface.BOLD)
-                        setTextColor(if (index == selectedRouteIndex) 
-                            android.graphics.Color.BLUE 
-                        else 
-                            android.graphics.Color.BLACK)
+                        setTextColor(
+                            if (index == selectedRouteIndex) 
+                                resources.getColor(R.color.colorPrimary, null)
+                            else 
+                                resources.getColor(R.color.textPrimary, null)
+                        )
                     })
                     
                     // Distance and duration
                     addView(android.widget.TextView(this@NavigationActivity).apply {
                         text = "$distanceText • $durationText"
                         textSize = 14f
-                        setTextColor(android.graphics.Color.GRAY)
+                        setTextColor(resources.getColor(R.color.textSecondary, null))
                     })
                     
                     // Click listener to select this route

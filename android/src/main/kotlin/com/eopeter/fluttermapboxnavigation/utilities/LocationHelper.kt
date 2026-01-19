@@ -86,7 +86,7 @@ class LocationHelper(private val context: Context) {
                 // 首先尝试获取最后已知位置
                 val lastKnownLocation = getLastKnownLocation()
                 if (lastKnownLocation != null) {
-                    android.util.Log.d("LocationHelper", "使用最后已知位置: ${lastKnownLocation.latitude}, ${lastKnownLocation.longitude}")
+                    android.util.Log.d("LocationHelper", "使用最后已知位置: ${lastKnownLocation.latitude()}, ${lastKnownLocation.longitude()}")
                     continuation.resume(lastKnownLocation)
                     return@suspendCancellableCoroutine
                 }

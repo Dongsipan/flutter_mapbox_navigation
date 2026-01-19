@@ -49,11 +49,17 @@ class StylePickerActivity : AppCompatActivity() {
     }
     
     private fun setupUI() {
-        // 设置标题和返回按钮
+        // 设置标题和返回按钮（使用深色背景）
         supportActionBar?.apply {
             title = "地图样式设置"
             setDisplayHomeAsUpEnabled(true)
             elevation = 4f
+            // 设置 ActionBar 背景为深色
+            setBackgroundDrawable(
+                android.graphics.drawable.ColorDrawable(
+                    resources.getColor(R.color.colorBackground, null)
+                )
+            )
         }
         
         // 地图样式选择
@@ -61,9 +67,9 @@ class StylePickerActivity : AppCompatActivity() {
         val styleAdapter = ArrayAdapter.createFromResource(
             this,
             R.array.map_styles,
-            android.R.layout.simple_spinner_item
+            R.layout.spinner_item_white
         )
-        styleAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        styleAdapter.setDropDownViewResource(R.layout.spinner_dropdown_item_white)
         styleSpinner.adapter = styleAdapter
         
         // 设置当前选中的样式
@@ -72,6 +78,8 @@ class StylePickerActivity : AppCompatActivity() {
         
         styleSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                // 设置选中项的文字颜色为白色
+                (view as? TextView)?.setTextColor(resources.getColor(R.color.textPrimary, null))
                 selectedStyle = getStyleValue(position)
                 updateLightPresetVisibility()
             }
@@ -84,9 +92,9 @@ class StylePickerActivity : AppCompatActivity() {
         val lightPresetAdapter = ArrayAdapter.createFromResource(
             this,
             R.array.light_presets,
-            android.R.layout.simple_spinner_item
+            R.layout.spinner_item_white
         )
-        lightPresetAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        lightPresetAdapter.setDropDownViewResource(R.layout.spinner_dropdown_item_white)
         lightPresetSpinner.adapter = lightPresetAdapter
         
         // 设置当前选中的 Light Preset
@@ -95,6 +103,8 @@ class StylePickerActivity : AppCompatActivity() {
         
         lightPresetSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                // 设置选中项的文字颜色为白色
+                (view as? TextView)?.setTextColor(resources.getColor(R.color.textPrimary, null))
                 selectedLightPreset = getLightPresetValue(position)
             }
             

@@ -122,11 +122,17 @@ class SearchActivity : AppCompatActivity() {
         searchResultsView = findViewById(R.id.search_results_view)
         searchPlaceView = findViewById(R.id.search_place_view)
         
-        // 设置 ActionBar（与 StylePickerActivity 一致）
+        // 设置 ActionBar（使用深色背景而非主题色）
         supportActionBar?.apply {
             title = getString(R.string.simple_ui_toolbar_title)
             setDisplayHomeAsUpEnabled(true)
             elevation = 4f
+            // 设置 ActionBar 背景为深色
+            setBackgroundDrawable(
+                android.graphics.drawable.ColorDrawable(
+                    resources.getColor(R.color.colorBackground, null)
+                )
+            )
         }
         
         // 初始化底部抽屉 - 参照官方示例

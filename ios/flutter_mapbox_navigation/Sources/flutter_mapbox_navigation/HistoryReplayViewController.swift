@@ -617,8 +617,8 @@ final class HistoryReplayViewController: UIViewController {
         // 设置导航栏外观，让状态栏区域与导航栏一体
         let appearance = UINavigationBarAppearance()
         appearance.configureWithOpaqueBackground()
-        appearance.backgroundColor = UIColor.systemBackground
-        appearance.titleTextAttributes = [.foregroundColor: UIColor.label]
+        appearance.backgroundColor = .appBackground
+        appearance.titleTextAttributes = [.foregroundColor: UIColor.appTextPrimary]
         
         // 移除导航栏底部的分隔线
         appearance.shadowColor = .clear
@@ -629,10 +629,10 @@ final class HistoryReplayViewController: UIViewController {
         navigationController.navigationBar.compactAppearance = appearance
         
         // 设置按钮颜色
-        navigationController.navigationBar.tintColor = UIColor.systemBlue
+        navigationController.navigationBar.tintColor = .appPrimary
         
         // 确保状态栏样式正确
-        navigationController.navigationBar.barStyle = .default
+        navigationController.navigationBar.barStyle = .black
         
         // 让导航栏延伸到状态栏区域
         navigationController.navigationBar.prefersLargeTitles = false

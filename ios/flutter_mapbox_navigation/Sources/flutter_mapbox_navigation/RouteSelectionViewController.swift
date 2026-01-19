@@ -97,7 +97,7 @@ class RouteSelectionViewController: UIViewController {
     private func setupTopBar() {
         // 创建顶部栏
         let topBar = UIView()
-        topBar.backgroundColor = .white.withAlphaComponent(0.95)
+        topBar.backgroundColor = .appBackground.withAlphaComponent(0.95)
         topBar.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(topBar)
         
@@ -106,7 +106,7 @@ class RouteSelectionViewController: UIViewController {
         backButton.setImage(UIImage(systemName: "chevron.left"), for: .normal)
         backButton.setTitle(" 返回", for: .normal)
         backButton.titleLabel?.font = .systemFont(ofSize: 17)
-        backButton.tintColor = .systemBlue
+        backButton.tintColor = .appPrimary
         backButton.translatesAutoresizingMaskIntoConstraints = false
         backButton.addTarget(self, action: #selector(backTapped), for: .touchUpInside)
         topBar.addSubview(backButton)
@@ -115,6 +115,7 @@ class RouteSelectionViewController: UIViewController {
         let titleLabel = UILabel()
         titleLabel.text = "选择路线"
         titleLabel.font = .systemFont(ofSize: 17, weight: .semibold)
+        titleLabel.textColor = .appTextPrimary
         titleLabel.textAlignment = .center
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
         topBar.addSubview(titleLabel)
@@ -142,12 +143,12 @@ class RouteSelectionViewController: UIViewController {
         // 创建全览按钮（类似地图应用的全览按钮）
         overviewButton = UIButton(type: .system)
         overviewButton.setImage(UIImage(systemName: "arrow.up.left.and.arrow.down.right"), for: .normal)
-        overviewButton.backgroundColor = .white
-        overviewButton.tintColor = .systemBlue
+        overviewButton.backgroundColor = .appCardBackground
+        overviewButton.tintColor = .appPrimary
         overviewButton.layer.cornerRadius = 8
         overviewButton.layer.shadowColor = UIColor.black.cgColor
         overviewButton.layer.shadowOffset = CGSize(width: 0, height: 2)
-        overviewButton.layer.shadowOpacity = 0.1
+        overviewButton.layer.shadowOpacity = 0.3
         overviewButton.layer.shadowRadius = 4
         overviewButton.translatesAutoresizingMaskIntoConstraints = false
         overviewButton.addTarget(self, action: #selector(overviewTapped), for: .touchUpInside)
@@ -165,14 +166,14 @@ class RouteSelectionViewController: UIViewController {
     private func setupButtons() {
         // 创建底部按钮容器，扩展到屏幕底部（无间隙）
         let buttonContainer = UIView()
-        buttonContainer.backgroundColor = .white
+        buttonContainer.backgroundColor = .appBackground
         buttonContainer.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(buttonContainer)
         
         // 取消按钮
         cancelButton = UIButton(type: .system)
         cancelButton.setTitle("取消", for: .normal)
-        cancelButton.setTitleColor(.systemGray, for: .normal)
+        cancelButton.setTitleColor(.appTextSecondary, for: .normal)
         cancelButton.titleLabel?.font = .systemFont(ofSize: 17, weight: .medium)
         cancelButton.translatesAutoresizingMaskIntoConstraints = false
         cancelButton.addTarget(self, action: #selector(cancelTapped), for: .touchUpInside)
@@ -182,7 +183,7 @@ class RouteSelectionViewController: UIViewController {
         startNavigationButton = UIButton(type: .system)
         startNavigationButton.setTitle("开始导航", for: .normal)
         startNavigationButton.setTitleColor(.white, for: .normal)
-        startNavigationButton.backgroundColor = .systemBlue
+        startNavigationButton.backgroundColor = .appPrimary
         startNavigationButton.layer.cornerRadius = 12
         startNavigationButton.titleLabel?.font = .systemFont(ofSize: 17, weight: .semibold)
         startNavigationButton.translatesAutoresizingMaskIntoConstraints = false

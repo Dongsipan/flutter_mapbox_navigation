@@ -1,5 +1,5 @@
-import 'history_event_data.dart';
-import 'location_data.dart';
+import 'package:flutter_mapbox_navigation/src/models/history_event_data.dart';
+import 'package:flutter_mapbox_navigation/src/models/location_data.dart';
 
 /// 导航历史事件数据模型
 /// 包含历史记录的所有事件、原始位置数据和初始路线信息
@@ -16,18 +16,22 @@ class NavigationHistoryEvents {
     // 解析事件列表
     final eventsList = map['events'] as List<dynamic>?;
     final events = eventsList
-            ?.map((e) => HistoryEventData.fromMap(
-                  Map<String, dynamic>.from(e as Map),
-                ))
+            ?.map(
+              (e) => HistoryEventData.fromMap(
+                Map<String, dynamic>.from(e as Map),
+              ),
+            )
             .toList() ??
         [];
 
     // 解析原始位置数据
     final locationsList = map['rawLocations'] as List<dynamic>?;
     final rawLocations = locationsList
-            ?.map((e) => LocationData.fromMap(
-                  Map<String, dynamic>.from(e as Map),
-                ))
+            ?.map(
+              (e) => LocationData.fromMap(
+                Map<String, dynamic>.from(e as Map),
+              ),
+            )
             .toList() ??
         [];
 

@@ -3,8 +3,8 @@ class MapboxSearchResult {
   const MapboxSearchResult({
     required this.id,
     required this.name,
-    this.address,
     required this.coordinate,
+    this.address,
     this.categories,
     this.distance,
   });
@@ -206,8 +206,8 @@ class MapboxSearchSuggestion {
   const MapboxSearchSuggestion({
     required this.id,
     required this.name,
-    this.address,
     required this.coordinate,
+    this.address,
   });
 
   factory MapboxSearchSuggestion.fromMap(Map<String, dynamic> map) {

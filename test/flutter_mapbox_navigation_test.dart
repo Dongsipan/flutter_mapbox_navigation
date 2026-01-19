@@ -65,7 +65,7 @@ class MockFlutterMapboxNavigationPlatform
     required String historyFilePath,
     String? historyId,
   }) =>
-      Future.value(null);
+      Future.value();
 
   @override
   Future<NavigationHistoryEvents> getNavigationHistoryEvents(

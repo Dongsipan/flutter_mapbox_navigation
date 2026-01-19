@@ -596,7 +596,7 @@ class _AdvancedFeaturesExampleState extends State<AdvancedFeaturesExample> {
     debugPrint('🔍 验证路径点，数量: ${wayPoints.length}');
 
     if (wayPoints.length < 2) {
-      final message = "至少需要2个路径点才能开始导航";
+      const message = "至少需要2个路径点才能开始导航";
       debugPrint('❌ $message');
       setState(() {
         _statusMessage = message;

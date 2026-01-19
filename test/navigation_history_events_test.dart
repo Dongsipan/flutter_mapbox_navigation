@@ -12,11 +12,11 @@ void main() {
         final location = LocationData(
           latitude: 39.9042,
           longitude: 116.4074,
-          altitude: 50.0,
-          horizontalAccuracy: 5.0,
-          verticalAccuracy: 3.0,
+          altitude: 50,
+          horizontalAccuracy: 5,
+          verticalAccuracy: 3,
           speed: 10.5,
-          course: 180.0,
+          course: 180,
           timestamp: DateTime.now().millisecondsSinceEpoch,
         );
 
@@ -28,7 +28,7 @@ void main() {
       test('should throw error for invalid latitude', () {
         expect(
           () => LocationData(
-            latitude: 91.0, // Invalid
+            latitude: 91, // Invalid
             longitude: 116.4074,
             timestamp: DateTime.now().millisecondsSinceEpoch,
           ),
@@ -40,7 +40,7 @@ void main() {
         expect(
           () => LocationData(
             latitude: 39.9042,
-            longitude: 181.0, // Invalid
+            longitude: 181, // Invalid
             timestamp: DateTime.now().millisecondsSinceEpoch,
           ),
           throwsArgumentError,
@@ -166,11 +166,17 @@ void main() {
 
           // Verify equivalence
           expect(
-              deserializedLocation.latitude, equals(originalLocation.latitude));
-          expect(deserializedLocation.longitude,
-              equals(originalLocation.longitude));
+            deserializedLocation.latitude,
+            equals(originalLocation.latitude),
+          );
           expect(
-              deserializedLocation.altitude, equals(originalLocation.altitude));
+            deserializedLocation.longitude,
+            equals(originalLocation.longitude),
+          );
+          expect(
+            deserializedLocation.altitude,
+            equals(originalLocation.altitude),
+          );
           expect(
             deserializedLocation.horizontalAccuracy,
             equals(originalLocation.horizontalAccuracy),
@@ -181,8 +187,10 @@ void main() {
           );
           expect(deserializedLocation.speed, equals(originalLocation.speed));
           expect(deserializedLocation.course, equals(originalLocation.course));
-          expect(deserializedLocation.timestamp,
-              equals(originalLocation.timestamp));
+          expect(
+            deserializedLocation.timestamp,
+            equals(originalLocation.timestamp),
+          );
         }
       });
 
@@ -221,12 +229,18 @@ void main() {
 
           // Verify equivalence
           expect(deserializedEvent.eventType, equals(originalEvent.eventType));
-          expect(deserializedEvent.data['field1'],
-              equals(originalEvent.data['field1']));
-          expect(deserializedEvent.data['field2'],
-              equals(originalEvent.data['field2']));
-          expect(deserializedEvent.data['field3'],
-              equals(originalEvent.data['field3']));
+          expect(
+            deserializedEvent.data['field1'],
+            equals(originalEvent.data['field1']),
+          );
+          expect(
+            deserializedEvent.data['field2'],
+            equals(originalEvent.data['field2']),
+          );
+          expect(
+            deserializedEvent.data['field3'],
+            equals(originalEvent.data['field3']),
+          );
         }
       });
 
@@ -357,31 +371,49 @@ void main() {
           final event = HistoryEventData.fromMap(eventData);
 
           // Verify the event structure
-          expect(event.eventType, equals('userPushed'),
-              reason: 'Iteration $i: eventType should be userPushed');
+          expect(
+            event.eventType,
+            equals('userPushed'),
+            reason: 'Iteration $i: eventType should be userPushed',
+          );
 
           // Verify the data contains type and properties
-          expect(event.data['type'], equals('test_event'),
-              reason: 'Iteration $i: type should match');
+          expect(
+            event.data['type'],
+            equals('test_event'),
+            reason: 'Iteration $i: type should match',
+          );
 
           // Verify properties were parsed correctly
           final parsedProperties =
               event.data['properties'] as Map<String, dynamic>;
-          expect(parsedProperties, isNotNull,
-              reason: 'Iteration $i: properties should be present');
-          expect(parsedProperties.length, equals(properties.length),
-              reason: 'Iteration $i: properties count should match');
+          expect(
+            parsedProperties,
+            isNotNull,
+            reason: 'Iteration $i: properties should be present',
+          );
+          expect(
+            parsedProperties.length,
+            equals(properties.length),
+            reason: 'Iteration $i: properties count should match',
+          );
 
           // Verify each property
           expect(
-              parsedProperties['property_0'], equals(properties['property_0']),
-              reason: 'Iteration $i: property_0 should match');
+            parsedProperties['property_0'],
+            equals(properties['property_0']),
+            reason: 'Iteration $i: property_0 should match',
+          );
           expect(
-              parsedProperties['property_1'], equals(properties['property_1']),
-              reason: 'Iteration $i: property_1 should match');
+            parsedProperties['property_1'],
+            equals(properties['property_1']),
+            reason: 'Iteration $i: property_1 should match',
+          );
           expect(
-              parsedProperties['property_2'], equals(properties['property_2']),
-              reason: 'Iteration $i: property_2 should match');
+            parsedProperties['property_2'],
+            equals(properties['property_2']),
+            reason: 'Iteration $i: property_2 should match',
+          );
         }
       });
 
@@ -452,28 +484,42 @@ void main() {
             final event = HistoryEventData.fromMap(eventData);
 
             // Verify eventType field exists
-            expect(event.eventType, isNotNull,
-                reason:
-                    'Iteration $i, type $expectedType: eventType field should be present');
+            expect(
+              event.eventType,
+              isNotNull,
+              reason:
+                  'Iteration $i, type $expectedType: eventType field should be present',
+            );
 
             // Verify eventType is valid
-            expect(validEventTypes.contains(event.eventType), isTrue,
-                reason:
-                    'Iteration $i, type $expectedType: eventType should be one of the valid types');
+            expect(
+              validEventTypes.contains(event.eventType),
+              isTrue,
+              reason:
+                  'Iteration $i, type $expectedType: eventType should be one of the valid types',
+            );
 
             // Verify eventType matches expected
-            expect(event.eventType, equals(expectedType),
-                reason: 'Iteration $i: eventType should be $expectedType');
+            expect(
+              event.eventType,
+              equals(expectedType),
+              reason: 'Iteration $i: eventType should be $expectedType',
+            );
 
             // Verify data field exists
-            expect(event.data, isNotNull,
-                reason:
-                    'Iteration $i, type $expectedType: data field should be present');
+            expect(
+              event.data,
+              isNotNull,
+              reason:
+                  'Iteration $i, type $expectedType: data field should be present',
+            );
 
             // Verify data is a Map
-            expect(event.data, isA<Map<String, dynamic>>(),
-                reason:
-                    'Iteration $i, type $expectedType: data should be a Map');
+            expect(
+              event.data,
+              isA<Map<String, dynamic>>(),
+              reason: 'Iteration $i, type $expectedType: data should be a Map',
+            );
           }
         }
       });

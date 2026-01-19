@@ -41,13 +41,18 @@ class MapboxSearch {
   /// [options] 搜索选项
   /// 返回搜索结果列表
   static Future<List<MapboxSearchResult>> searchPlaces(
-      MapboxSearchOptions options) async {
+    MapboxSearchOptions options,
+  ) async {
     try {
       final results = await _channel.invokeMethod(
-          'searchPlaces', options.toMap()) as List<dynamic>;
+        'searchPlaces',
+        options.toMap(),
+      ) as List<dynamic>;
       return results
-          .map((result) =>
-              MapboxSearchResult.fromMap(result as Map<String, dynamic>))
+          .map(
+            (result) =>
+                MapboxSearchResult.fromMap(result as Map<String, dynamic>),
+          )
           .toList();
     } on PlatformException catch (e) {
       throw MapboxSearchException('搜索地点失败: ${e.message}', e.code);
@@ -59,13 +64,18 @@ class MapboxSearch {
   /// [options] 附近搜索选项
   /// 返回附近地点列表
   static Future<List<MapboxSearchResult>> searchNearby(
-      MapboxNearbySearchOptions options) async {
+    MapboxNearbySearchOptions options,
+  ) async {
     try {
       final results = await _channel.invokeMethod(
-          'searchNearby', options.toMap()) as List<dynamic>;
+        'searchNearby',
+        options.toMap(),
+      ) as List<dynamic>;
       return results
-          .map((result) =>
-              MapboxSearchResult.fromMap(result as Map<String, dynamic>))
+          .map(
+            (result) =>
+                MapboxSearchResult.fromMap(result as Map<String, dynamic>),
+          )
           .toList();
     } on PlatformException catch (e) {
       throw MapboxSearchException('搜索附近地点失败: ${e.message}', e.code);
@@ -77,14 +87,17 @@ class MapboxSearch {
   /// [coordinate] 要查询的坐标
   /// 返回该坐标的地址信息
   static Future<List<MapboxSearchResult>> reverseGeocode(
-      MapboxCoordinate coordinate) async {
+    MapboxCoordinate coordinate,
+  ) async {
     try {
       final results = await _channel.invokeMethod('reverseGeocode', {
         'coordinate': coordinate.toMap(),
       }) as List<dynamic>;
       return results
-          .map((result) =>
-              MapboxSearchResult.fromMap(result as Map<String, dynamic>))
+          .map(
+            (result) =>
+                MapboxSearchResult.fromMap(result as Map<String, dynamic>),
+          )
           .toList();
     } on PlatformException catch (e) {
       throw MapboxSearchException('反向地理编码失败: ${e.message}', e.code);
@@ -113,10 +126,14 @@ class MapboxSearch {
       }
 
       final results = await _channel.invokeMethod(
-          'getSearchSuggestions', params) as List<dynamic>;
+        'getSearchSuggestions',
+        params,
+      ) as List<dynamic>;
       return results
-          .map((result) =>
-              MapboxSearchSuggestion.fromMap(result as Map<String, dynamic>))
+          .map(
+            (result) =>
+                MapboxSearchSuggestion.fromMap(result as Map<String, dynamic>),
+          )
           .toList();
     } on PlatformException catch (e) {
       throw MapboxSearchException('获取搜索建议失败: ${e.message}', e.code);

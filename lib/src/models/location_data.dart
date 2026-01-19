@@ -4,12 +4,12 @@ class LocationData {
   LocationData({
     required this.latitude,
     required this.longitude,
+    required this.timestamp,
     this.altitude,
     this.horizontalAccuracy,
     this.verticalAccuracy,
     this.speed,
     this.course,
-    required this.timestamp,
   }) {
     // 验证纬度范围
     if (latitude < -90 || latitude > 90) {
@@ -28,7 +28,7 @@ class LocationData {
       if (value is double) return value;
       if (value is int) return value.toDouble();
       if (value is String) return double.parse(value);
-      return 0.0;
+      return 0;
     }
 
     double? parseOptionalDouble(dynamic value) {

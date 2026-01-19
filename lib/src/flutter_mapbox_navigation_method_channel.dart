@@ -131,7 +131,7 @@ class MethodChannelFlutterMapboxNavigation
               final itemMap = Map<String, dynamic>.from(item as Map);
               log('Converted item map: $itemMap');
               final history = NavigationHistory.fromMap(itemMap);
-              log('Successfully created NavigationHistory: ${history}');
+              log('Successfully created NavigationHistory: $history');
               return history;
             } catch (e, stackTrace) {
               log('Error creating NavigationHistory from item: $item');

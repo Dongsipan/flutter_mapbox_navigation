@@ -68,7 +68,8 @@ dependencies {
     implementation "androidx.cardview:cardview:1.0.0"
     implementation "androidx.constraintlayout:constraintlayout:2.1.4"
     implementation "androidx.coordinatorlayout:coordinatorlayout:1.2.0"
-    implementation "com.google.android.gms:play-services-location:21.1.0"
+    // Google Play Services 已移除 - 使用 Android 原生 LocationManager 替代
+    // implementation "com.google.android.gms:play-services-location:21.1.0"
     debugImplementation "com.squareup.leakcanary:leakcanary-android:2.12"
     implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3"
     implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3"

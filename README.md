@@ -21,6 +21,7 @@ A comprehensive Flutter plugin for Mapbox Navigation SDK that brings professiona
 * **Smart traffic handling** - Traffic avoidance and proactive rerouting in [over 55 countries](https://docs.mapbox.com/help/how-mapbox-works/directions/#traffic-data)
 * **Natural voice guidance** - Turn instructions powered by [Amazon Polly](https://aws.amazon.com/polly/) (no configuration needed)
 * **Global language support** - [20+ languages](https://docs.mapbox.com/ios/navigation/overview/localization-and-internationalization/) for international audiences
+* **🌍 No Google Services Required** - Works on all Android devices including Huawei, Chinese market devices, and custom ROMs without Google Play Services
 
 ### Advanced Features
 * **📍 Navigation History Recording** - Automatically record complete navigation sessions with route data, timestamps, and metadata
@@ -55,6 +56,8 @@ A comprehensive Flutter plugin for Mapbox Navigation SDK that brings professiona
 
 
 ## Android Configuration
+
+> **Note:** This plugin does not require Google Play Services. It works on all Android devices including Huawei HarmonyOS, Chinese market devices, and custom ROMs. See [Location Without Google Services Guide](./docs/LOCATION_WITHOUT_GOOGLE_SERVICES.md) for details.
 
 1. Mapbox APIs and vector tiles require a Mapbox account and API access token. Add a new resource file called `mapbox_access_token.xml` with it's full path being `<YOUR_FLUTTER_APP_ROOT>/android/app/src/main/res/values/mapbox_access_token.xml`. Then add a string resource with name "mapbox_access_token" and your token as it's value as shown below. You can obtain an access token from the [Mapbox account page](https://account.mapbox.com/access-tokens/).
 ```xml

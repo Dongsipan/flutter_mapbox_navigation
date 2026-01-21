@@ -215,7 +215,7 @@ class HistoryEventsParser {
     }
     
     /// 序列化未知事件
-    private func serializeUnknownEvent(_ event: HistoryEvent) -> [String: Any] {
+    private func serializeUnknownEvent(_ event: any HistoryEvent) -> [String: Any] {
         return [
             "eventType": "unknown",
             "data": [

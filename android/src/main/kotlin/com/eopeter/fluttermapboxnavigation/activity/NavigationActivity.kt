@@ -193,6 +193,10 @@ class NavigationActivity : AppCompatActivity() {
     private var pendingWaypointSet: WaypointSet? = null
     private var isNavigationReady = false
     
+    // Back Press Handling (返回键处理)
+    private lateinit var backPressedCallback: androidx.activity.OnBackPressedCallback
+    private var isExitDialogShowing = false
+    
     // MapboxNavigation observer for lifecycle management
     private val mapboxNavigationObserver = object : MapboxNavigationObserver {
         override fun onAttached(mapboxNavigation: MapboxNavigation) {
@@ -282,6 +286,9 @@ class NavigationActivity : AppCompatActivity() {
         
         // Setup Broadcast Receivers
         setupBroadcastReceivers()
+        
+        // Setup Back Press Handler
+        setupBackPressedHandler()
         
         // Handle Free Drive Mode
         if (FlutterMapboxNavigationPlugin.enableFreeDriveMode) {
@@ -648,6 +655,96 @@ class NavigationActivity : AppCompatActivity() {
                 addWayPointsBroadcastReceiver,
                 IntentFilter(NavigationLauncher.KEY_ADD_WAYPOINTS)
             )
+        }
+    }
+    
+    /**
+     * 设置返回键处理器
+     * 使用 OnBackPressedDispatcher API（Android 13+ 推荐）
+     * 
+     * 此方法初始化返回键回调，拦截用户按下返回键的操作。
+     * 根据导航状态决定是否显示退出确认对话框。
+     */
+    private fun setupBackPressedHandler() {
+        backPressedCallback = object : androidx.activity.OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                handleBackPress()
+            }
+        }
+        
+        // 注册回调到 OnBackPressedDispatcher
+        onBackPressedDispatcher.addCallback(this, backPressedCallback)
+        
+        android.util.Log.d(TAG, "Back pressed handler initialized")
+    }
+    
+    /**
+     * 处理返回键按下事件
+     * 根据导航状态决定是否显示确认对话框
+     * 
+     * 如果导航正在进行中（isNavigationInProgress == true），显示退出确认对话框。
+     * 如果导航未开始或已结束，直接退出 Activity。
+     */
+    private fun handleBackPress() {
+        android.util.Log.d(TAG, "Back pressed, isNavigationInProgress=$isNavigationInProgress")
+        
+        if (isNavigationInProgress) {
+            // 导航进行中，显示确认对话框
+            showExitConfirmationDialog()
+        } else {
+            // 未开始导航或已结束，直接退出
+            android.util.Log.d(TAG, "Navigation not in progress, finishing activity")
+            finish()
+        }
+    }
+    
+    /**
+     * 显示退出确认对话框
+     * 防止重复显示，支持主题切换
+     * 
+     * 当用户在导航进行中按下返回键时，显示此对话框确认是否退出导航。
+     * 对话框包含标题、消息和两个按钮（确认/取消）。
+     */
+    private fun showExitConfirmationDialog() {
+        // 防止重复显示
+        if (isExitDialogShowing) {
+            android.util.Log.d(TAG, "Exit dialog is already showing, ignoring")
+            return
+        }
+        
+        // 检查 Activity 状态
+        if (isFinishing || isDestroyed) {
+            android.util.Log.w(TAG, "Activity is finishing or destroyed, cannot show dialog")
+            return
+        }
+        
+        try {
+            isExitDialogShowing = true
+            
+            androidx.appcompat.app.AlertDialog.Builder(this, R.style.AlertDialogTheme)
+                .setTitle(R.string.exit_navigation_title)
+                .setMessage(R.string.exit_navigation_message)
+                .setPositiveButton(R.string.exit_navigation_confirm) { dialog, _ ->
+                    android.util.Log.d(TAG, "User confirmed exit navigation")
+                    dialog.dismiss()
+                    stopNavigation()
+                }
+                .setNegativeButton(R.string.exit_navigation_cancel) { dialog, _ ->
+                    android.util.Log.d(TAG, "User cancelled exit navigation")
+                    dialog.dismiss()
+                }
+                .setCancelable(true)
+                .setOnDismissListener {
+                    isExitDialogShowing = false
+                    android.util.Log.d(TAG, "Exit dialog dismissed")
+                }
+                .show()
+            
+            android.util.Log.d(TAG, "Exit confirmation dialog shown")
+        } catch (e: Exception) {
+            android.util.Log.e(TAG, "Failed to show exit confirmation dialog", e)
+            isExitDialogShowing = false
+            finish()
         }
     }
     
@@ -1997,12 +2094,38 @@ class NavigationActivity : AppCompatActivity() {
         }
     }
     
+    
+    /**
+     * 兼容 Android 13 以下版本
+     * 重写 onBackPressed 方法
+     * 
+     * 对于 Android 13 以下版本，手动调用 handleBackPress()。
+     * 对于 Android 13 及以上版本，使用 OnBackPressedCallback。
+     */
+    @Deprecated("Deprecated in Java")
+    override fun onBackPressed() {
+        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.TIRAMISU) {
+            android.util.Log.d(TAG, "Using legacy onBackPressed for Android < 13")
+            handleBackPress()
+        } else {
+            super.onBackPressed()
+        }
+    }
+    
     // ==================== Lifecycle ====================
     
     override fun onDestroy() {
         super.onDestroy()
         
         try {
+            // Clean up back pressed callback
+            try {
+                backPressedCallback.remove()
+                android.util.Log.d(TAG, "Back pressed callback removed")
+            } catch (e: Exception) {
+                android.util.Log.e(TAG, "Error removing back pressed callback: ${e.message}", e)
+            }
+            
             // Stop GPS signal monitoring
             stopGpsSignalMonitoring()
             

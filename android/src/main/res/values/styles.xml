@@ -98,4 +98,30 @@
         <item name="android:navigationBarColor">@color/colorBackground</item>
         <item name="android:windowLightStatusBar">false</item>
     </style>
+
+    <!-- AlertDialog Theme - 退出导航确认对话框主题 -->
+    <style name="AlertDialogTheme" parent="Theme.MaterialComponents.DayNight.Dialog.Alert">
+        <!-- 主题色用于按钮等交互元素 -->
+        <item name="colorPrimary">@color/colorPrimary</item>
+        <item name="colorAccent">@color/colorPrimary</item>
+        <!-- 背景色配置 - 使用卡片背景色使对话框在深色背景上可见 -->
+        <item name="android:background">@color/colorCardBackground</item>
+        <item name="colorSurface">@color/colorCardBackground</item>
+        <!-- 文字颜色配置 -->
+        <item name="android:textColorPrimary">@color/textPrimary</item>
+        <item name="android:textColorSecondary">@color/textSecondary</item>
+        <!-- 按钮样式配置 -->
+        <item name="buttonBarPositiveButtonStyle">@style/PositiveButtonStyle</item>
+        <item name="buttonBarNegativeButtonStyle">@style/NegativeButtonStyle</item>
+    </style>
+
+    <!-- 确认按钮样式 - 使用主题色 -->
+    <style name="PositiveButtonStyle" parent="Widget.MaterialComponents.Button.TextButton.Dialog">
+        <item name="android:textColor">@color/colorPrimary</item>
+    </style>
+
+    <!-- 取消按钮样式 - 使用次要文字颜色 -->
+    <style name="NegativeButtonStyle" parent="Widget.MaterialComponents.Button.TextButton.Dialog">
+        <item name="android:textColor">@color/textSecondary</item>
+    </style>
 </resources>

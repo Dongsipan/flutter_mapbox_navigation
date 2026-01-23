@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Exit Navigation Confirmation Dialog -->
+    <string name="exit_navigation_title">Exit Navigation?</string>
+    <string name="exit_navigation_message">Navigation will be cancelled. Are you sure you want to exit?</string>
+    <string name="exit_navigation_confirm">Exit</string>
+    <string name="exit_navigation_cancel">Cancel</string>
+</resources>

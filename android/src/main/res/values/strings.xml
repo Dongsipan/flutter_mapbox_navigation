@@ -39,4 +39,10 @@
     <string name="location_permission_required">需要位置权限才能使用此功能</string>
     <string name="location_service_disabled">请开启位置服务</string>
     <string name="no_results">未找到相关地点</string>
+    
+    <!-- Exit Navigation Confirmation Dialog -->
+    <string name="exit_navigation_title">退出导航？</string>
+    <string name="exit_navigation_message">导航将被取消，确定要退出吗？</string>
+    <string name="exit_navigation_confirm">退出</string>
+    <string name="exit_navigation_cancel">取消</string>
 </resources>

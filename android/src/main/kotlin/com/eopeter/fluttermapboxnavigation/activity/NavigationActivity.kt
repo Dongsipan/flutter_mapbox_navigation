@@ -193,6 +193,9 @@ class NavigationActivity : AppCompatActivity() {
     private var pendingWaypointSet: WaypointSet? = null
     private var isNavigationReady = false
     
+    // 相机是否已初始化到用户位置
+    private var isCameraInitialized = false
+    
     // Back Press Handling (返回键处理)
     private lateinit var backPressedCallback: androidx.activity.OnBackPressedCallback
     private var isExitDialogShowing = false
@@ -316,6 +319,7 @@ class NavigationActivity : AppCompatActivity() {
     private fun initializeNavigation() {
         try {
             // In SDK v3, access token is automatically retrieved from resources
+            // 🎯 优化：使用 setupAndAttach 方法，确保更快的初始化
             val navigationOptions = NavigationOptions.Builder(this.applicationContext)
                 .build()
             
@@ -396,6 +400,9 @@ class NavigationActivity : AppCompatActivity() {
                 // Register position changed listener for vanishing route line
                 binding.mapView.location.addOnIndicatorPositionChangedListener(onIndicatorPositionChangedListener)
                 
+                // 🎯 初始化相机到用户当前位置，避免从地球另一端转动
+                initializeCameraToUserLocation()
+                
                 android.util.Log.d(TAG, "Map style loaded successfully: $styleUrl")
             }
             
@@ -416,6 +423,34 @@ class NavigationActivity : AppCompatActivity() {
             android.util.Log.e(TAG, "❌ Failed to initialize map: ${e.message}", e)
             sendEvent(MapBoxEvents.NAVIGATION_CANCELLED)
             finish()
+        }
+    }
+    
+    /**
+     * 初始化相机到用户当前位置
+     * 避免相机从地球另一端转动到用户位置
+     */
+    private fun initializeCameraToUserLocation() {
+        try {
+            // 获取最后已知位置或等待第一个位置更新
+            lastLocation?.let { location ->
+                val userPoint = Point.fromLngLat(location.longitude, location.latitude)
+                val cameraOptions = CameraOptions.Builder()
+                    .center(userPoint)
+                    .zoom(15.0)
+                    .pitch(0.0)
+                    .bearing(0.0)
+                    .build()
+                
+                // 立即设置相机位置，不使用动画
+                binding.mapView.mapboxMap.setCamera(cameraOptions)
+                android.util.Log.d(TAG, "📷 Camera initialized to user location: ${location.latitude}, ${location.longitude}")
+            } ?: run {
+                // 如果没有位置，使用默认位置（避免从 0,0 开始）
+                android.util.Log.d(TAG, "📷 No user location available yet, camera will update when location is received")
+            }
+        } catch (e: Exception) {
+            android.util.Log.e(TAG, "❌ Failed to initialize camera to user location: ${e.message}", e)
         }
     }
     
@@ -983,16 +1018,10 @@ class NavigationActivity : AppCompatActivity() {
                 }
             }
             
-            // Use NavigationCamera to show route overview first, then switch to following
-            // This is the official Turn-by-Turn pattern
-            navigationCamera.requestNavigationCameraToOverview()
-            android.util.Log.d(TAG, "📷 Camera set to overview mode")
-            
-            // After a short delay, switch to following mode to start turn-by-turn navigation
-            binding.mapView.postDelayed({
-                navigationCamera.requestNavigationCameraToFollowing()
-                android.util.Log.d(TAG, "📷 Camera switched to following mode")
-            }, 1500)
+            // 🎯 优化：直接切换到 following 模式，避免不必要的 overview 动画
+            // 相机已经在用户位置初始化，直接开始导航更流畅
+            navigationCamera.requestNavigationCameraToFollowing()
+            android.util.Log.d(TAG, "📷 Camera set to following mode (direct start)")
             
             // 显示官方 UI 组件
             binding.tripProgressCard?.visibility = View.VISIBLE
@@ -1406,6 +1435,25 @@ class NavigationActivity : AppCompatActivity() {
                 accuracy = enhancedLocation.horizontalAccuracy?.toFloat() ?: 0f
             }
             
+            // 🎯 首次收到位置时，立即初始化相机到用户位置
+            if (!isCameraInitialized) {
+                val userPoint = Point.fromLngLat(
+                    enhancedLocation.longitude,
+                    enhancedLocation.latitude
+                )
+                val cameraOptions = CameraOptions.Builder()
+                    .center(userPoint)
+                    .zoom(15.0)
+                    .pitch(0.0)
+                    .bearing(enhancedLocation.bearing?.toDouble() ?: 0.0)
+                    .build()
+                
+                // 立即设置相机位置，不使用动画
+                binding.mapView.mapboxMap.setCamera(cameraOptions)
+                isCameraInitialized = true
+                android.util.Log.d(TAG, "📷 Camera initialized to first location: ${enhancedLocation.latitude}, ${enhancedLocation.longitude}")
+            }
+            
             // Check location accuracy for GPS signal quality
             val accuracy = enhancedLocation.horizontalAccuracy
             if (accuracy != null && accuracy > 50.0) {
@@ -1426,16 +1474,6 @@ class NavigationActivity : AppCompatActivity() {
             // Update viewport data source with new location (official Turn-by-Turn pattern)
             viewportDataSource.onLocationChanged(enhancedLocation)
             viewportDataSource.evaluate()
-            
-            // 如果是第一次收到位置更新，立即移动相机到当前位置
-            if (!firstLocationUpdateReceived) {
-                firstLocationUpdateReceived = true
-                navigationCamera.requestNavigationCameraToOverview(
-                    stateTransitionOptions = com.mapbox.navigation.ui.maps.camera.transition.NavigationCameraTransitionOptions.Builder()
-                        .maxDuration(0) // instant transition
-                        .build()
-                )
-            }
             
             android.util.Log.d(TAG, "📷 ViewportDataSource updated with location")
         }

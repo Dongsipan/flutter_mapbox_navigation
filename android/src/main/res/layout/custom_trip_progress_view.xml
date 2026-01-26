@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Modern clean navigation metrics - aligned grid layout -->
+<LinearLayout 
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:background="@android:color/transparent">
+
+    <!-- Time Remaining - Primary metric (green, largest) -->
+    <LinearLayout
+        android:id="@+id/timeMetric"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:gravity="center">
+
+        <TextView
+            android:id="@+id/timeRemainingValue"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="6"
+            android:textSize="48sp"
+            android:textStyle="bold"
+            android:textColor="@color/cardAccentGreen"
+            android:fontFamily="sans-serif-medium"
+            android:includeFontPadding="false"
+            android:lineHeight="48dp" />
+
+        <TextView
+            android:id="@+id/timeRemainingLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="min"
+            android:textSize="13sp"
+            android:textColor="@color/textSecondary"
+            android:layout_marginTop="2dp"
+            android:alpha="0.7" />
+    </LinearLayout>
+
+    <!-- Distance Remaining - Secondary metric (white) -->
+    <LinearLayout
+        android:id="@+id/distanceMetric"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:gravity="center">
+
+        <TextView
+            android:id="@+id/distanceRemainingValue"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="1.9"
+            android:textSize="32sp"
+            android:textStyle="bold"
+            android:textColor="@color/textPrimary"
+            android:fontFamily="sans-serif-medium"
+            android:includeFontPadding="false"
+            android:lineHeight="32dp" />
+
+        <TextView
+            android:id="@+id/distanceRemainingLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="km"
+            android:textSize="13sp"
+            android:textColor="@color/textSecondary"
+            android:layout_marginTop="2dp"
+            android:alpha="0.7" />
+    </LinearLayout>
+
+    <!-- ETA - Tertiary metric (white) -->
+    <LinearLayout
+        android:id="@+id/etaMetric"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:gravity="center">
+
+        <TextView
+            android:id="@+id/etaValue"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="1:57"
+            android:textSize="32sp"
+            android:textStyle="bold"
+            android:textColor="@color/textPrimary"
+            android:fontFamily="sans-serif-medium"
+            android:includeFontPadding="false"
+            android:lineHeight="32dp" />
+
+        <TextView
+            android:id="@+id/etaLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="pm"
+            android:textSize="13sp"
+            android:textColor="@color/textSecondary"
+            android:layout_marginTop="2dp"
+            android:alpha="0.7" />
+    </LinearLayout>
+
+</LinearLayout>

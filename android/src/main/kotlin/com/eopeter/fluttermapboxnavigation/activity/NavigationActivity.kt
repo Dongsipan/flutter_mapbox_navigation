@@ -662,9 +662,13 @@ class NavigationActivity : AppCompatActivity() {
     }
     
     private fun setupUI() {
-        // Stop/End Navigation Button (官方组件)
-        binding.stop?.setOnClickListener {
-            stopNavigation()
+        // Stop/End Navigation Button with confirmation dialog
+        // Support both old and new button IDs
+        val stopButton = binding.root.findViewById<com.google.android.material.button.MaterialButton>(R.id.stopButton)
+            ?: binding.stop
+        
+        stopButton?.setOnClickListener {
+            showStopNavigationDialog()
         }
         
         // Recenter Button (官方组件)
@@ -687,6 +691,9 @@ class NavigationActivity : AppCompatActivity() {
         // 设置初始声音按钮状态
         binding.soundButton?.unmute()
         
+        // 自定义 Mapbox 按钮样式 - 白色图标
+        customizeMapboxButtons()
+        
         // 初始隐藏官方 UI 组件
         binding.tripProgressCard?.visibility = View.INVISIBLE
         binding.maneuverView?.visibility = View.INVISIBLE
@@ -696,6 +703,80 @@ class NavigationActivity : AppCompatActivity() {
         // 自定义组件
         binding.gpsWarningPanel?.visibility = View.GONE
         binding.routeSelectionPanel?.visibility = View.GONE
+    }
+    
+    /**
+     * 自定义 Mapbox 按钮样式
+     * Customize Mapbox button styles with dark background and white icons
+     * Based on Mapbox Navigation SDK 3.9.2 official API
+     */
+    private fun customizeMapboxButtons() {
+        try {
+            val darkBackground = android.graphics.Color.parseColor("#040608")
+            val whiteColor = android.graphics.Color.WHITE
+            
+            // Helper function to recursively find and style child views
+            fun styleChildViews(view: View, iconColor: Int, textColor: Int) {
+                when (view) {
+                    is android.widget.ImageView -> {
+                        view.setColorFilter(iconColor, android.graphics.PorterDuff.Mode.SRC_IN)
+                        android.util.Log.d(TAG, "✓ Colored ImageView in ${view.parent?.javaClass?.simpleName}")
+                    }
+                    is android.widget.TextView -> {
+                        view.setTextColor(textColor)
+                        android.util.Log.d(TAG, "✓ Colored TextView in ${view.parent?.javaClass?.simpleName}")
+                    }
+                    is android.view.ViewGroup -> {
+                        for (i in 0 until view.childCount) {
+                            styleChildViews(view.getChildAt(i), iconColor, textColor)
+                        }
+                    }
+                }
+            }
+            
+            // Create rounded background drawable
+            val cornerRadius = 24f // 圆形按钮
+            val roundedBackground = android.graphics.drawable.GradientDrawable().apply {
+                shape = android.graphics.drawable.GradientDrawable.RECTANGLE
+                setColor(darkBackground)
+                setCornerRadius(cornerRadius)
+            }
+            
+            // Sound Button - 圆形背景 + 白色图标和文字
+            binding.soundButton?.let { button ->
+                button.background = roundedBackground
+                styleChildViews(button, whiteColor, whiteColor)
+                android.util.Log.d(TAG, "✓ Customized soundButton: circular bg + white icon/text")
+            }
+            
+            // Route Overview Button - 圆形背景 + 白色图标和文字
+            binding.routeOverview?.let { button ->
+                val roundedBg = android.graphics.drawable.GradientDrawable().apply {
+                    shape = android.graphics.drawable.GradientDrawable.RECTANGLE
+                    setColor(darkBackground)
+                    setCornerRadius(cornerRadius)
+                }
+                button.background = roundedBg
+                styleChildViews(button, whiteColor, whiteColor)
+                android.util.Log.d(TAG, "✓ Customized routeOverview: circular bg + white icon/text")
+            }
+            
+            // Recenter Button - 圆形背景 + 白色图标和文字
+            binding.recenter?.let { button ->
+                val roundedBg = android.graphics.drawable.GradientDrawable().apply {
+                    shape = android.graphics.drawable.GradientDrawable.RECTANGLE
+                    setColor(darkBackground)
+                    setCornerRadius(cornerRadius)
+                }
+                button.background = roundedBg
+                styleChildViews(button, whiteColor, whiteColor)
+                android.util.Log.d(TAG, "✓ Customized recenter: circular bg + white icon/text")
+            }
+            
+            android.util.Log.d(TAG, "🎨 All Mapbox buttons customized: circular #040608 background + white icons/text")
+        } catch (e: Exception) {
+            android.util.Log.e(TAG, "Failed to customize Mapbox buttons: ${e.message}", e)
+        }
     }
     
     private fun setupBroadcastReceivers() {
@@ -1378,6 +1459,22 @@ class NavigationActivity : AppCompatActivity() {
     }
     
     @OptIn(com.mapbox.navigation.base.ExperimentalPreviewMapboxNavigationAPI::class)
+    private fun showStopNavigationDialog() {
+        androidx.appcompat.app.AlertDialog.Builder(this, R.style.AlertDialogTheme)
+            .setTitle("End Navigation")
+            .setMessage("Are you sure you want to stop navigation?")
+            .setPositiveButton("Stop") { dialog, _ ->
+                dialog.dismiss()
+                stopNavigation()
+            }
+            .setNegativeButton("Cancel") { dialog, _ ->
+                dialog.dismiss()
+            }
+            .setCancelable(true)
+            .show()
+    }
+    
+    @OptIn(com.mapbox.navigation.base.ExperimentalPreviewMapboxNavigationAPI::class)
     private fun stopNavigation() {
         val mapboxNavigation = MapboxNavigationApp.current() ?: run {
             android.util.Log.w(TAG, "MapboxNavigation is null when stopping navigation")
@@ -1565,10 +1662,8 @@ class NavigationActivity : AppCompatActivity() {
         
         android.util.Log.d(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
         
-        // 更新官方 Trip Progress View (SDK v3 官方方式)
-        binding.tripProgressView?.render(
-            tripProgressApi.getTripProgress(routeProgress)
-        )
+        // 更新自定义骑行指标视图
+        updateCustomTripProgressView(routeProgress)
         
         // 更新官方 Maneuver View (SDK v3 官方方式)
         val maneuvers = maneuverApi.getManeuvers(routeProgress)
@@ -1891,6 +1986,54 @@ class NavigationActivity : AppCompatActivity() {
     }
     
     // ==================== UI Updates ====================
+    
+    /**
+     * 更新自定义骑行指标视图 - 简洁横向布局
+     * Update custom cycling metrics view with navigation data - minimal horizontal layout
+     */
+    private fun updateCustomTripProgressView(routeProgress: RouteProgress) {
+        try {
+            val customView = binding.root.findViewById<View>(R.id.customTripProgressView) ?: return
+            
+            // Time Remaining - 绿色大字显示（只显示数字）
+            val timeRemainingValue = customView.findViewById<android.widget.TextView>(R.id.timeRemainingValue)
+            val durationRemaining = routeProgress.durationRemaining
+            val minutes = (durationRemaining / 60).toInt()
+            timeRemainingValue?.text = "$minutes"
+            
+            // Distance Remaining - 白色（分离数字和单位）
+            val distanceRemainingValue = customView.findViewById<android.widget.TextView>(R.id.distanceRemainingValue)
+            val distanceRemainingLabel = customView.findViewById<android.widget.TextView>(R.id.distanceRemainingLabel)
+            val distanceRemaining = routeProgress.distanceRemaining
+            
+            if (distanceRemaining >= 1000) {
+                val distanceKm = distanceRemaining / 1000
+                distanceRemainingValue?.text = String.format("%.1f", distanceKm)
+                distanceRemainingLabel?.text = "km"
+            } else {
+                distanceRemainingValue?.text = String.format("%.0f", distanceRemaining)
+                distanceRemainingLabel?.text = "m"
+            }
+            
+            // ETA - 白色（分离时间和 AM/PM）
+            val etaValue = customView.findViewById<android.widget.TextView>(R.id.etaValue)
+            val etaLabel = customView.findViewById<android.widget.TextView>(R.id.etaLabel)
+            val eta = System.currentTimeMillis() + (durationRemaining * 1000).toLong()
+            val calendar = java.util.Calendar.getInstance()
+            calendar.timeInMillis = eta
+            
+            val hour = calendar.get(java.util.Calendar.HOUR)
+            val minute = calendar.get(java.util.Calendar.MINUTE)
+            val amPm = if (calendar.get(java.util.Calendar.AM_PM) == java.util.Calendar.AM) "am" else "pm"
+            
+            etaValue?.text = String.format("%d:%02d", if (hour == 0) 12 else hour, minute)
+            etaLabel?.text = amPm
+            
+        } catch (e: Exception) {
+            android.util.Log.e(TAG, "Error updating custom trip progress view: ${e.message}", e)
+        }
+    }
+    
     // 注意：使用官方 MapboxTripProgressView 和 MapboxManeuverView 后，
     // 以下函数不再需要，已在 routeProgressObserver 中直接使用官方组件
     

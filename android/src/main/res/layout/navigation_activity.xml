@@ -20,7 +20,7 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
-    <!-- Trip Progress Card (Bottom) - Modern Cycling Navigation Design -->
+    <!-- Trip Progress Card (Bottom) - Modern Minimal Design with Icon Button -->
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/tripProgressCard"
         android:layout_width="0dp"
@@ -29,48 +29,55 @@
         android:background="@drawable/trip_progress_card_background"
         android:elevation="20dp"
         android:paddingTop="20dp"
-        android:paddingBottom="28dp"
-        android:paddingStart="20dp"
+        android:paddingBottom="20dp"
+        android:paddingStart="24dp"
         android:paddingEnd="20dp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent">
 
-        <!-- Trip Progress View with proper spacing -->
-        <com.mapbox.navigation.ui.components.tripprogress.view.MapboxTripProgressView
-            android:id="@+id/tripProgressView"
-            style="@style/MapboxCustomTripProgressStyle"
+        <!-- Custom Trip Progress View - Clean Aligned Grid -->
+        <include
+            android:id="@+id/customTripProgressView"
+            layout="@layout/custom_trip_progress_view"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginEnd="12dp"
-            android:background="@android:color/transparent"
             app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toStartOf="@id/stop"
-            app:layout_constraintBottom_toBottomOf="parent" />
+            app:layout_constraintEnd_toStartOf="@id/stopButton" />
 
-        <!-- Stop/End Navigation Button - Modern Cycling Theme -->
+        <!-- Stop Navigation Button - Modern Circular Icon Button -->
         <com.google.android.material.button.MaterialButton
-            android:id="@+id/stop"
-            android:layout_width="52dp"
-            android:layout_height="52dp"
+            android:id="@+id/stopButton"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_marginStart="16dp"
             android:contentDescription="Stop Navigation"
             android:insetTop="0dp"
             android:insetBottom="0dp"
+            android:insetLeft="0dp"
+            android:insetRight="0dp"
             android:padding="0dp"
             app:icon="@android:drawable/ic_delete"
             app:iconGravity="textStart"
             app:iconPadding="0dp"
-            app:iconSize="26dp"
-            app:iconTint="@color/textPrimary"
-            app:cornerRadius="14dp"
-            app:backgroundTint="#1A1C1E"
-            app:rippleColor="#4001E47C"
-            app:strokeWidth="1dp"
-            app:strokeColor="#20FFFFFF"
-            app:layout_constraintTop_toTopOf="@id/tripProgressView"
-            app:layout_constraintBottom_toBottomOf="@id/tripProgressView"
+            app:iconSize="20dp"
+            app:iconTint="#FFFFFF"
+            app:cornerRadius="24dp"
+            app:backgroundTint="#20FFFFFF"
+            app:rippleColor="#40FFFFFF"
+            app:strokeWidth="0dp"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent" />
+
+        <!-- Keep old stop button ID for compatibility -->
+        <View
+            android:id="@+id/stop"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 
@@ -86,7 +93,7 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
-    <!-- Sound/Voice Button - Official Mapbox Component -->
+    <!-- Sound/Voice Button - Official Mapbox Component with Custom Style -->
     <com.mapbox.navigation.ui.components.voice.view.MapboxSoundButton
         android:id="@+id/soundButton"
         android:layout_width="wrap_content"
@@ -97,7 +104,7 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintTop_toBottomOf="@id/maneuverView" />
 
-    <!-- Route Overview Button - Official Mapbox Component -->
+    <!-- Route Overview Button - Official Mapbox Component with Custom Style -->
     <com.mapbox.navigation.ui.components.maps.camera.view.MapboxRouteOverviewButton
         android:id="@+id/routeOverview"
         android:layout_width="wrap_content"
@@ -108,7 +115,7 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintTop_toBottomOf="@id/soundButton" />
 
-    <!-- Recenter Button - Official Mapbox Component -->
+    <!-- Recenter Button - Official Mapbox Component with Custom Style -->
     <com.mapbox.navigation.ui.components.maps.camera.view.MapboxRecenterButton
         android:id="@+id/recenter"
         android:layout_width="wrap_content"

@@ -20,37 +20,64 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
-    <!-- Trip Progress Card (Bottom) - Official Mapbox Component -->
-    <androidx.cardview.widget.CardView
+    <!-- Trip Progress Card (Bottom) - Modern Cycling Navigation Design -->
+    <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/tripProgressCard"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:visibility="invisible"
-        app:cardElevation="8dp"
-        app:cardUseCompatPadding="false"
+        android:background="@drawable/trip_progress_card_background"
+        android:elevation="20dp"
+        android:paddingTop="20dp"
+        android:paddingBottom="28dp"
+        android:paddingStart="20dp"
+        android:paddingEnd="20dp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent">
 
+        <!-- Trip Progress View with proper spacing -->
         <com.mapbox.navigation.ui.components.tripprogress.view.MapboxTripProgressView
             android:id="@+id/tripProgressView"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content" />
-
-        <!-- Stop/End Navigation Button -->
-        <ImageView
-            android:id="@+id/stop"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:layout_gravity="end|center_vertical"
+            style="@style/MapboxCustomTripProgressStyle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
             android:layout_marginEnd="12dp"
-            android:contentDescription="Stop Navigation"
-            app:srcCompat="@android:drawable/ic_delete" />
-    </androidx.cardview.widget.CardView>
+            android:background="@android:color/transparent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toStartOf="@id/stop"
+            app:layout_constraintBottom_toBottomOf="parent" />
 
-    <!-- Maneuver View (Top) - Official Mapbox Component -->
+        <!-- Stop/End Navigation Button - Modern Cycling Theme -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/stop"
+            android:layout_width="52dp"
+            android:layout_height="52dp"
+            android:contentDescription="Stop Navigation"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            android:padding="0dp"
+            app:icon="@android:drawable/ic_delete"
+            app:iconGravity="textStart"
+            app:iconPadding="0dp"
+            app:iconSize="26dp"
+            app:iconTint="@color/textPrimary"
+            app:cornerRadius="14dp"
+            app:backgroundTint="#1A1C1E"
+            app:rippleColor="#4001E47C"
+            app:strokeWidth="1dp"
+            app:strokeColor="#20FFFFFF"
+            app:layout_constraintTop_toTopOf="@id/tripProgressView"
+            app:layout_constraintBottom_toBottomOf="@id/tripProgressView"
+            app:layout_constraintEnd_toEndOf="parent" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+    <!-- Maneuver View (Top) - Official Mapbox Component with Cycling Theme -->
     <com.mapbox.navigation.ui.components.maneuver.view.MapboxManeuverView
         android:id="@+id/maneuverView"
+        style="@style/MapboxCustomManeuverStyle"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_margin="4dp"

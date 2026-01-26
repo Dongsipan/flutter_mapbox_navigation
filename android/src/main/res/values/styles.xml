@@ -20,9 +20,12 @@
         <item name="android:windowLightStatusBar">false</item>
     </style>
 
+    <!-- Mapbox Trip Progress View - 骑行导航样式 -->
     <style name="MapboxCustomTripProgressStyle" parent="MapboxStyleTripProgressView">
+        <!-- 背景色 - 透明，使用父容器背景 -->
+        <item name="tripProgressViewBackgroundColor">@android:color/transparent</item>
+        <!-- 文字颜色 -->
         <item name="tripProgressTextColor">@color/textPrimary</item>
-        <item name="tripProgressViewBackgroundColor">@color/colorSurface</item>
     </style>
 
     <style name="MapboxCustomManeuverTurnIconStyle" parent="MapboxStyleTurnIconManeuver">
@@ -31,9 +34,9 @@
     </style>
 
     <style name="MapboxCustomManeuverStyle" parent="MapboxStyleManeuverView">
-        <item name="maneuverViewBackgroundColor">@color/colorSurface</item>
-        <item name="subManeuverViewBackgroundColor">@color/colorSurface</item>
-        <item name="upcomingManeuverViewBackgroundColor">@color/colorSurface</item>
+        <item name="maneuverViewBackgroundColor">@color/cardBackgroundDark</item>
+        <item name="subManeuverViewBackgroundColor">@color/cardBackgroundDark</item>
+        <item name="upcomingManeuverViewBackgroundColor">@color/cardBackgroundDark</item>
         <item name="maneuverViewIconStyle">@style/MapboxCustomManeuverTurnIconStyle</item>
         <item name="laneGuidanceManeuverIconStyle">@style/MapboxCustomManeuverTurnIconStyle</item>
     </style>

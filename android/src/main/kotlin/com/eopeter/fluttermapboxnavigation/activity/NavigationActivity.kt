@@ -78,6 +78,7 @@ import com.mapbox.navigation.tripdata.progress.model.EstimatedTimeToArrivalForma
 import com.mapbox.navigation.tripdata.progress.model.PercentDistanceTraveledFormatter
 import com.mapbox.navigation.tripdata.progress.model.TimeRemainingFormatter
 import com.mapbox.navigation.tripdata.progress.model.TripProgressUpdateFormatter
+import com.mapbox.navigation.ui.base.formatter.ValueFormatter
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -559,19 +560,70 @@ class NavigationActivity : AppCompatActivity() {
     
     private fun initializeTripProgressApi() {
         try {
-            // Initialize Trip Progress API following official example
+            // Initialize Trip Progress API with custom formatters for cycling theme
             val distanceFormatterOptions = DistanceFormatterOptions.Builder(this).build()
+            
+            // Custom time formatter - green color for cycling theme
+            val defaultTimeFormatter = TimeRemainingFormatter(this)
+            val customTimeFormatter = object : ValueFormatter<Double, android.text.SpannableString> {
+                override fun format(t: Double): android.text.SpannableString {
+                    val formatted = defaultTimeFormatter.format(t)
+                    // Apply green color (#01E47C) to time
+                    val greenColor = android.graphics.Color.parseColor("#01E47C")
+                    formatted.setSpan(
+                        android.text.style.ForegroundColorSpan(greenColor),
+                        0,
+                        formatted.length,
+                        android.text.Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+                    )
+                    return formatted
+                }
+            }
+            
+            // Custom distance formatter - white color for better visibility
+            val defaultDistanceFormatter = DistanceRemainingFormatter(distanceFormatterOptions)
+            val customDistanceFormatter = object : ValueFormatter<Double, android.text.SpannableString> {
+                override fun format(t: Double): android.text.SpannableString {
+                    val formatted = defaultDistanceFormatter.format(t)
+                    // Apply white color for better visibility
+                    val whiteColor = android.graphics.Color.WHITE
+                    formatted.setSpan(
+                        android.text.style.ForegroundColorSpan(whiteColor),
+                        0,
+                        formatted.length,
+                        android.text.Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+                    )
+                    return formatted
+                }
+            }
+            
+            // Custom ETA formatter - white color
+            val defaultEtaFormatter = EstimatedTimeToArrivalFormatter(this, TimeFormat.NONE_SPECIFIED)
+            val customEtaFormatter = object : ValueFormatter<Long, android.text.SpannableString> {
+                override fun format(t: Long): android.text.SpannableString {
+                    val formatted = defaultEtaFormatter.format(t)
+                    // Apply white color
+                    val whiteColor = android.graphics.Color.WHITE
+                    formatted.setSpan(
+                        android.text.style.ForegroundColorSpan(whiteColor),
+                        0,
+                        formatted.length,
+                        android.text.Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+                    )
+                    return formatted
+                }
+            }
             
             tripProgressApi = MapboxTripProgressApi(
                 TripProgressUpdateFormatter.Builder(this)
-                    .distanceRemainingFormatter(DistanceRemainingFormatter(distanceFormatterOptions))
-                    .timeRemainingFormatter(TimeRemainingFormatter(this))
+                    .distanceRemainingFormatter(customDistanceFormatter) // White distance
+                    .timeRemainingFormatter(customTimeFormatter) // Green time
                     .percentRouteTraveledFormatter(PercentDistanceTraveledFormatter())
-                    .estimatedTimeToArrivalFormatter(EstimatedTimeToArrivalFormatter(this, TimeFormat.NONE_SPECIFIED))
+                    .estimatedTimeToArrivalFormatter(customEtaFormatter) // White ETA
                     .build()
             )
             
-            android.util.Log.d(TAG, "Trip Progress API initialized successfully")
+            android.util.Log.d(TAG, "Trip Progress API initialized with cycling theme colors")
         } catch (e: Exception) {
             android.util.Log.e(TAG, "Failed to initialize trip progress API: ${e.message}", e)
         }

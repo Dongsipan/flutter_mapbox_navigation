@@ -273,7 +273,7 @@ final class HistoryCoverGenerator {
             // 绘制起点（绿色）
             if let startCoord = coordsWithSpeed.first?.coord {
                 let p = overlay.pointForCoordinate(startCoord)
-                let r: CGFloat = 5
+                let r: CGFloat = 6
                 ctx.setFillColor(UIColor(hex: "#00E676").cgColor)  // 使用与回放页面一致的绿色
                 ctx.addEllipse(in: CGRect(x: p.x - r, y: p.y - r, width: r * 2, height: r * 2))
                 ctx.fillPath()
@@ -282,7 +282,7 @@ final class HistoryCoverGenerator {
             // 绘制终点（红色）
             if let endCoord = coordsWithSpeed.last?.coord, coordsWithSpeed.count > 1 {
                 let p = overlay.pointForCoordinate(endCoord)
-                let r: CGFloat = 5
+                let r: CGFloat = 6
                 ctx.setFillColor(UIColor(hex: "#FF5252").cgColor)  // 使用与回放页面一致的红色
                 ctx.addEllipse(in: CGRect(x: p.x - r, y: p.y - r, width: r * 2, height: r * 2))
                 ctx.fillPath()

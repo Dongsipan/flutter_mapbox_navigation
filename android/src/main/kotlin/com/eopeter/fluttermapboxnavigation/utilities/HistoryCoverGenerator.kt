@@ -42,7 +42,10 @@ object HistoryCoverGenerator {
     private const val COVER_HEIGHT = 405f
     
     // 渲染配置
-    private const val LINE_WIDTH = 8.0
+    // lineWidth 单位是像素（pixels），不需要乘以 density
+    // 与 iOS 的 setLineWidth 使用相同的数值以保持视觉一致
+    // 如果视觉上仍有差异，可以微调此值（建议范围：4.0 - 6.0）
+    private const val LINE_WIDTH = 6.0  // 像素单位，与 iOS 保持一致
     private const val MARKER_RADIUS = 6.0
     private const val MIN_POINT_DISTANCE = 0.5  // 米
     
@@ -396,7 +399,7 @@ object HistoryCoverGenerator {
             lineGradient(gradientExpression)
         }
         style.addLayer(routeLayer)
-        Log.d(TAG, "路线图层已添加")
+        Log.d(TAG, "路线图层已添加，lineWidth = $LINE_WIDTH pixels（不乘 density）")
         
         // 4. 添加起点标记
         val startPoint = points.first()

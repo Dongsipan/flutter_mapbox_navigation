@@ -152,6 +152,9 @@ class FlutterMapboxNavigationPlugin : FlutterPlugin, MethodCallHandler,
             "getNavigationHistoryEvents" -> {
                 getNavigationHistoryEvents(call, result)
             }
+            "generateHistoryCover" -> {
+                generateHistoryCover(call, result)
+            }
             else -> result.notImplemented()
         }
     }
@@ -346,6 +349,88 @@ class FlutterMapboxNavigationPlugin : FlutterPlugin, MethodCallHandler,
                     
                     currentActivity?.runOnUiThread {
                         result.error("PARSE_ERROR", "Failed to parse history file: ${e.message}", null)
+                    }
+                }
+            }.start()
+            
+        } catch (e: Exception) {
+            android.util.Log.e("FlutterMapboxNavigation", "❌ Unexpected error: ${e.message}", e)
+            result.error("UNKNOWN_ERROR", "An unexpected error occurred: ${e.message}", null)
+        }
+    }
+
+    private fun generateHistoryCover(call: MethodCall, result: Result) {
+        android.util.Log.d("FlutterMapboxNavigation", "📸 generateHistoryCover called")
+        
+        try {
+            val historyFilePath = call.argument<String>("historyFilePath")
+            val historyId = call.argument<String>("historyId")
+            
+            if (historyFilePath.isNullOrEmpty()) {
+                android.util.Log.e("FlutterMapboxNavigation", "❌ INVALID_ARGUMENT: historyFilePath is required")
+                result.error("INVALID_ARGUMENT", "historyFilePath is required", null)
+                return
+            }
+            
+            if (historyId.isNullOrEmpty()) {
+                android.util.Log.e("FlutterMapboxNavigation", "❌ INVALID_ARGUMENT: historyId is required")
+                result.error("INVALID_ARGUMENT", "historyId is required", null)
+                return
+            }
+            
+            android.util.Log.d("FlutterMapboxNavigation", "🔍 Generating cover for history ID: $historyId, file: $historyFilePath")
+            
+            // 检查文件是否存在
+            val file = java.io.File(historyFilePath)
+            if (!file.exists()) {
+                android.util.Log.e("FlutterMapboxNavigation", "❌ FILE_NOT_FOUND: History file not found at path $historyFilePath")
+                result.error("FILE_NOT_FOUND", "History file not found at path $historyFilePath", null)
+                return
+            }
+            
+            // 获取当前样式设置
+            val prefs = currentActivity?.getSharedPreferences("mapbox_style_settings", Context.MODE_PRIVATE)
+            val mapStyle = prefs?.getString("map_style", "standard") ?: "standard"
+            val lightPreset = prefs?.getString("light_preset", "day") ?: "day"
+            
+            android.util.Log.d("FlutterMapboxNavigation", "🎨 Using style: $mapStyle, lightPreset: $lightPreset")
+            
+            // 在后台线程生成封面
+            Thread {
+                try {
+                    kotlinx.coroutines.runBlocking {
+                        com.eopeter.fluttermapboxnavigation.utilities.HistoryCoverGenerator.generateHistoryCover(
+                            currentContext,
+                            historyFilePath,
+                            historyId,
+                            mapStyle,
+                            lightPreset,
+                            object : com.eopeter.fluttermapboxnavigation.utilities.HistoryCoverGenerator.HistoryCoverCallback {
+                                override fun onSuccess(coverPath: String) {
+                                    android.util.Log.d("FlutterMapboxNavigation", "✅ Cover generated successfully: $coverPath")
+                                    
+                                    // 在主线程返回结果
+                                    currentActivity?.runOnUiThread {
+                                        result.success(coverPath)
+                                    }
+                                }
+                                
+                                override fun onFailure(error: String) {
+                                    android.util.Log.e("FlutterMapboxNavigation", "❌ Cover generation failed: $error")
+                                    
+                                    // 在主线程返回错误
+                                    currentActivity?.runOnUiThread {
+                                        result.error("COVER_GENERATION_ERROR", error, null)
+                                    }
+                                }
+                            }
+                        )
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("FlutterMapboxNavigation", "❌ Unexpected error during cover generation: ${e.message}", e)
+                    
+                    currentActivity?.runOnUiThread {
+                        result.error("UNKNOWN_ERROR", "An unexpected error occurred: ${e.message}", null)
                     }
                 }
             }.start()

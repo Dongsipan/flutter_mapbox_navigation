@@ -37,9 +37,12 @@ object HistoryCoverGenerator {
     
     private const val TAG = "HistoryCoverGenerator"
     
-    // 封面尺寸配置（16:9 宽高比）
+    // 封面尺寸配置
+    // 生成更高的封面以包含底部水印区域
+    // 生成比例约 1.69:1 (720:426)
+    // 显示时使用 2.2:1 和 1.91:1，会自动裁剪底部水印
     private const val COVER_WIDTH = 720f
-    private const val COVER_HEIGHT = 405f
+    private const val COVER_HEIGHT = 426f  // 比2.2:1的327px高出约100px
     
     // 渲染配置
     // lineWidth 单位是像素（pixels），不需要乘以 density
@@ -320,10 +323,18 @@ object HistoryCoverGenerator {
             Log.d(TAG, "使用样式: $styleUri")
             
             // 5. 设置相机位置（使用 cameraForCoordinates 自动计算）
-            val padding = com.mapbox.maps.EdgeInsets(50.0, 30.0, 50.0, 30.0)
+            // 调整边距：
+            // - top: 增加，确保轨迹不会太靠上
+            // - bottom: 大幅增加，确保轨迹不会延伸到会被裁剪的区域
+            //   (2.2:1会裁剪底部99px，1.91:1会裁剪底部49px)
+            // - left/right: 保持，确保宽屏下轨迹完整
+            val padding = com.mapbox.maps.EdgeInsets(50.0, 50.0, 110.0, 50.0)
             val camera = snapshotter.cameraForCoordinates(lineString.coordinates(), padding, null, null)
             snapshotter.setCamera(camera)
             Log.d(TAG, "相机已设置: center=${camera.center}, zoom=${camera.zoom}")
+            Log.d(TAG, "封面尺寸: ${COVER_WIDTH}x${COVER_HEIGHT} (约1.69:1 比例，包含底部水印区域)")
+            Log.d(TAG, "边距: top=50, left=50, bottom=110, right=50")
+            Log.d(TAG, "说明: 底部padding=110px，确保轨迹不会延伸到裁剪区域(99px)")
             
             // 6. 设置样式监听器
             snapshotter.setStyleListener(object : SnapshotStyleListener {

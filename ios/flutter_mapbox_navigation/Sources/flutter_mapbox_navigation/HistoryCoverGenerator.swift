@@ -148,7 +148,10 @@ final class HistoryCoverGenerator {
         cancelables.removeAll()
         currentSnapshotter = nil
 
-        let size = CGSize(width: 720, height: 405) // 16:9 封面
+        // 使用更高的比例以包含底部水印区域
+        // 生成比例约 1.69:1 (720:426)
+        // 显示时使用 2.2:1 和 1.91:1，会自动裁剪底部水印
+        let size = CGSize(width: 720, height: 426)
         let pixelRatio = CGFloat(UIScreen.main.scale)
 
         // 使用 MapSnapshotOptions
@@ -162,8 +165,12 @@ final class HistoryCoverGenerator {
         let styleURI = getStyleURI(for: mapStyle)
         snapshotter.styleURI = styleURI
         
-        // 使用固定边距，让 Mapbox 自动计算合适的缩放级别
-        let padding = UIEdgeInsets(top: 50, left: 30, bottom: 50, right: 30)
+        // 调整边距：
+        // - top: 增加，确保轨迹不会太靠上
+        // - bottom: 大幅增加，确保轨迹不会延伸到会被裁剪的区域
+        //   (2.2:1会裁剪底部99px，1.91:1会裁剪底部49px)
+        // - left/right: 保持，确保宽屏下轨迹完整
+        let padding = UIEdgeInsets(top: 50, left: 50, bottom: 110, right: 50)
         let camera = snapshotter.camera(
             for: coordinates,
             padding: padding,
@@ -173,7 +180,9 @@ final class HistoryCoverGenerator {
         snapshotter.setCamera(to: camera)
         
         print("📸 封面生成: 使用样式 \(mapStyle ?? "streets"), lightPreset: \(lightPreset ?? "nil")")
-        print("📸 固定边距: top=\(padding.top), left=\(padding.left), bottom=\(padding.bottom), right=\(padding.right)")
+        print("📸 尺寸: \(size.width)x\(size.height) (约1.69:1 比例，包含底部水印区域)")
+        print("📸 边距: top=\(padding.top), left=\(padding.left), bottom=\(padding.bottom), right=\(padding.right)")
+        print("📸 说明: 底部padding=110px，确保轨迹不会延伸到裁剪区域(99px)")
 
         // 等待样式加载完成再开始生成快照
         snapshotter.onStyleLoaded.observeNext { [weak self] _ in

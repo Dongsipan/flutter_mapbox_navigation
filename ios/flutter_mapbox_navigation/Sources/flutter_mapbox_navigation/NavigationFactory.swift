@@ -93,6 +93,7 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
     var _isHistoryRecording = false
     var _currentHistoryId: String?
     var _historyStartTime: Date?
+    var _historyDistanceTraveled: Double = 0.0  // 跟踪实际行驶距离
     var _autoBuildRoute = true
     
     // Mapbox Navigation v3 components
@@ -298,6 +299,9 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
     func startNavigation(navigationRoutes: NavigationRoutes, mapboxNavigation: MapboxNavigation)
     {
         isEmbeddedNavigation = false
+        
+        // 重置历史记录跟踪变量
+        _historyDistanceTraveled = 0.0
         
         // 重新加载样式设置，确保使用最新的用户配置
         print("🔄 重新加载样式设置...")
@@ -681,12 +685,15 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
             let historyList = historyManager!.getHistoryList()
             print("Retrieved \(historyList.count) history records")
 
-            let historyMaps = historyList.map { $0.toFlutterMap() }
+            // 按创建时间倒序排列（最新的在最前面）
+            let sortedHistoryList = historyList.sorted { $0.startTime > $1.startTime }
+            
+            let historyMaps = sortedHistoryList.map { $0.toFlutterMap() }
             
             // 调试：打印每条记录
             historyMaps.forEach { print("History map: \($0)") }
 
-            print("Returning \(historyMaps.count) history maps to Flutter")
+            print("Returning \(historyMaps.count) history maps to Flutter (sorted by startTime desc)")
             result(historyMaps)
         } catch {
             print("Error in getNavigationHistoryList: \(error)")
@@ -1106,6 +1113,14 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
                 let duration = startTime != nil ? Date().timeIntervalSince(startTime!) : 0
                 print("✅ Calculated duration: \(duration) seconds")
                 
+                // 使用实际行驶距离（从导航进度中获取）
+                let totalDistance = _historyDistanceTraveled > 0 ? _historyDistanceTraveled : nil
+                if let distance = totalDistance {
+                    print("✅ Got traveled distance: \(distance) meters")
+                } else {
+                    print("⚠️ No distance traveled recorded")
+                }
+                
                 // 调试：检查 wayPoints 状态
                 print("📍 wayPoints count: \(wayPoints.count)")
                 if let first = wayPoints.first {
@@ -1153,6 +1168,10 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
                     "lightPreset": lightPreset ?? "day"
                 ]
 
+                if let distance = totalDistance {
+                    historyData["distance"] = distance
+                }
+                
                 if let coverPath = coverPath {
                     historyData["cover"] = coverPath
                 }
@@ -1251,6 +1270,9 @@ extension NavigationFactory : NavigationViewControllerDelegate {
         _lastKnownLocation = location
         _distanceRemaining = progress.distanceRemaining
         _durationRemaining = progress.durationRemaining
+        
+        // 跟踪实际行驶距离
+        _historyDistanceTraveled = progress.distanceTraveled
         
         // 启动历史记录（仅在第一次更新时）
         if !_isHistoryRecording {
@@ -1506,6 +1528,7 @@ class HistoryManager {
                 historyFilePath: historyData["filePath"] as? String ?? "",
                 startTime: Date(timeIntervalSince1970: historyData["startTime"] as? TimeInterval ?? 0),
                 duration: historyData["duration"] as? Int ?? 0,
+                distance: historyData["distance"] as? Double,
                 startPointName: historyData["startPointName"] as? String,
                 endPointName: historyData["endPointName"] as? String,
                 navigationMode: historyData["navigationMode"] as? String,
@@ -1630,6 +1653,7 @@ class HistoryManager {
                 historyFilePath: oldRecord.historyFilePath,
                 startTime: oldRecord.startTime,
                 duration: oldRecord.duration,
+                distance: oldRecord.distance,
                 startPointName: oldRecord.startPointName,
                 endPointName: oldRecord.endPointName,
                 navigationMode: oldRecord.navigationMode,
@@ -1762,6 +1786,7 @@ struct HistoryRecord: Codable {
     let historyFilePath: String
     let startTime: Date
     let duration: Int
+    let distance: Double?        // 导航距离（米）
     let startPointName: String?
     let endPointName: String?
     let navigationMode: String?
@@ -1787,6 +1812,9 @@ struct HistoryRecord: Codable {
         ]
         
         // 可选字段：只在有值时添加
+        if let distance = distance {
+            map["distance"] = distance
+        }
         if let cover = cover {
             map["cover"] = resolveCurrentPath(cover)  // 🆕 动态解析封面路径
         }

@@ -172,8 +172,11 @@ class FlutterMapboxNavigationPlugin : FlutterPlugin, MethodCallHandler,
             val historyList = FlutterMapboxNavigationPlugin.historyManager.getHistoryList()
             android.util.Log.d("FlutterMapboxNavigation", "Retrieved ${historyList.size} history records from database")
             
-            val historyMaps = historyList.map { history ->
-                android.util.Log.d("FlutterMapboxNavigation", "History record: ${history.id}, path: ${history.historyFilePath}, cover: ${history.cover}")
+            // 按创建时间倒序排列（最新的在最前面）
+            val sortedHistoryList = historyList.sortedByDescending { it.startTime }
+            
+            val historyMaps = sortedHistoryList.map { history ->
+                android.util.Log.d("FlutterMapboxNavigation", "History record: ${history.id}, path: ${history.historyFilePath}, cover: ${history.cover}, distance: ${history.distance}")
                 mapOf(
                     "id" to history.id,
                     "historyFilePath" to history.historyFilePath,
@@ -187,7 +190,7 @@ class FlutterMapboxNavigationPlugin : FlutterPlugin, MethodCallHandler,
                     "navigationMode" to history.navigationMode
                 )
             }
-            android.util.Log.d("FlutterMapboxNavigation", "Returning ${historyMaps.size} history records to Flutter")
+            android.util.Log.d("FlutterMapboxNavigation", "Returning ${historyMaps.size} history records to Flutter (sorted by startTime desc)")
             result.success(historyMaps)
         } catch (e: Exception) {
             android.util.Log.e("FlutterMapboxNavigation", "Failed to get history list: ${e.message}", e)

@@ -120,10 +120,11 @@ open class TurnByTurn(
         val points = arguments?.get("wayPoints") as HashMap<*, *>
         for (item in points) {
             val point = item.value as HashMap<*, *>
+            val name = point["Name"] as? String ?: ""  // 获取 name 字段
             val latitude = point["Latitude"] as Double
             val longitude = point["Longitude"] as Double
             val isSilent = point["IsSilent"] as Boolean
-            this.addedWaypoints.add(Waypoint(Point.fromLngLat(longitude, latitude),isSilent))
+            this.addedWaypoints.add(Waypoint(name, Point.fromLngLat(longitude, latitude), isSilent))  // 传入 name
         }
         this.getRoute(this.context)
         result.success(true)
@@ -671,15 +672,16 @@ open class TurnByTurn(
             // Record navigation start time and waypoint info
             navigationStartTime = System.currentTimeMillis()
             
-            // Use simple default names for now
-            navigationStartPointName = "Start Point"
-            navigationEndPointName = "End Point"
+            // Get waypoint names from addedWaypoints
+            navigationStartPointName = addedWaypoints.getFirstWaypointName()
+            navigationEndPointName = addedWaypoints.getLastWaypointName()
             
             // Record initial route distance
             navigationInitialDistance = currentRoutes?.firstOrNull()?.directionsRoute?.distance()?.toFloat()
             navigationDistanceTraveled = 0f
             
             Log.d(TAG, "Initial route distance: ${navigationInitialDistance}m")
+            Log.d(TAG, "Start point: $navigationStartPointName, End point: $navigationEndPointName")
             
             // v3: startRecording() 有返回值 List<String>，可选接收
             val paths = mapboxNavigation.historyRecorder.startRecording()

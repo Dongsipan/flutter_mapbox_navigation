@@ -2226,6 +2226,10 @@ class NavigationActivity : AppCompatActivity() {
             val capturedDistanceTraveled = navigationDistanceTraveled
             val capturedInitialDistance = navigationInitialDistance
             
+            // 获取坐标用于反地理编码
+            val startPoint = waypointSet.coordinatesList().firstOrNull()
+            val endPoint = waypointSet.coordinatesList().lastOrNull()
+            
             // Stop history recording
             mapboxNavigation.historyRecorder.stopRecording { historyFilePath ->
                 if (historyFilePath != null) {
@@ -2258,50 +2262,76 @@ class NavigationActivity : AppCompatActivity() {
                     android.util.Log.d(TAG, "  - End Point: $capturedEndPointName")
                     android.util.Log.d(TAG, "  - Mode: $capturedNavigationMode")
                     
-                    // Save history record to HistoryManager (without cover first)
-                    try {
-                        val historyData: Map<String, Any?> = mapOf(
-                            "id" to capturedHistoryId,
-                            "filePath" to historyFilePath,
-                            "startTime" to capturedStartTime,
-                            "endTime" to navigationEndTime,
-                            "distance" to totalDistance,
-                            "duration" to duration.toLong(),
-                            "startPointName" to capturedStartPointName,
-                            "endPointName" to capturedEndPointName,
-                            "navigationMode" to capturedNavigationMode
-                        )
+                    // 检查是否需要反地理编码
+                    val needsReverseGeocode = (com.eopeter.fluttermapboxnavigation.utilities.ReverseGeocoder.isPlaceholderName(capturedStartPointName) ||
+                                               com.eopeter.fluttermapboxnavigation.utilities.ReverseGeocoder.isPlaceholderName(capturedEndPointName)) &&
+                                              startPoint != null && endPoint != null
+                    
+                    if (needsReverseGeocode) {
+                        android.util.Log.d(TAG, "🔍 需要反地理编码 - startPoint: $capturedStartPointName, endPoint: $capturedEndPointName")
                         
-                        android.util.Log.d(TAG, "💾 Saving history data: $historyData")
-                        
-                        val saved = FlutterMapboxNavigationPlugin.historyManager.saveHistoryRecord(historyData)
-                        if (saved) {
-                            android.util.Log.d(TAG, "✅ History record saved to database: $capturedStartPointName -> $capturedEndPointName, duration: ${duration}s")
-                            
-                            // 异步生成封面（不阻塞历史记录保存）
-                            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
-                                com.eopeter.fluttermapboxnavigation.utilities.HistoryCoverGenerator.generateHistoryCover(
+                        // 使用协程进行反地理编码
+                        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+                            try {
+                                val (newStartName, newEndName) = com.eopeter.fluttermapboxnavigation.utilities.ReverseGeocoder.reverseGeocodeWaypoints(
                                     this@NavigationActivity,
-                                    historyFilePath,
+                                    startPoint!!,
+                                    endPoint!!,
+                                    capturedStartPointName,
+                                    capturedEndPointName
+                                )
+                                
+                                android.util.Log.d(TAG, "✅ 反地理编码完成: $newStartName -> $newEndName")
+                                
+                                // 使用反地理编码后的名称保存
+                                saveHistoryRecordWithNames(
                                     capturedHistoryId,
+                                    historyFilePath,
+                                    capturedStartTime,
+                                    navigationEndTime,
+                                    totalDistance,
+                                    duration,
+                                    newStartName,
+                                    newEndName,
+                                    capturedNavigationMode,
                                     capturedMapStyle,
-                                    capturedLightPreset,
-                                    object : com.eopeter.fluttermapboxnavigation.utilities.HistoryCoverGenerator.HistoryCoverCallback {
-                                        override fun onSuccess(coverPath: String) {
-                                            android.util.Log.d(TAG, "✅ 封面生成成功: $coverPath")
-                                        }
-                                        
-                                        override fun onFailure(error: String) {
-                                            android.util.Log.w(TAG, "⚠️ 封面生成失败: $error")
-                                        }
-                                    }
+                                    capturedLightPreset
+                                )
+                            } catch (e: Exception) {
+                                android.util.Log.e(TAG, "❌ 反地理编码失败，使用原名称: ${e.message}", e)
+                                
+                                // 失败时使用原名称保存
+                                saveHistoryRecordWithNames(
+                                    capturedHistoryId,
+                                    historyFilePath,
+                                    capturedStartTime,
+                                    navigationEndTime,
+                                    totalDistance,
+                                    duration,
+                                    capturedStartPointName,
+                                    capturedEndPointName,
+                                    capturedNavigationMode,
+                                    capturedMapStyle,
+                                    capturedLightPreset
                                 )
                             }
-                        } else {
-                            android.util.Log.w(TAG, "⚠️ Failed to save history record to database")
                         }
-                    } catch (e: Exception) {
-                        android.util.Log.e(TAG, "❌ Error saving history record: ${e.message}", e)
+                    } else {
+                        // 不需要反地理编码，直接保存
+                        android.util.Log.d(TAG, "✅ 使用原名称保存（非占位符）")
+                        saveHistoryRecordWithNames(
+                            capturedHistoryId,
+                            historyFilePath,
+                            capturedStartTime,
+                            navigationEndTime,
+                            totalDistance,
+                            duration,
+                            capturedStartPointName,
+                            capturedEndPointName,
+                            capturedNavigationMode,
+                            capturedMapStyle,
+                            capturedLightPreset
+                        )
                     }
                     
                     // Send file path to Flutter
@@ -2324,6 +2354,70 @@ class NavigationActivity : AppCompatActivity() {
             isRecordingHistory = false
             currentHistoryFilePath = null
             sendEvent(MapBoxEvents.HISTORY_RECORDING_ERROR)
+        }
+    }
+    
+    
+    /**
+     * 保存历史记录（带地点名称）
+     * 提取为独立方法以支持反地理编码后的保存
+     */
+    private fun saveHistoryRecordWithNames(
+        historyId: String,
+        historyFilePath: String,
+        startTime: Long,
+        endTime: Long,
+        totalDistance: Double?,
+        duration: Int,
+        startPointName: String,
+        endPointName: String,
+        navigationMode: String,
+        mapStyle: String,
+        lightPreset: String
+    ) {
+        try {
+            val historyData: Map<String, Any?> = mapOf(
+                "id" to historyId,
+                "filePath" to historyFilePath,
+                "startTime" to startTime,
+                "endTime" to endTime,
+                "distance" to totalDistance,
+                "duration" to duration.toLong(),
+                "startPointName" to startPointName,
+                "endPointName" to endPointName,
+                "navigationMode" to navigationMode
+            )
+            
+            android.util.Log.d(TAG, "💾 Saving history data: $historyData")
+            
+            val saved = FlutterMapboxNavigationPlugin.historyManager.saveHistoryRecord(historyData)
+            if (saved) {
+                android.util.Log.d(TAG, "✅ History record saved to database: $startPointName -> $endPointName, duration: ${duration}s")
+                
+                // 异步生成封面（不阻塞历史记录保存）
+                kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+                    com.eopeter.fluttermapboxnavigation.utilities.HistoryCoverGenerator.generateHistoryCover(
+                        this@NavigationActivity,
+                        historyFilePath,
+                        historyId,
+                        mapStyle,
+                        lightPreset,
+                        object : com.eopeter.fluttermapboxnavigation.utilities.HistoryCoverGenerator.HistoryCoverCallback {
+                            override fun onSuccess(coverPath: String) {
+                                android.util.Log.d(TAG, "✅ 封面生成成功: $coverPath")
+                            }
+                            
+                            override fun onFailure(error: String) {
+                                android.util.Log.w(TAG, "⚠️ 封面生成失败: $error")
+                            }
+                        }
+                    )
+                }
+            } else {
+                android.util.Log.w(TAG, "⚠️ Failed to save history record to database")
+            }
+        } catch (e: Exception) {
+            android.util.Log.e(TAG, "❌ Error saving history record: ${e.message}", e)
         }
     }
     

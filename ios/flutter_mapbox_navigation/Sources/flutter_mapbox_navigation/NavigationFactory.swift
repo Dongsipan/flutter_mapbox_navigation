@@ -326,6 +326,10 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
                 self._navigationViewController!.delegate = self
                 self._navigationViewController!.routeLineTracksTraversal = true
                 
+                // 应用自定义主题颜色（Top Banner 等 UI 元素）
+                print("🎨 应用自定义主题颜色")
+                self._navigationViewController!.applyCustomTheme()
+                
                 // 先设置监听器，然后再应用样式（关键！）
                 print("🔴 准备设置监听器和应用样式")
                 self._navigationViewController!.setupLightPresetAndStyle(

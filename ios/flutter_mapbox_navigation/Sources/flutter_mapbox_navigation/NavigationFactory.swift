@@ -310,12 +310,25 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
         if(self._navigationViewController == nil)
         {
             Task { @MainActor in
-                // 创建 NavigationViewController（使用自定义样式）
+                // 创建 NavigationViewController（使用自定义样式，传递用户配置的样式参数）
+                let dayStyle = CustomDayStyle(
+                    mapStyle: self._mapStyle,
+                    lightPreset: self._lightPreset,
+                    lightPresetMode: self._lightPresetMode
+                )
+                let nightStyle = CustomNightStyle(
+                    mapStyle: self._mapStyle,
+                    lightPreset: self._lightPreset,
+                    lightPresetMode: self._lightPresetMode
+                )
+                
+                print("🎨 创建导航样式: mapStyle=\(self._mapStyle ?? "nil"), lightPreset=\(self._lightPreset ?? "nil"), mode=\(self._lightPresetMode.rawValue)")
+                
                 let navigationOptions = NavigationOptions(
                     mapboxNavigation: mapboxNavigation,
                     voiceController: mapboxNavigationProvider!.routeVoiceController,
                     eventsManager: mapboxNavigation.eventsManager(),
-                    styles: [CustomDayStyle(), CustomNightStyle()]  // 使用自定义样式
+                    styles: [dayStyle, nightStyle]  // 使用配置好的自定义样式
                 )
                 
                 self._navigationViewController = NavigationViewController(
@@ -327,8 +340,7 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
                 self._navigationViewController!.delegate = self
                 self._navigationViewController!.routeLineTracksTraversal = true
                 
-                // 自定义样式已经在 NavigationOptions 中应用
-                print("🎨 使用自定义样式 CustomDayStyle 和 CustomNightStyle")
+                print("✅ 导航控制器已创建，样式参数已传递")
                 
                 // Configure feedback options
                 // Note: v3 API may have different properties for feedback

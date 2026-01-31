@@ -2,7 +2,8 @@ import UIKit
 import MapboxMaps
 import CoreLocation
 
-/// 地图样式选择器视图控制器（现代卡片风格）
+/// Map Style Picker View Controller (Premium Design)
+/// Modern glassmorphism design with OLED optimization
 class StylePickerViewController: UIViewController {
     
     // MARK: - Properties
@@ -13,7 +14,7 @@ class StylePickerViewController: UIViewController {
     
     private var completion: ((StylePickerResult?) -> Void)?
     
-    // 支持 Light Preset 的样式
+    // Styles that support Light Preset
     private let stylesWithLightPreset: Set<String> = ["standard", "standardSatellite", "faded", "monochrome"]
     
     // Map Components
@@ -24,26 +25,27 @@ class StylePickerViewController: UIViewController {
     private let scrollView = UIScrollView()
     private let contentView = UIView()
     
-    // 地图预览卡片
+    // Map preview card with glassmorphism
     private let mapPreviewCard = UIView()
     private let mapContainerView = UIView()
+    private let mapOverlayGradient = CAGradientLayer()
     
-    // 说明卡片
+    // Info card with premium design
     private let infoCard = UIView()
     
-    // 样式选择卡片
+    // Style selection card with modern picker
     private let styleCard = UIView()
     private let stylePickerView = UIPickerView()
     
-    // Light Preset 卡片
+    // Light Preset card with elegant design
     private let lightPresetCard = UIView()
     private let lightPresetPickerView = UIPickerView()
     
-    // 自动调整卡片
+    // Auto-adjust card with smooth animations
     private let autoAdjustCard = UIView()
     private let autoAdjustSwitch = UISwitch()
     
-    // 底部按钮容器
+    // Bottom button container with floating effect
     private let bottomButtonContainer = UIView()
     private let cancelButton = UIButton(type: .system)
     private let applyButton = UIButton(type: .system)
@@ -75,7 +77,7 @@ class StylePickerViewController: UIViewController {
         
         self.selectedStyle = currentStyle ?? "standard"
         self.selectedLightPreset = currentLightPreset ?? "day"
-        // 兼容旧的 realTime 和 demo，统一映射为 automatic
+        // Compatible with old realTime and demo, unified mapping to automatic
         if lightPresetMode == "realTime" || lightPresetMode == "demo" {
             self.lightPresetMode = "automatic"
         } else {
@@ -107,23 +109,27 @@ class StylePickerViewController: UIViewController {
         title = "Map Style Settings"
         navigationItem.largeTitleDisplayMode = .never
         
-        // 设置导航栏主题色
+        // Set navigation bar theme with premium styling
         if let navigationBar = navigationController?.navigationBar {
             navigationBar.tintColor = .appPrimary
             navigationBar.titleTextAttributes = [
-                .foregroundColor: UIColor.white
+                .foregroundColor: UIColor.white,
+                .font: UIFont.systemFont(ofSize: 17, weight: .semibold)
             ]
             let appearance = UINavigationBarAppearance()
             appearance.configureWithOpaqueBackground()
-            appearance.backgroundColor = .appBackground
+            appearance.backgroundColor = UIColor(white: 0.02, alpha: 0.98) // Deeper black with slight transparency
             appearance.titleTextAttributes = [
-                .foregroundColor: UIColor.white
+                .foregroundColor: UIColor.white,
+                .font: UIFont.systemFont(ofSize: 17, weight: .semibold)
             ]
+            // Add subtle shadow for depth
+            appearance.shadowColor = UIColor.appPrimary.withAlphaComponent(0.1)
             navigationBar.standardAppearance = appearance
             navigationBar.scrollEdgeAppearance = appearance
         }
         
-        // 取消按钮
+        // Cancel button with glow effect
         let cancelBarButton = UIBarButtonItem(
             barButtonSystemItem: .cancel,
             target: self,
@@ -136,39 +142,45 @@ class StylePickerViewController: UIViewController {
     // MARK: - UI Setup
     
     private func setupUI() {
-        view.backgroundColor = .appBackground
+        view.backgroundColor = UIColor(white: 0.01, alpha: 1.0) // Deep OLED black
         
-        // ========== ScrollView ==========
+        // ========== Fixed Map Preview (Always Visible) ==========
+        setupMapPreviewCard()
+        
+        // ========== ScrollView with smooth scrolling ==========
         scrollView.translatesAutoresizingMaskIntoConstraints = false
-        scrollView.showsVerticalScrollIndicator = true
-        scrollView.contentInset = UIEdgeInsets(top: 0, left: 0, bottom: 90, right: 0)
+        scrollView.showsVerticalScrollIndicator = false // Hide for cleaner look
+        scrollView.alwaysBounceVertical = true
         view.addSubview(scrollView)
         
         contentView.translatesAutoresizingMaskIntoConstraints = false
         scrollView.addSubview(contentView)
         
-        // ========== 地图预览卡片 ==========
-        setupMapPreviewCard()
-        
-        // ========== 说明卡片 ==========
+        // ========== Info card with premium design ==========
         setupInfoCard()
         
-        // ========== 样式选择卡片 ==========
+        // ========== Style selection card ==========
         setupStyleCard()
         
-        // ========== Light Preset 卡片 ==========
+        // ========== Light Preset card ==========
         setupLightPresetCard()
         
-        // ========== 自动调整卡片 ==========
+        // ========== Auto-adjust card ==========
         setupAutoAdjustCard()
         
-        // ========== 底部按钮容器 ==========
+        // ========== Bottom buttons with floating effect ==========
         setupBottomButtons()
         
-        // ========== 布局约束 ==========
+        // ========== Layout constraints ==========
         NSLayoutConstraint.activate([
-            // ScrollView
-            scrollView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            // Fixed Map Preview (not in scroll view)
+            mapPreviewCard.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 12),
+            mapPreviewCard.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
+            mapPreviewCard.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
+            mapPreviewCard.heightAnchor.constraint(equalToConstant: 200), // Reduced height for better space
+            
+            // ScrollView (starts below map preview)
+            scrollView.topAnchor.constraint(equalTo: mapPreviewCard.bottomAnchor, constant: 12),
             scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
@@ -180,38 +192,32 @@ class StylePickerViewController: UIViewController {
             contentView.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor),
             contentView.widthAnchor.constraint(equalTo: scrollView.widthAnchor),
             
-            // 地图预览卡片
-            mapPreviewCard.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 16),
-            mapPreviewCard.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
-            mapPreviewCard.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
-            mapPreviewCard.heightAnchor.constraint(equalToConstant: 200),
+            // Info card - Contextual information
+            infoCard.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 8),
+            infoCard.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
+            infoCard.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
             
-            // 说明卡片
-            infoCard.topAnchor.constraint(equalTo: mapPreviewCard.bottomAnchor, constant: 16),
-            infoCard.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
-            infoCard.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
+            // Style selection card
+            styleCard.topAnchor.constraint(equalTo: infoCard.bottomAnchor, constant: 16),
+            styleCard.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
+            styleCard.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
             
-            // 样式选择卡片
-            styleCard.topAnchor.constraint(equalTo: infoCard.bottomAnchor, constant: 12),
-            styleCard.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
-            styleCard.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
+            // Light Preset card
+            lightPresetCard.topAnchor.constraint(equalTo: styleCard.bottomAnchor, constant: 16),
+            lightPresetCard.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
+            lightPresetCard.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
             
-            // Light Preset 卡片
-            lightPresetCard.topAnchor.constraint(equalTo: styleCard.bottomAnchor, constant: 12),
-            lightPresetCard.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
-            lightPresetCard.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
+            // Auto-adjust card
+            autoAdjustCard.topAnchor.constraint(equalTo: lightPresetCard.bottomAnchor, constant: 16),
+            autoAdjustCard.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
+            autoAdjustCard.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
+            autoAdjustCard.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -120), // Extra space for bottom buttons
             
-            // 自动调整卡片
-            autoAdjustCard.topAnchor.constraint(equalTo: lightPresetCard.bottomAnchor, constant: 12),
-            autoAdjustCard.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
-            autoAdjustCard.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
-            autoAdjustCard.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -16),
-            
-            // 底部按钮容器
+            // Bottom button container - Floating effect
             bottomButtonContainer.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             bottomButtonContainer.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             bottomButtonContainer.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-            bottomButtonContainer.heightAnchor.constraint(equalToConstant: 90)
+            bottomButtonContainer.heightAnchor.constraint(equalToConstant: 100)
         ])
     }
     
@@ -219,13 +225,36 @@ class StylePickerViewController: UIViewController {
     
     private func setupMapPreviewCard() {
         mapPreviewCard.translatesAutoresizingMaskIntoConstraints = false
-        mapPreviewCard.backgroundColor = .appCardBackground
-        mapPreviewCard.layer.cornerRadius = 12
-        mapPreviewCard.layer.masksToBounds = true
-        contentView.addSubview(mapPreviewCard)
+        mapPreviewCard.backgroundColor = UIColor(white: 0.08, alpha: 0.6) // Glassmorphism base
+        mapPreviewCard.layer.cornerRadius = 16 // Slightly reduced for fixed position
+        mapPreviewCard.layer.masksToBounds = false // Allow shadow to show
+        
+        // Add subtle border with glow
+        mapPreviewCard.layer.borderWidth = 1
+        mapPreviewCard.layer.borderColor = UIColor.appPrimary.withAlphaComponent(0.2).cgColor
+        
+        // Add shadow for depth
+        mapPreviewCard.layer.shadowColor = UIColor.appPrimary.cgColor
+        mapPreviewCard.layer.shadowOffset = CGSize(width: 0, height: 4)
+        mapPreviewCard.layer.shadowOpacity = 0.25
+        mapPreviewCard.layer.shadowRadius = 12
+        
+        // Add to main view (not scroll view) for fixed position
+        view.addSubview(mapPreviewCard)
         
         mapContainerView.translatesAutoresizingMaskIntoConstraints = false
+        mapContainerView.layer.cornerRadius = 16
+        mapContainerView.layer.masksToBounds = true
         mapPreviewCard.addSubview(mapContainerView)
+        
+        // Add gradient overlay for premium look
+        mapOverlayGradient.colors = [
+            UIColor.clear.cgColor,
+            UIColor(white: 0, alpha: 0.3).cgColor
+        ]
+        mapOverlayGradient.locations = [0.6, 1.0]
+        mapOverlayGradient.frame = CGRect(x: 0, y: 0, width: UIScreen.main.bounds.width - 40, height: 200)
+        mapContainerView.layer.addSublayer(mapOverlayGradient)
         
         NSLayoutConstraint.activate([
             mapContainerView.topAnchor.constraint(equalTo: mapPreviewCard.topAnchor),
@@ -237,44 +266,56 @@ class StylePickerViewController: UIViewController {
     
     private func setupInfoCard() {
         infoCard.translatesAutoresizingMaskIntoConstraints = false
-        infoCard.backgroundColor = .appCardBackground
-        infoCard.layer.cornerRadius = 12
+        infoCard.backgroundColor = UIColor(white: 0.06, alpha: 0.8) // Darker glassmorphism
+        infoCard.layer.cornerRadius = 16
+        
+        // Add subtle border
+        infoCard.layer.borderWidth = 1
+        infoCard.layer.borderColor = UIColor(white: 0.15, alpha: 0.3).cgColor
+        
         contentView.addSubview(infoCard)
         
-        let iconView = UIImageView(image: UIImage(systemName: "paintpalette"))
+        // Icon with glow effect
+        let iconView = UIImageView(image: UIImage(systemName: "paintpalette.fill"))
         iconView.tintColor = .appPrimary
         iconView.contentMode = .scaleAspectFit
         iconView.translatesAutoresizingMaskIntoConstraints = false
         
+        // Add glow to icon
+        iconView.layer.shadowColor = UIColor.appPrimary.cgColor
+        iconView.layer.shadowOffset = .zero
+        iconView.layer.shadowOpacity = 0.6
+        iconView.layer.shadowRadius = 8
+        
         let titleLabel = UILabel()
         titleLabel.text = "Customize Map Appearance"
-        titleLabel.font = .systemFont(ofSize: 15, weight: .semibold)
+        titleLabel.font = .systemFont(ofSize: 15, weight: .bold)
         titleLabel.textColor = .white
         
         let descLabel = UILabel()
         descLabel.text = "Adjust map style and lighting effects to create a personalized navigation experience"
-        descLabel.font = .systemFont(ofSize: 13)
-        descLabel.textColor = UIColor(white: 0.7, alpha: 1.0)
+        descLabel.font = .systemFont(ofSize: 13, weight: .regular)
+        descLabel.textColor = UIColor(white: 0.75, alpha: 1.0)
         descLabel.numberOfLines = 0
         
         let textStack = UIStackView(arrangedSubviews: [titleLabel, descLabel])
         textStack.axis = .vertical
-        textStack.spacing = 2
+        textStack.spacing = 4
         textStack.translatesAutoresizingMaskIntoConstraints = false
         
         infoCard.addSubview(iconView)
         infoCard.addSubview(textStack)
         
         NSLayoutConstraint.activate([
-            iconView.leadingAnchor.constraint(equalTo: infoCard.leadingAnchor, constant: 16),
+            iconView.leadingAnchor.constraint(equalTo: infoCard.leadingAnchor, constant: 18),
             iconView.centerYAnchor.constraint(equalTo: infoCard.centerYAnchor),
-            iconView.widthAnchor.constraint(equalToConstant: 24),
-            iconView.heightAnchor.constraint(equalToConstant: 24),
+            iconView.widthAnchor.constraint(equalToConstant: 28),
+            iconView.heightAnchor.constraint(equalToConstant: 28),
             
-            textStack.leadingAnchor.constraint(equalTo: iconView.trailingAnchor, constant: 12),
-            textStack.trailingAnchor.constraint(equalTo: infoCard.trailingAnchor, constant: -16),
-            textStack.topAnchor.constraint(equalTo: infoCard.topAnchor, constant: 16),
-            textStack.bottomAnchor.constraint(equalTo: infoCard.bottomAnchor, constant: -16)
+            textStack.leadingAnchor.constraint(equalTo: iconView.trailingAnchor, constant: 14),
+            textStack.trailingAnchor.constraint(equalTo: infoCard.trailingAnchor, constant: -18),
+            textStack.topAnchor.constraint(equalTo: infoCard.topAnchor, constant: 18),
+            textStack.bottomAnchor.constraint(equalTo: infoCard.bottomAnchor, constant: -18)
         ])
     }
     
@@ -411,7 +452,7 @@ class StylePickerViewController: UIViewController {
         bottomButtonContainer.backgroundColor = .appBackground
         
         let separatorLine = UIView()
-        separatorLine.backgroundColor = UIColor.appPrimary.withAlphaComponent(0.2)
+        separatorLine.backgroundColor = UIColor(white: 0.15, alpha: 0.3) // Subtle gray separator
         separatorLine.translatesAutoresizingMaskIntoConstraints = false
         bottomButtonContainer.addSubview(separatorLine)
         

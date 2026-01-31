@@ -277,7 +277,7 @@ final class HistoryReplayViewController: UIViewController {
     private func buildSpeedGradientExpression() -> Exp {
         guard !locationSpeeds.isEmpty, !cumulativeDistances.isEmpty else {
             // 如果没有有效数据，返回默认颜色
-            return Exp(.literal, UIColor.systemBlue.hexString)
+            return Exp(.literal, UIColor.systemBlue.hexString ?? "#007AFF")
         }
 
         var stops: [(Double, UIColor)] = []
@@ -285,7 +285,7 @@ final class HistoryReplayViewController: UIViewController {
         // 总距离
         let totalDistance = cumulativeDistances.last ?? 1.0
         guard totalDistance > 0 else {
-            return Exp(.literal, UIColor.systemBlue.hexString)
+            return Exp(.literal, UIColor.systemBlue.hexString ?? "#007AFF")
         }
 
         // 起点
@@ -316,7 +316,7 @@ final class HistoryReplayViewController: UIViewController {
         guard stops.count >= 2 else {
             // 至少需要两个停止点才能创建插值
             let fallbackColor = stops.first?.1 ?? UIColor.systemBlue
-            return Exp(.literal, fallbackColor.hexString)
+            return Exp(.literal, fallbackColor.hexString ?? "#007AFF")
         }
         
         // 构建 Mapbox表达式 - 使用字典格式停止点

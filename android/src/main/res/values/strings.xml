@@ -8,41 +8,53 @@
     
     <!-- Map Styles -->
     <string-array name="map_styles">
-        <item>Standard（标准）</item>
-        <item>Standard Satellite（卫星）</item>
-        <item>Faded（褪色）</item>
-        <item>Monochrome（单色）</item>
-        <item>Light（浅色）</item>
-        <item>Dark（深色）</item>
-        <item>Outdoors（户外）</item>
+        <item>Standard</item>
+        <item>Satellite</item>
+        <item>Faded</item>
+        <item>Monochrome</item>
+        <item>Light</item>
+        <item>Dark</item>
+        <item>Outdoors</item>
     </string-array>
     
     <!-- Light Presets -->
     <string-array name="light_presets">
-        <item>🌅 Dawn（黎明）</item>
-        <item>☀️ Day（白天）</item>
-        <item>🌇 Dusk（黄昏）</item>
-        <item>🌙 Night（夜晚）</item>
+        <item>Dawn (5:00-7:00 AM)</item>
+        <item>Day (7:00 AM-5:00 PM)</item>
+        <item>Dusk (5:00-7:00 PM)</item>
+        <item>Night (7:00 PM-5:00 AM)</item>
     </string-array>
     
+    <!-- Style Picker Activity -->
+    <string name="style_picker_title">Map Style Settings</string>
+    <string name="style_picker_info_title">Customize Map Appearance</string>
+    <string name="style_picker_info_desc">Adjust map style and lighting effects to create a personalized navigation experience</string>
+    <string name="style_picker_map_style_label">Map Style</string>
+    <string name="style_picker_light_preset_label">Light Preset</string>
+    <string name="style_picker_light_preset_desc">Select lighting effects for different times of day</string>
+    <string name="style_picker_auto_adjust_title">Auto-Adjust Based on Sunrise/Sunset</string>
+    <string name="style_picker_auto_adjust_desc">Automatically switch lighting effects based on time</string>
+    <string name="style_picker_cancel">Cancel</string>
+    <string name="style_picker_apply">Apply</string>
+    
     <!-- Search Activity -->
-    <string name="simple_ui_toolbar_title">搜索地点</string>
-    <string name="query_hint">搜索地点</string>
-    <string name="search_hint">搜索地点</string>
-    <string name="go_to_place">🧭 前往此处</string>
-    <string name="current_location">当前位置</string>
-    <string name="cancel">取消</string>
-    <string name="my_location">我的位置</string>
-    <string name="map_view_description">地图视图</string>
-    <string name="network_error">网络连接失败，请检查网络设置</string>
-    <string name="search_service_error">搜索服务暂时不可用，请稍后重试</string>
-    <string name="location_permission_required">需要位置权限才能使用此功能</string>
-    <string name="location_service_disabled">请开启位置服务</string>
-    <string name="no_results">未找到相关地点</string>
+    <string name="simple_ui_toolbar_title">Search Location</string>
+    <string name="query_hint">Search location</string>
+    <string name="search_hint">Search location</string>
+    <string name="go_to_place">🧭 Go to this place</string>
+    <string name="current_location">Current Location</string>
+    <string name="cancel">Cancel</string>
+    <string name="my_location">My Location</string>
+    <string name="map_view_description">Map View</string>
+    <string name="network_error">Network connection failed, please check network settings</string>
+    <string name="search_service_error">Search service temporarily unavailable, please try again later</string>
+    <string name="location_permission_required">Location permission required to use this feature</string>
+    <string name="location_service_disabled">Please enable location services</string>
+    <string name="no_results">No locations found</string>
     
     <!-- Exit Navigation Confirmation Dialog -->
-    <string name="exit_navigation_title">退出导航？</string>
-    <string name="exit_navigation_message">导航将被取消，确定要退出吗？</string>
-    <string name="exit_navigation_confirm">退出</string>
-    <string name="exit_navigation_cancel">取消</string>
+    <string name="exit_navigation_title">Exit Navigation?</string>
+    <string name="exit_navigation_message">Navigation will be cancelled. Are you sure you want to exit?</string>
+    <string name="exit_navigation_confirm">Exit</string>
+    <string name="exit_navigation_cancel">Cancel</string>
 </resources>

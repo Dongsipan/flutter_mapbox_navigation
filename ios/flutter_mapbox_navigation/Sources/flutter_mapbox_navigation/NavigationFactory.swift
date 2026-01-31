@@ -310,11 +310,12 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
         if(self._navigationViewController == nil)
         {
             Task { @MainActor in
-                // 创建 NavigationViewController（不带自定义样式）
+                // 创建 NavigationViewController（使用自定义样式）
                 let navigationOptions = NavigationOptions(
                     mapboxNavigation: mapboxNavigation,
                     voiceController: mapboxNavigationProvider!.routeVoiceController,
-                    eventsManager: mapboxNavigation.eventsManager()
+                    eventsManager: mapboxNavigation.eventsManager(),
+                    styles: [CustomDayStyle(), CustomNightStyle()]  // 使用自定义样式
                 )
                 
                 self._navigationViewController = NavigationViewController(
@@ -326,17 +327,8 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
                 self._navigationViewController!.delegate = self
                 self._navigationViewController!.routeLineTracksTraversal = true
                 
-                // 应用自定义主题颜色（Top Banner 等 UI 元素）
-                print("🎨 应用自定义主题颜色")
-                self._navigationViewController!.applyCustomTheme()
-                
-                // 先设置监听器，然后再应用样式（关键！）
-                print("🔴 准备设置监听器和应用样式")
-                self._navigationViewController!.setupLightPresetAndStyle(
-                    mapStyle: _mapStyle,
-                    lightPreset: _lightPreset,
-                    lightPresetMode: _lightPresetMode
-                )
+                // 自定义样式已经在 NavigationOptions 中应用
+                print("🎨 使用自定义样式 CustomDayStyle 和 CustomNightStyle")
                 
                 // Configure feedback options
                 // Note: v3 API may have different properties for feedback

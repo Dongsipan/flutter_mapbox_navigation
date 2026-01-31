@@ -52,7 +52,7 @@
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="自定义地图外观"
+                            android:text="@string/style_picker_info_title"
                             android:textColor="@color/textPrimary"
                             android:textSize="15sp"
                             android:textStyle="bold"
@@ -62,7 +62,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="2dp"
-                            android:text="调整地图样式和光照效果，打造个性化导航体验"
+                            android:text="@string/style_picker_info_desc"
                             android:textColor="@color/textSecondary"
                             android:textSize="13sp" />
                     </LinearLayout>
@@ -88,7 +88,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="地图样式"
+                        android:text="@string/style_picker_map_style_label"
                         android:textSize="14sp"
                         android:textColor="@color/textSecondary"
                         android:textStyle="bold"
@@ -129,7 +129,7 @@
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Light Preset（光照效果）"
+                            android:text="@string/style_picker_light_preset_label"
                             android:textSize="14sp"
                             android:textColor="@color/textSecondary"
                             android:textStyle="bold"
@@ -139,7 +139,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="4dp"
-                            android:text="选择不同时段的光照效果"
+                            android:text="@string/style_picker_light_preset_desc"
                             android:textColor="@color/textSecondary"
                             android:textSize="12sp" />
 
@@ -187,7 +187,7 @@
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="根据日出日落自动调整"
+                                android:text="@string/style_picker_auto_adjust_title"
                                 android:textSize="16sp"
                                 android:textColor="@color/textPrimary"
                                 android:fontFamily="sans-serif-medium" />
@@ -196,7 +196,7 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="4dp"
-                                android:text="自动根据时间切换光照效果"
+                                android:text="@string/style_picker_auto_adjust_desc"
                                 android:textColor="@color/textSecondary"
                                 android:textSize="14sp" />
                         </LinearLayout>
@@ -236,7 +236,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginEnd="8dp"
                 android:layout_weight="1"
-                android:text="取消"
+                android:text="@string/style_picker_cancel"
                 android:textColor="@color/textSecondary"
                 android:textSize="16sp"
                 style="@style/Widget.MaterialComponents.Button.OutlinedButton"
@@ -249,7 +249,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginStart="8dp"
                 android:layout_weight="1"
-                android:text="应用"
+                android:text="@string/style_picker_apply"
                 android:textSize="16sp"
                 app:cornerRadius="8dp"
                 app:backgroundTint="@color/colorPrimary" />

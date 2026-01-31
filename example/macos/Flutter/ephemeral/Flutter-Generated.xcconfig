@@ -1,6 +1,6 @@
 // This is a generated file; do not edit or check into version control.
-FLUTTER_ROOT=/Users/dongsipan/dev/flutter
-FLUTTER_APPLICATION_PATH=/Users/dongsipan/Documents/workspace/kt/work-space/flutter_mapbox_navigation/example
+FLUTTER_ROOT=/Users/dongsipan/development/flutter
+FLUTTER_APPLICATION_PATH=/Users/dongsipan/Desktop/workspace/kt/kt-workspace/flutter_mapbox_navigation/example
 COCOAPODS_PARALLEL_CODE_SIGN=true
 FLUTTER_BUILD_DIR=build
 FLUTTER_BUILD_NAME=1.0.0

@@ -2,6 +2,7 @@ import MapboxMaps
 import MapboxDirections
 import MapboxNavigationCore
 import MapboxNavigationUIKit
+import UIKit
 
 class CustomNightStyle: StandardNightStyle {
     
@@ -65,6 +66,32 @@ class CustomNightStyle: StandardNightStyle {
         super.apply()
         
         print("✅ CustomNightStyle.apply() 被调用")
+        
+        // 夜间模式使用相同的主题色
+        tintColor = UIColor(hex: "#01E47C")  // #01E47C 亮绿色
+        
+        let traitCollection = UIScreen.main.traitCollection
+        let backgroundColor = UIColor(hex: "#040608")
+        let primaryColor = UIColor(hex: "#01E47C")
+        
+        // 夜间模式的关键配置
+        BottomBannerView.appearance(for: traitCollection).backgroundColor = backgroundColor
+        BottomPaddingView.appearance(for: traitCollection).backgroundColor = backgroundColor
+        FloatingButton.appearance(for: traitCollection).backgroundColor = UIColor(hex: "#0A0C0E")
+        FloatingButton.appearance(for: traitCollection).tintColor = primaryColor
+        ResumeButton.appearance(for: traitCollection).backgroundColor = UIColor(hex: "#0A0C0E")
+        ResumeButton.appearance(for: traitCollection).tintColor = primaryColor
+        TimeRemainingLabel.appearance(for: traitCollection).textColor = primaryColor
+        TimeRemainingLabel.appearance(for: traitCollection).trafficLowColor = primaryColor
+        TimeRemainingLabel.appearance(for: traitCollection).trafficUnknownColor = primaryColor
+        
+        // NextInstructionLabel - 设置多个属性确保生效
+        NextInstructionLabel.appearance(for: traitCollection).textColor = primaryColor
+        NextInstructionLabel.appearance(for: traitCollection).normalTextColor = primaryColor
+        NextInstructionLabel.appearance(for: traitCollection, whenContainedInInstancesOf: [NextBannerView.self]).textColor = primaryColor
+        NextInstructionLabel.appearance(for: traitCollection, whenContainedInInstancesOf: [NextBannerView.self]).normalTextColor = primaryColor
+        
+        print("🎨 CustomNightStyle: 已应用主题色 #01E47C")
         
         // 通过通知中心发送自定义配置
         NotificationCenter.default.post(

@@ -4,8 +4,8 @@ import MapboxNavigationCore
 import MapboxNavigationUIKit
 import Combine
 
-/// 路线选择视图控制器
-/// 显示多条可选路线，用户可以点击选择路线，然后点击底部按钮开始导航
+/// Route Selection View Controller
+/// Displays multiple route options, users can tap to select a route, then tap the bottom button to start navigation
 class RouteSelectionViewController: UIViewController {
     
     // MARK: - Properties
@@ -15,7 +15,7 @@ class RouteSelectionViewController: UIViewController {
     private let mapboxNavigation: MapboxNavigation
     private let mapboxNavigationProvider: MapboxNavigationProvider
     
-    // 样式设置
+    // Style settings
     private let mapStyle: String?
     private let lightPreset: String?
     private let lightPresetMode: LightPresetMode
@@ -25,7 +25,7 @@ class RouteSelectionViewController: UIViewController {
     private var backButton: UIButton!
     private var overviewButton: UIButton!
     
-    /// 路线选择回调
+    /// Route selection callback
     var onRouteSelected: ((NavigationRoutes) -> Void)?
     
     // Style loading event subscriptions
@@ -60,13 +60,13 @@ class RouteSelectionViewController: UIViewController {
         setupTopBar()
         setupOverviewButton()
         setupButtons()
-        // displayRoutes() 移到样式加载完成后调用
+        // displayRoutes() will be called after style loading completes
     }
     
     // MARK: - Setup
     
     private func setupMapView() {
-        // 使用 navigation() 方法访问 publishers
+        // Use navigation() method to access publishers
         navigationMapView = NavigationMapView(
             location: mapboxNavigationProvider.navigation().locationMatching
                 .map(\.mapMatchingResult.enhancedLocation)
@@ -83,64 +83,64 @@ class RouteSelectionViewController: UIViewController {
         navigationMapView.frame = view.bounds
         view.addSubview(navigationMapView)
         
-        // 调整指南针位置，避免被顶部栏遮挡
+        // Adjust compass position to avoid being covered by top bar
         let compassOptions = CompassViewOptions(
-            position: .topTrailing, // 右上角
-            margins: CGPoint(x: 16, y: 60) // 留出顶部栏的空间
+            position: .topTrailing, // Top right
+            margins: CGPoint(x: 16, y: 60) // Leave space for top bar
         )
         navigationMapView.mapView.ornaments.options.compass = compassOptions
         
-        // 应用样式设置
+        // Apply style settings
         applyMapStyle()
     }
     
     private func setupTopBar() {
-        // 创建顶部栏
+        // Create top bar
         let topBar = UIView()
         topBar.backgroundColor = .appBackground.withAlphaComponent(0.95)
         topBar.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(topBar)
         
-        // 返回按钮
+        // Back button
         backButton = UIButton(type: .system)
         backButton.setImage(UIImage(systemName: "chevron.left"), for: .normal)
-        backButton.setTitle(" 返回", for: .normal)
+        backButton.setTitle(" Back", for: .normal)
         backButton.titleLabel?.font = .systemFont(ofSize: 17)
         backButton.tintColor = .appPrimary
         backButton.translatesAutoresizingMaskIntoConstraints = false
         backButton.addTarget(self, action: #selector(backTapped), for: .touchUpInside)
         topBar.addSubview(backButton)
         
-        // 标题
+        // Title
         let titleLabel = UILabel()
-        titleLabel.text = "选择路线"
+        titleLabel.text = "Select Route"
         titleLabel.font = .systemFont(ofSize: 17, weight: .semibold)
         titleLabel.textColor = .appTextPrimary
         titleLabel.textAlignment = .center
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
         topBar.addSubview(titleLabel)
         
-        // 布局约束
+        // Layout constraints
         NSLayoutConstraint.activate([
-            // 顶部栏
+            // Top bar
             topBar.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             topBar.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             topBar.topAnchor.constraint(equalTo: view.topAnchor),
             topBar.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 44),
             
-            // 返回按钮
+            // Back button
             backButton.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 8),
             backButton.centerYAnchor.constraint(equalTo: topBar.bottomAnchor, constant: -22),
             backButton.heightAnchor.constraint(equalToConstant: 44),
             
-            // 标题
+            // Title
             titleLabel.centerXAnchor.constraint(equalTo: topBar.centerXAnchor),
             titleLabel.centerYAnchor.constraint(equalTo: topBar.bottomAnchor, constant: -22),
         ])
     }
     
     private func setupOverviewButton() {
-        // 创建全览按钮（类似地图应用的全览按钮）
+        // Create overview button (similar to map app's overview button)
         overviewButton = UIButton(type: .system)
         overviewButton.setImage(UIImage(systemName: "arrow.up.left.and.arrow.down.right"), for: .normal)
         overviewButton.backgroundColor = .appCardBackground
@@ -154,7 +154,7 @@ class RouteSelectionViewController: UIViewController {
         overviewButton.addTarget(self, action: #selector(overviewTapped), for: .touchUpInside)
         view.addSubview(overviewButton)
         
-        // 布局约束 - 放在右下角，避开指南针
+        // Layout constraints - place in bottom right, avoiding compass
         NSLayoutConstraint.activate([
             overviewButton.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -16),
             overviewButton.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -100),
@@ -164,24 +164,24 @@ class RouteSelectionViewController: UIViewController {
     }
     
     private func setupButtons() {
-        // 创建底部按钮容器，扩展到屏幕底部（无间隙）
+        // Create bottom button container, extending to screen bottom (no gap)
         let buttonContainer = UIView()
         buttonContainer.backgroundColor = .appBackground
         buttonContainer.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(buttonContainer)
         
-        // 取消按钮
+        // Cancel button
         cancelButton = UIButton(type: .system)
-        cancelButton.setTitle("取消", for: .normal)
+        cancelButton.setTitle("Cancel", for: .normal)
         cancelButton.setTitleColor(.appTextSecondary, for: .normal)
         cancelButton.titleLabel?.font = .systemFont(ofSize: 17, weight: .medium)
         cancelButton.translatesAutoresizingMaskIntoConstraints = false
         cancelButton.addTarget(self, action: #selector(cancelTapped), for: .touchUpInside)
         buttonContainer.addSubview(cancelButton)
         
-        // 开始导航按钮
+        // Start navigation button
         startNavigationButton = UIButton(type: .system)
-        startNavigationButton.setTitle("开始导航", for: .normal)
+        startNavigationButton.setTitle("Start Navigation", for: .normal)
         startNavigationButton.setTitleColor(.white, for: .normal)
         startNavigationButton.backgroundColor = .appPrimary
         startNavigationButton.layer.cornerRadius = 12
@@ -190,53 +190,53 @@ class RouteSelectionViewController: UIViewController {
         startNavigationButton.addTarget(self, action: #selector(startNavigationTapped), for: .touchUpInside)
         buttonContainer.addSubview(startNavigationButton)
         
-        // 布局约束 - 扩展到屏幕底部
+        // Layout constraints - extend to screen bottom
         NSLayoutConstraint.activate([
-            // 容器约束 - 扩展到view底部
+            // Container constraints - extend to view bottom
             buttonContainer.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             buttonContainer.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             buttonContainer.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             
-            // 取消按钮
+            // Cancel button
             cancelButton.leadingAnchor.constraint(equalTo: buttonContainer.leadingAnchor, constant: 20),
             cancelButton.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -16),
             cancelButton.widthAnchor.constraint(equalToConstant: 80),
             cancelButton.heightAnchor.constraint(equalToConstant: 50),
             
-            // 开始导航按钮
+            // Start navigation button
             startNavigationButton.trailingAnchor.constraint(equalTo: buttonContainer.trailingAnchor, constant: -20),
             startNavigationButton.centerYAnchor.constraint(equalTo: cancelButton.centerYAnchor),
             startNavigationButton.leadingAnchor.constraint(equalTo: cancelButton.trailingAnchor, constant: 20),
             startNavigationButton.heightAnchor.constraint(equalToConstant: 50),
             
-            // 容器顶部约束 - 给按钮留足够空间
+            // Container top constraint - leave enough space for buttons
             buttonContainer.topAnchor.constraint(equalTo: cancelButton.topAnchor, constant: -16),
         ])
     }
     
     private func displayRoutes() {
-        // 在地图上显示所有路线
+        // Display all routes on the map
         Task { @MainActor in
-            print("📍 RouteSelection: 开始展示路线到最佳视野")
-            print("📍   备选路线数量: \(navigationRoutes.alternativeRoutes.count)")
+            print("📍 RouteSelection: Starting to showcase routes to best view")
+            print("📍   Number of alternative routes: \(navigationRoutes.alternativeRoutes.count)")
             
-            // 使用 showcase 方法展示路线，带动画效果
+            // Use showcase method to display routes with animation
             navigationMapView.showcase(navigationRoutes, animated: true)
             
-            // 如果有多条路线，更新界面提示
+            // If there are multiple routes, update UI prompt
             if navigationRoutes.alternativeRoutes.count > 0 {
                 updateRouteSelectionUI()
             }
             
-            print("✅ RouteSelection: 路线展示完成")
+            print("✅ RouteSelection: Route showcase completed")
         }
     }
     
     private func updateRouteSelectionUI() {
-        // 可以添加路线信息标签，显示当前选中的路线信息
-        // 例如：距离、预计时间等
+        // Can add route info labels to display current selected route info
+        // For example: distance, estimated time, etc.
         let routeCount = navigationRoutes.alternativeRoutes.count + 1
-        print("📍 共有 \(routeCount) 条可选路线")
+        print("📍 Total \(routeCount) routes available")
     }
     
     // MARK: - Actions
@@ -250,17 +250,17 @@ class RouteSelectionViewController: UIViewController {
     }
     
     @objc private func overviewTapped() {
-        // 显示完整路线全览
+        // Show complete route overview
         Task { @MainActor in
-            print("📍 用户点击全览按钮")
+            print("📍 User tapped overview button")
             navigationMapView.showcase(navigationRoutes, animated: true)
         }
     }
     
     @objc private func startNavigationTapped() {
-        // 触发回调，通知选择了路线
+        // Trigger callback to notify route selection
         onRouteSelected?(navigationRoutes)
-        // 关闭当前视图
+        // Close current view
         dismiss(animated: true, completion: nil)
     }
     
@@ -378,21 +378,21 @@ class RouteSelectionViewController: UIViewController {
 
 extension RouteSelectionViewController: NavigationMapViewDelegate {
     func navigationMapView(_ navigationMapView: NavigationMapView, didSelect alternativeRoute: AlternativeRoute) {
-        // 用户点击了备选路线
-        print("📍 用户选择了备选路线：路线 ID \(alternativeRoute.id)")
+        // User tapped an alternative route
+        print("📍 User selected alternative route: Route ID \(alternativeRoute.id)")
         
-        // 切换到选中的备选路线
+        // Switch to the selected alternative route
         Task { @MainActor in
             if let newNavigationRoutes = await navigationRoutes.selecting(alternativeRoute: alternativeRoute) {
-                // 更新 navigationRoutes
+                // Update navigationRoutes
                 navigationRoutes = newNavigationRoutes
                 
-                // 更新地图显示
+                // Update map display
                 navigationMapView.showcase(newNavigationRoutes)
                 
-                print("✅ 路线已切换为备选路线")
+                print("✅ Route switched to alternative route")
             } else {
-                print("❌ 无法切换到备选路线")
+                print("❌ Unable to switch to alternative route")
             }
         }
     }

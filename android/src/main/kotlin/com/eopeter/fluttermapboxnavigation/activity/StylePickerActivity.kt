@@ -33,14 +33,14 @@ class StylePickerActivity : AppCompatActivity() {
     private var selectedLightPreset: String = "day"
     private var lightPresetMode: String = "manual"
     
-    // 支持 Light Preset 的样式
+    // Styles that support Light Preset
     private val stylesWithLightPreset = setOf("standard", "standardSatellite", "faded", "monochrome")
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_style_picker)
         
-        // 获取当前设置
+        // Get current settings
         selectedStyle = intent.getStringExtra(EXTRA_CURRENT_STYLE) ?: "standard"
         selectedLightPreset = intent.getStringExtra(EXTRA_CURRENT_LIGHT_PRESET) ?: "day"
         lightPresetMode = intent.getStringExtra(EXTRA_LIGHT_PRESET_MODE) ?: "manual"
@@ -49,12 +49,12 @@ class StylePickerActivity : AppCompatActivity() {
     }
     
     private fun setupUI() {
-        // 设置标题和返回按钮（使用深色背景）
+        // Set title and back button (using dark background)
         supportActionBar?.apply {
-            title = "地图样式设置"
+            title = getString(R.string.style_picker_title)
             setDisplayHomeAsUpEnabled(true)
             elevation = 4f
-            // 设置 ActionBar 背景为深色
+            // Set ActionBar background to dark
             setBackgroundDrawable(
                 android.graphics.drawable.ColorDrawable(
                     resources.getColor(R.color.colorBackground, null)
@@ -62,7 +62,7 @@ class StylePickerActivity : AppCompatActivity() {
             )
         }
         
-        // 地图样式选择
+        // Map style selection
         val styleSpinner = findViewById<Spinner>(R.id.styleSpinner)
         val styleAdapter = ArrayAdapter.createFromResource(
             this,
@@ -72,13 +72,13 @@ class StylePickerActivity : AppCompatActivity() {
         styleAdapter.setDropDownViewResource(R.layout.spinner_dropdown_item_white)
         styleSpinner.adapter = styleAdapter
         
-        // 设置当前选中的样式
+        // Set currently selected style
         val stylePosition = getStylePosition(selectedStyle)
         styleSpinner.setSelection(stylePosition)
         
         styleSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
-                // 设置选中项的文字颜色为白色
+                // Set selected item text color to white
                 (view as? TextView)?.setTextColor(resources.getColor(R.color.textPrimary, null))
                 selectedStyle = getStyleValue(position)
                 updateLightPresetVisibility()
@@ -87,7 +87,7 @@ class StylePickerActivity : AppCompatActivity() {
             override fun onNothingSelected(parent: AdapterView<*>?) {}
         }
         
-        // Light Preset 选择
+        // Light Preset selection
         val lightPresetSpinner = findViewById<Spinner>(R.id.lightPresetSpinner)
         val lightPresetAdapter = ArrayAdapter.createFromResource(
             this,
@@ -97,13 +97,13 @@ class StylePickerActivity : AppCompatActivity() {
         lightPresetAdapter.setDropDownViewResource(R.layout.spinner_dropdown_item_white)
         lightPresetSpinner.adapter = lightPresetAdapter
         
-        // 设置当前选中的 Light Preset
+        // Set currently selected Light Preset
         val lightPresetPosition = getLightPresetPosition(selectedLightPreset)
         lightPresetSpinner.setSelection(lightPresetPosition)
         
         lightPresetSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
-                // 设置选中项的文字颜色为白色
+                // Set selected item text color to white
                 (view as? TextView)?.setTextColor(resources.getColor(R.color.textPrimary, null))
                 selectedLightPreset = getLightPresetValue(position)
             }
@@ -111,19 +111,19 @@ class StylePickerActivity : AppCompatActivity() {
             override fun onNothingSelected(parent: AdapterView<*>?) {}
         }
         
-        // 自动调整开关 - 使用 Material Switch
+        // Auto-adjust switch - using Material Switch
         val autoAdjustSwitch = findViewById<SwitchMaterial>(R.id.autoAdjustSwitch)
         autoAdjustSwitch.isChecked = lightPresetMode == "automatic"
         autoAdjustSwitch.setOnCheckedChangeListener { _, isChecked ->
             lightPresetMode = if (isChecked) "automatic" else "manual"
-            // 当开启自动模式时，禁用手动选择
+            // Disable manual selection when auto mode is enabled
             lightPresetSpinner.isEnabled = !isChecked
         }
         
-        // 初始化 spinner 状态
+        // Initialize spinner state
         lightPresetSpinner.isEnabled = lightPresetMode != "automatic"
         
-        // 应用按钮 - 使用 Material Button
+        // Apply button - using Material Button
         findViewById<MaterialButton>(R.id.applyButton).setOnClickListener {
             val resultIntent = Intent().apply {
                 putExtra(RESULT_STYLE, selectedStyle)
@@ -134,13 +134,13 @@ class StylePickerActivity : AppCompatActivity() {
             finish()
         }
         
-        // 取消按钮 - 使用 Material Button
+        // Cancel button - using Material Button
         findViewById<MaterialButton>(R.id.cancelButton).setOnClickListener {
             setResult(Activity.RESULT_CANCELED)
             finish()
         }
         
-        // 初始化 Light Preset 可见性
+        // Initialize Light Preset visibility
         updateLightPresetVisibility()
     }
     

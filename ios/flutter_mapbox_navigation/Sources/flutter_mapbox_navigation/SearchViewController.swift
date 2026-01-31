@@ -78,7 +78,26 @@ public class SearchViewController: NSObject, FlutterPlugin {
 class SearchMapViewController: UIViewController {
 
     private lazy var searchController: MapboxSearchController = {
-        let config = Configuration(hideCategorySlots: true)
+        // Create custom theme
+        let customStyle = Style(
+            primaryTextColor: UIColor(hex: "#01E47C"),
+            primaryBackgroundColor: UIColor(hex: "#040608"),
+            secondaryBackgroundColor: UIColor(hex: "#0A0C0E"),
+            separatorColor: UIColor(hex: "#01E47C", alpha: 0.2),
+            primaryAccentColor: UIColor(hex: "#01E47C"),
+            primaryInactiveElementColor: UIColor(hex: "#A0A0A0"),
+            panelShadowColor: UIColor.black.withAlphaComponent(0.3),
+            panelHandlerColor: UIColor(hex: "#01E47C", alpha: 0.5),
+            iconTintColor: UIColor(hex: "#01E47C"),
+            activeSegmentTitleColor: UIColor(hex: "#01E47C")
+        )
+        
+        // Create Configuration with custom style
+        var config = Configuration()
+        config.style = customStyle
+        
+        print("🎨 Search UI: Applied custom theme #01E47C")
+        
         return MapboxSearchController(apiType: .searchBox, configuration: config)
     }()
     private var mapView = MapView(frame: .zero)
@@ -116,8 +135,16 @@ class SearchMapViewController: UIViewController {
     }
     
     private func setupUI() {
-        view.backgroundColor = .white
-        title = "搜索地点"
+        view.backgroundColor = UIColor(hex: "#040608")
+        title = "Search Location"
+        
+        // 设置导航栏主题色
+        if let navigationBar = navigationController?.navigationBar {
+            navigationBar.tintColor = UIColor(hex: "#01E47C")
+            navigationBar.titleTextAttributes = [
+                .foregroundColor: UIColor(hex: "#01E47C")
+            ]
+        }
         
         // 添加取消按钮
         navigationItem.leftBarButtonItem = UIBarButtonItem(
@@ -166,9 +193,72 @@ class SearchMapViewController: UIViewController {
         let panelController = MapboxPanelController(rootViewController: searchController)
         addChild(panelController)
         
+        // 使用 UIAppearance 强制设置主题色（备用方案）
+        applySearchUITheme()
+        
         // 请求位置权限
         let locationManager = CLLocationManager()
         locationManager.requestWhenInUseAuthorization()
+    }
+    
+    private func applySearchUITheme() {
+        // 设置全局 tintColor 为主题色
+        if let searchView = searchController.view {
+            searchView.tintColor = UIColor(hex: "#01E47C")
+        }
+        
+        // 使用 UIAppearance 设置 Search UI 内部控件的颜色
+        UISegmentedControl.appearance(whenContainedInInstancesOf: [MapboxSearchController.self]).selectedSegmentTintColor = UIColor(hex: "#01E47C")
+        UISegmentedControl.appearance(whenContainedInInstancesOf: [MapboxSearchController.self]).setTitleTextAttributes([
+            .foregroundColor: UIColor.white  // 选中状态文字改为白色
+        ], for: .selected)
+        UISegmentedControl.appearance(whenContainedInInstancesOf: [MapboxSearchController.self]).setTitleTextAttributes([
+            .foregroundColor: UIColor(hex: "#01E47C")
+        ], for: .normal)
+        
+        // 设置搜索结果列表中的距离标签颜色（次要信息）
+        UILabel.appearance(whenContainedInInstancesOf: [MapboxSearchController.self]).textColor = UIColor(hex: "#A0A0A0")
+        
+        // 设置搜索结果列表中的图标颜色（次要信息）
+        UIImageView.appearance(whenContainedInInstancesOf: [MapboxSearchController.self]).tintColor = UIColor(hex: "#A0A0A0")
+        
+        // 延迟执行，确保视图已加载
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+            self?.updateSearchResultsTextColor()
+        }
+        
+        print("🎨 Search UI: 应用 UIAppearance 主题色")
+    }
+    
+    private func updateSearchResultsTextColor() {
+        // 递归遍历 searchController 的所有子视图，找到距离标签、图标并设置颜色
+        func updateLabels(in view: UIView) {
+            for subview in view.subviews {
+                if let label = subview as? UILabel {
+                    // 检查是否是距离标签（包含 "mi" 或 "km"）
+                    if let text = label.text, (text.contains("mi") || text.contains("km")) {
+                        label.textColor = UIColor(hex: "#A0A0A0")
+                        print("🎨 更新距离标签颜色: \(text)")
+                    }
+                    // 检查是否是地址标签（通常字体较小）
+                    else if let font = label.font, font.pointSize < 15 {
+                        label.textColor = UIColor(hex: "#A0A0A0")
+                    }
+                }
+                // 处理图标 - 设置为浅灰色
+                else if let imageView = subview as? UIImageView {
+                    // 检查是否是搜索结果的图标（通常是 24x24 或类似尺寸）
+                    if imageView.frame.width <= 30 && imageView.frame.height <= 30 {
+                        imageView.tintColor = UIColor(hex: "#A0A0A0")
+                        print("🎨 更新图标颜色: \(imageView.frame.size)")
+                    }
+                }
+                // 递归处理子视图
+                updateLabels(in: subview)
+            }
+        }
+        
+        updateLabels(in: searchController.view)
     }
     
     @objc private func cancelTapped() {
@@ -192,12 +282,12 @@ class SearchMapViewController: UIViewController {
     private func setupBottomDrawer() {
         // 创建底部抽屉容器
         bottomDrawerView = UIView()
-        bottomDrawerView.backgroundColor = UIColor.systemBackground
+        bottomDrawerView.backgroundColor = UIColor(hex: "#0A0C0E")  // 使用主题背景色
         bottomDrawerView.layer.cornerRadius = 16
         bottomDrawerView.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
         bottomDrawerView.layer.shadowColor = UIColor.black.cgColor
         bottomDrawerView.layer.shadowOffset = CGSize(width: 0, height: -2)
-        bottomDrawerView.layer.shadowOpacity = 0.1
+        bottomDrawerView.layer.shadowOpacity = 0.3
         bottomDrawerView.layer.shadowRadius = 8
         bottomDrawerView.clipsToBounds = true // 关键：裁剪子视图
         bottomDrawerView.translatesAutoresizingMaskIntoConstraints = false
@@ -217,84 +307,237 @@ class SearchMapViewController: UIViewController {
     }
 
     private func setupDrawerContent() {
-        // 拖拽指示器
+        // Drag indicator
         let dragIndicator = UIView()
-        dragIndicator.backgroundColor = UIColor.systemGray3
-        dragIndicator.layer.cornerRadius = 2
+        dragIndicator.backgroundColor = UIColor(hex: "#01E47C", alpha: 0.5)
+        dragIndicator.layer.cornerRadius = 2.5
         dragIndicator.translatesAutoresizingMaskIntoConstraints = false
         bottomDrawerView.addSubview(dragIndicator)
 
-        // 位置名称标签
-        let nameLabel = UILabel()
-        nameLabel.font = UIFont.boldSystemFont(ofSize: 18)
-        nameLabel.numberOfLines = 2
-        nameLabel.textColor = UIColor.label
-        nameLabel.tag = 100 // 用于后续更新内容
-        nameLabel.translatesAutoresizingMaskIntoConstraints = false
-        bottomDrawerView.addSubview(nameLabel)
+        // Main content stack
+        let contentStack = UIStackView()
+        contentStack.axis = .vertical
+        contentStack.spacing = 12
+        contentStack.translatesAutoresizingMaskIntoConstraints = false
+        bottomDrawerView.addSubview(contentStack)
 
-        // 地址标签
+        // Top container (icon + name + distance)
+        let topContainer = UIView()
+        topContainer.translatesAutoresizingMaskIntoConstraints = false
+        
+        // Location icon
+        let locationIcon = UIImageView(image: UIImage(systemName: "mappin.circle.fill"))
+        locationIcon.tintColor = UIColor(hex: "#01E47C")
+        locationIcon.contentMode = .scaleAspectFit
+        locationIcon.translatesAutoresizingMaskIntoConstraints = false
+        topContainer.addSubview(locationIcon)
+        
+        // Location name label
+        let nameLabel = UILabel()
+        nameLabel.font = UIFont.boldSystemFont(ofSize: 20)
+        nameLabel.numberOfLines = 2
+        nameLabel.textColor = UIColor(hex: "#01E47C")
+        nameLabel.tag = 100
+        nameLabel.translatesAutoresizingMaskIntoConstraints = false
+        topContainer.addSubview(nameLabel)
+        
+        // Distance label with cycling icon
+        let distanceContainer = UIStackView()
+        distanceContainer.axis = .horizontal
+        distanceContainer.spacing = 4
+        distanceContainer.alignment = .center
+        distanceContainer.tag = 102
+        distanceContainer.translatesAutoresizingMaskIntoConstraints = false
+        
+        let bikeIcon = UIImageView(image: UIImage(systemName: "bicycle"))
+        bikeIcon.tintColor = UIColor(hex: "#01E47C")
+        bikeIcon.contentMode = .scaleAspectFit
+        bikeIcon.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            bikeIcon.widthAnchor.constraint(equalToConstant: 16),
+            bikeIcon.heightAnchor.constraint(equalToConstant: 16)
+        ])
+        
+        let distanceLabel = UILabel()
+        distanceLabel.font = UIFont.systemFont(ofSize: 14, weight: .semibold)
+        distanceLabel.textColor = UIColor(hex: "#01E47C")
+        distanceLabel.tag = 103
+        
+        distanceContainer.addArrangedSubview(bikeIcon)
+        distanceContainer.addArrangedSubview(distanceLabel)
+        topContainer.addSubview(distanceContainer)
+        
+        NSLayoutConstraint.activate([
+            locationIcon.leadingAnchor.constraint(equalTo: topContainer.leadingAnchor),
+            locationIcon.topAnchor.constraint(equalTo: topContainer.topAnchor),
+            locationIcon.widthAnchor.constraint(equalToConstant: 28),
+            locationIcon.heightAnchor.constraint(equalToConstant: 28),
+            
+            nameLabel.leadingAnchor.constraint(equalTo: locationIcon.trailingAnchor, constant: 12),
+            nameLabel.topAnchor.constraint(equalTo: topContainer.topAnchor),
+            nameLabel.trailingAnchor.constraint(equalTo: distanceContainer.leadingAnchor, constant: -8),
+            
+            distanceContainer.trailingAnchor.constraint(equalTo: topContainer.trailingAnchor),
+            distanceContainer.centerYAnchor.constraint(equalTo: nameLabel.firstBaselineAnchor),
+            
+            topContainer.bottomAnchor.constraint(equalTo: nameLabel.bottomAnchor)
+        ])
+        
+        contentStack.addArrangedSubview(topContainer)
+
+        // Address container (icon + address)
+        let addressContainer = UIView()
+        addressContainer.translatesAutoresizingMaskIntoConstraints = false
+        
+        let addressIcon = UIImageView(image: UIImage(systemName: "location.fill"))
+        addressIcon.tintColor = UIColor(hex: "#A0A0A0")
+        addressIcon.contentMode = .scaleAspectFit
+        addressIcon.translatesAutoresizingMaskIntoConstraints = false
+        addressContainer.addSubview(addressIcon)
+        
         let addressLabel = UILabel()
         addressLabel.font = UIFont.systemFont(ofSize: 14)
-        addressLabel.textColor = UIColor.secondaryLabel
-        addressLabel.numberOfLines = 3
-        addressLabel.tag = 101 // 用于后续更新内容
+        addressLabel.textColor = UIColor(hex: "#A0A0A0")
+        addressLabel.numberOfLines = 2
+        addressLabel.tag = 101
         addressLabel.translatesAutoresizingMaskIntoConstraints = false
-        bottomDrawerView.addSubview(addressLabel)
-
-        // 分隔线
-        let separatorLine = UIView()
-        separatorLine.backgroundColor = UIColor.separator
-        separatorLine.translatesAutoresizingMaskIntoConstraints = false
-        bottomDrawerView.addSubview(separatorLine)
-
-        // 前往此处按钮
-        let goToButton = UIButton(type: .system)
-        goToButton.setTitle("🧭 前往此处", for: .normal)
-        goToButton.titleLabel?.font = UIFont.boldSystemFont(ofSize: 16)
-        goToButton.backgroundColor = UIColor.systemBlue
-        goToButton.setTitleColor(UIColor.white, for: .normal)
-        goToButton.layer.cornerRadius = 12
-        goToButton.layer.shadowColor = UIColor.black.cgColor
-        goToButton.layer.shadowOffset = CGSize(width: 0, height: 2)
-        goToButton.layer.shadowOpacity = 0.1
-        goToButton.layer.shadowRadius = 4
-        goToButton.addTarget(self, action: #selector(goToButtonTapped), for: .touchUpInside)
-        goToButton.translatesAutoresizingMaskIntoConstraints = false
-
-        bottomDrawerView.addSubview(goToButton)
-
-        // 设置约束
+        addressContainer.addSubview(addressLabel)
+        
         NSLayoutConstraint.activate([
-            // 拖拽指示器
+            addressIcon.leadingAnchor.constraint(equalTo: addressContainer.leadingAnchor),
+            addressIcon.topAnchor.constraint(equalTo: addressContainer.topAnchor, constant: 2),
+            addressIcon.widthAnchor.constraint(equalToConstant: 16),
+            addressIcon.heightAnchor.constraint(equalToConstant: 16),
+            
+            addressLabel.leadingAnchor.constraint(equalTo: addressIcon.trailingAnchor, constant: 8),
+            addressLabel.topAnchor.constraint(equalTo: addressContainer.topAnchor),
+            addressLabel.trailingAnchor.constraint(equalTo: addressContainer.trailingAnchor),
+            addressLabel.bottomAnchor.constraint(equalTo: addressContainer.bottomAnchor)
+        ])
+        
+        contentStack.addArrangedSubview(addressContainer)
+
+        // Estimated time container (for cycling)
+        let timeContainer = UIView()
+        timeContainer.backgroundColor = UIColor(hex: "#01E47C", alpha: 0.1)
+        timeContainer.layer.cornerRadius = 8
+        timeContainer.translatesAutoresizingMaskIntoConstraints = false
+        
+        let timeStack = UIStackView()
+        timeStack.axis = .horizontal
+        timeStack.spacing = 8
+        timeStack.alignment = .center
+        timeStack.translatesAutoresizingMaskIntoConstraints = false
+        
+        let clockIcon = UIImageView(image: UIImage(systemName: "clock.fill"))
+        clockIcon.tintColor = UIColor(hex: "#01E47C")
+        clockIcon.contentMode = .scaleAspectFit
+        clockIcon.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            clockIcon.widthAnchor.constraint(equalToConstant: 18),
+            clockIcon.heightAnchor.constraint(equalToConstant: 18)
+        ])
+        
+        let timeLabel = UILabel()
+        timeLabel.font = UIFont.systemFont(ofSize: 14, weight: .medium)
+        timeLabel.textColor = UIColor(hex: "#01E47C")
+        timeLabel.tag = 104
+        timeLabel.text = "Est. time: --"
+        
+        timeStack.addArrangedSubview(clockIcon)
+        timeStack.addArrangedSubview(timeLabel)
+        
+        timeContainer.addSubview(timeStack)
+        NSLayoutConstraint.activate([
+            timeStack.topAnchor.constraint(equalTo: timeContainer.topAnchor, constant: 8),
+            timeStack.leadingAnchor.constraint(equalTo: timeContainer.leadingAnchor, constant: 12),
+            timeStack.trailingAnchor.constraint(equalTo: timeContainer.trailingAnchor, constant: -12),
+            timeStack.bottomAnchor.constraint(equalTo: timeContainer.bottomAnchor, constant: -8)
+        ])
+        
+        contentStack.addArrangedSubview(timeContainer)
+
+        // Separator line
+        let separatorLine = UIView()
+        separatorLine.backgroundColor = UIColor(hex: "#01E47C", alpha: 0.15)
+        separatorLine.translatesAutoresizingMaskIntoConstraints = false
+        contentStack.addArrangedSubview(separatorLine)
+        NSLayoutConstraint.activate([
+            separatorLine.heightAnchor.constraint(equalToConstant: 1)
+        ])
+
+        // Start Ride button (full width)
+        let startRideButton = createActionButton(
+            title: "Start Ride",
+            icon: "bicycle.circle.fill",
+            isPrimary: true
+        )
+        startRideButton.addTarget(self, action: #selector(goToButtonTapped), for: .touchUpInside)
+        
+        contentStack.addArrangedSubview(startRideButton)
+        NSLayoutConstraint.activate([
+            startRideButton.heightAnchor.constraint(equalToConstant: 54)
+        ])
+
+        // Set constraints
+        NSLayoutConstraint.activate([
             dragIndicator.topAnchor.constraint(equalTo: bottomDrawerView.topAnchor, constant: 8),
             dragIndicator.centerXAnchor.constraint(equalTo: bottomDrawerView.centerXAnchor),
-            dragIndicator.widthAnchor.constraint(equalToConstant: 36),
-            dragIndicator.heightAnchor.constraint(equalToConstant: 4),
+            dragIndicator.widthAnchor.constraint(equalToConstant: 40),
+            dragIndicator.heightAnchor.constraint(equalToConstant: 5),
 
-            // 位置名称
-            nameLabel.topAnchor.constraint(equalTo: dragIndicator.bottomAnchor, constant: 16),
-            nameLabel.leadingAnchor.constraint(equalTo: bottomDrawerView.leadingAnchor, constant: 20),
-            nameLabel.trailingAnchor.constraint(equalTo: bottomDrawerView.trailingAnchor, constant: -20),
-
-            // 地址
-            addressLabel.topAnchor.constraint(equalTo: nameLabel.bottomAnchor, constant: 8),
-            addressLabel.leadingAnchor.constraint(equalTo: bottomDrawerView.leadingAnchor, constant: 20),
-            addressLabel.trailingAnchor.constraint(equalTo: bottomDrawerView.trailingAnchor, constant: -20),
-
-            // 分隔线
-            separatorLine.topAnchor.constraint(equalTo: addressLabel.bottomAnchor, constant: 16),
-            separatorLine.leadingAnchor.constraint(equalTo: bottomDrawerView.leadingAnchor, constant: 20),
-            separatorLine.trailingAnchor.constraint(equalTo: bottomDrawerView.trailingAnchor, constant: -20),
-            separatorLine.heightAnchor.constraint(equalToConstant: 0.5),
-
-            // 前往此处按钮
-            goToButton.topAnchor.constraint(equalTo: separatorLine.bottomAnchor, constant: 16),
-            goToButton.leadingAnchor.constraint(equalTo: bottomDrawerView.leadingAnchor, constant: 20),
-            goToButton.trailingAnchor.constraint(equalTo: bottomDrawerView.trailingAnchor, constant: -20),
-            goToButton.heightAnchor.constraint(equalToConstant: 50),
-            goToButton.bottomAnchor.constraint(lessThanOrEqualTo: bottomDrawerView.safeAreaLayoutGuide.bottomAnchor, constant: -20)
+            contentStack.topAnchor.constraint(equalTo: dragIndicator.bottomAnchor, constant: 16),
+            contentStack.leadingAnchor.constraint(equalTo: bottomDrawerView.leadingAnchor, constant: 20),
+            contentStack.trailingAnchor.constraint(equalTo: bottomDrawerView.trailingAnchor, constant: -20),
+            contentStack.bottomAnchor.constraint(lessThanOrEqualTo: bottomDrawerView.safeAreaLayoutGuide.bottomAnchor, constant: -20)
         ])
+    }
+    
+    // Create action button helper method
+    private func createActionButton(title: String, icon: String, isPrimary: Bool) -> UIButton {
+        let button = UIButton(type: .system)
+        
+        // Set title and icon
+        button.setTitle(title, for: .normal)
+        if let iconImage = UIImage(systemName: icon) {
+            button.setImage(iconImage, for: .normal)
+        }
+        
+        // Icon on left, text on right
+        button.semanticContentAttribute = .forceLeftToRight
+        button.imageEdgeInsets = UIEdgeInsets(top: 0, left: 0, bottom: 0, right: 8)
+        button.titleEdgeInsets = UIEdgeInsets(top: 0, left: 8, bottom: 0, right: 0)
+        button.contentEdgeInsets = UIEdgeInsets(top: 14, left: 16, bottom: 14, right: 16)
+        
+        // Set corner radius
+        button.layer.cornerRadius = 12
+        button.layer.masksToBounds = false
+        
+        if isPrimary {
+            // Primary button - green background
+            button.backgroundColor = UIColor(hex: "#01E47C")
+            button.setTitleColor(UIColor(hex: "#040608"), for: .normal)
+            button.tintColor = UIColor(hex: "#040608")
+            button.titleLabel?.font = UIFont.boldSystemFont(ofSize: 16)
+            
+            // Add shadow
+            button.layer.shadowColor = UIColor(hex: "#01E47C").cgColor
+            button.layer.shadowOffset = CGSize(width: 0, height: 4)
+            button.layer.shadowOpacity = 0.3
+            button.layer.shadowRadius = 8
+        } else {
+            // Secondary button - transparent background with green border
+            button.backgroundColor = UIColor.clear
+            button.setTitleColor(UIColor(hex: "#01E47C"), for: .normal)
+            button.tintColor = UIColor(hex: "#01E47C")
+            button.titleLabel?.font = UIFont.systemFont(ofSize: 16, weight: .medium)
+            button.layer.borderColor = UIColor(hex: "#01E47C").cgColor
+            button.layer.borderWidth = 1.5
+        }
+        
+        button.translatesAutoresizingMaskIntoConstraints = false
+        
+        return button
     }
 
     // MARK: - 抽屉控制方法
@@ -302,25 +545,74 @@ class SearchMapViewController: UIViewController {
     private func showBottomDrawer(with searchResult: SearchResult) {
         selectedSearchResult = searchResult
 
-        // 更新抽屉内容
+        // Update location name
         if let nameLabel = bottomDrawerView.viewWithTag(100) as? UILabel {
-            nameLabel.text = "📍 \(searchResult.name)"
+            nameLabel.text = searchResult.name
         }
 
+        // Update address
         if let addressLabel = bottomDrawerView.viewWithTag(101) as? UILabel {
-            let address = searchResult.address?.formattedAddress(style: .medium) ?? "地址信息不可用"
-            addressLabel.text = "🏠 \(address)"
+            let address = searchResult.address?.formattedAddress(style: .medium) ?? "Address unavailable"
+            addressLabel.text = address
+        }
+        
+        // Update distance (if user location available)
+        let userLocation = mapView.location.latestLocation?.coordinate ?? CLLocationCoordinate2D(latitude: 0, longitude: 0)
+        let distanceInMeters = calculateDistanceInMeters(from: userLocation, to: searchResult.coordinate)
+        let distanceText = formatDistance(distanceInMeters)
+        
+        if let distanceLabel = bottomDrawerView.viewWithTag(103) as? UILabel {
+            distanceLabel.text = distanceText
+        }
+        
+        // Calculate and update estimated cycling time
+        if let timeLabel = bottomDrawerView.viewWithTag(104) as? UILabel {
+            let estimatedTime = calculateCyclingTime(distanceInMeters: distanceInMeters)
+            timeLabel.text = "Est. time: \(estimatedTime)"
         }
 
-
-
-        // 显示抽屉
-        bottomDrawerHeightConstraint.constant = 220
+        // Show drawer - adjust height for new layout
+        bottomDrawerHeightConstraint.constant = 280
         UIView.animate(withDuration: 0.3, delay: 0, usingSpringWithDamping: 0.8, initialSpringVelocity: 0, options: .curveEaseInOut) {
             self.view.layoutIfNeeded()
         }
 
         isDrawerVisible = true
+    }
+    
+    // Calculate distance in meters
+    private func calculateDistanceInMeters(from: CLLocationCoordinate2D, to: CLLocationCoordinate2D) -> Double {
+        let fromLocation = CLLocation(latitude: from.latitude, longitude: from.longitude)
+        let toLocation = CLLocation(latitude: to.latitude, longitude: to.longitude)
+        return fromLocation.distance(from: toLocation)
+    }
+    
+    // Format distance for display
+    private func formatDistance(_ distanceInMeters: Double) -> String {
+        let distanceInMiles = distanceInMeters / 1609.34
+        if distanceInMiles < 0.1 {
+            return String(format: "%.0f ft", distanceInMeters * 3.28084)
+        } else {
+            return String(format: "%.1f mi", distanceInMiles)
+        }
+    }
+    
+    // Calculate estimated cycling time (assuming average speed of 12 mph / 19 km/h)
+    private func calculateCyclingTime(distanceInMeters: Double) -> String {
+        let averageSpeedMph = 12.0
+        let distanceInMiles = distanceInMeters / 1609.34
+        let timeInHours = distanceInMiles / averageSpeedMph
+        let timeInMinutes = timeInHours * 60
+        
+        if timeInMinutes < 1 {
+            return "< 1 min"
+        } else if timeInMinutes < 60 {
+            return String(format: "%.0f min", timeInMinutes)
+        } else {
+            let hours = Int(timeInMinutes / 60)
+            let minutes = Int(timeInMinutes.truncatingRemainder(dividingBy: 60))
+            return String(format: "%dh %dm", hours, minutes)
+        }
     }
 
     private func hideBottomDrawer() {
@@ -403,14 +695,14 @@ class SearchMapViewController: UIViewController {
         geocoder.reverseGeocodeLocation(location) { placemarks, error in
             DispatchQueue.main.async {
                 if let placemark = placemarks?.first {
-                    // 优先使用地点名称，然后是街道地址，最后是城市
+                    // Prioritize location name, then street address, then city
                     let locationName = placemark.name ??
                                      placemark.thoroughfare ??
                                      placemark.locality ??
-                                     "当前位置"
+                                     "Current Location"
                     completion(locationName)
                 } else {
-                    completion("当前位置")
+                    completion("Current Location")
                 }
             }
         }
@@ -477,6 +769,9 @@ extension SearchMapViewController: SearchControllerDelegate {
         // 停止跟随用户位置
         mapView.viewport.idle()
         showAnnotations(results: results)
+        
+        // 更新搜索结果的文字颜色
+        updateSearchResultsTextColor()
     }
 
     /// 当用户选择搜索结果时显示标注
@@ -497,6 +792,9 @@ extension SearchMapViewController: SearchControllerDelegate {
         // 停止跟随用户位置
         mapView.viewport.idle()
         showAnnotations(results: [userFavorite])
+        
+        // 更新搜索结果的文字颜色
+        updateSearchResultsTextColor()
     }
 }
 
@@ -509,7 +807,7 @@ extension PointAnnotation {
         // 设置文本标签
         annotation.textField = searchResult.name
         annotation.textSize = 16
-        annotation.textColor = StyleColor(.black)
+        annotation.textColor = StyleColor(UIColor(hex: "#01E47C"))  // 使用主题色
         annotation.textOffset = [0, -2] // 文本偏移，避免与图标重叠
 
         // 关键：设置标记图片 - 使用系统默认的红色标记

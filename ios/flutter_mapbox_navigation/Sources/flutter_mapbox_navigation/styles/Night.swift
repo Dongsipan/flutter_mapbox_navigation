@@ -73,6 +73,7 @@ class CustomNightStyle: StandardNightStyle {
         let traitCollection = UIScreen.main.traitCollection
         let backgroundColor = UIColor(hex: "#040608")
         let primaryColor = UIColor(hex: "#01E47C")
+        let whiteColor = UIColor.white
         
         // 夜间模式的关键配置
         BottomBannerView.appearance(for: traitCollection).backgroundColor = backgroundColor
@@ -81,15 +82,41 @@ class CustomNightStyle: StandardNightStyle {
         FloatingButton.appearance(for: traitCollection).tintColor = primaryColor
         ResumeButton.appearance(for: traitCollection).backgroundColor = UIColor(hex: "#0A0C0E")
         ResumeButton.appearance(for: traitCollection).tintColor = primaryColor
-        TimeRemainingLabel.appearance(for: traitCollection).textColor = primaryColor
-        TimeRemainingLabel.appearance(for: traitCollection).trafficLowColor = primaryColor
-        TimeRemainingLabel.appearance(for: traitCollection).trafficUnknownColor = primaryColor
         
-        // NextInstructionLabel - 设置多个属性确保生效
-        NextInstructionLabel.appearance(for: traitCollection).textColor = primaryColor
-        NextInstructionLabel.appearance(for: traitCollection).normalTextColor = primaryColor
-        NextInstructionLabel.appearance(for: traitCollection, whenContainedInInstancesOf: [NextBannerView.self]).textColor = primaryColor
-        NextInstructionLabel.appearance(for: traitCollection, whenContainedInInstancesOf: [NextBannerView.self]).normalTextColor = primaryColor
+        // 时间和距离标签 - 改为白色
+        TimeRemainingLabel.appearance(for: traitCollection).textColor = whiteColor
+        TimeRemainingLabel.appearance(for: traitCollection).trafficLowColor = whiteColor
+        TimeRemainingLabel.appearance(for: traitCollection).trafficUnknownColor = whiteColor.withAlphaComponent(0.8)
+        ArrivalTimeLabel.appearance(for: traitCollection).textColor = whiteColor
+        DistanceRemainingLabel.appearance(for: traitCollection).textColor = whiteColor
+        
+        // NextInstructionLabel - 改为白色
+        NextInstructionLabel.appearance(for: traitCollection).textColor = whiteColor
+        NextInstructionLabel.appearance(for: traitCollection).normalTextColor = whiteColor
+        NextInstructionLabel.appearance(for: traitCollection, whenContainedInInstancesOf: [NextBannerView.self]).textColor = whiteColor
+        NextInstructionLabel.appearance(for: traitCollection, whenContainedInInstancesOf: [NextBannerView.self]).normalTextColor = whiteColor
+        
+        // 文字标签颜色 - 改为白色
+        PrimaryLabel.appearance(for: traitCollection, whenContainedInInstancesOf: [InstructionsBannerView.self]).normalTextColor = whiteColor
+        PrimaryLabel.appearance(for: traitCollection, whenContainedInInstancesOf: [StepInstructionsView.self]).normalTextColor = whiteColor
+        SecondaryLabel.appearance(for: traitCollection, whenContainedInInstancesOf: [InstructionsBannerView.self]).normalTextColor = whiteColor.withAlphaComponent(0.8)
+        SecondaryLabel.appearance(for: traitCollection, whenContainedInInstancesOf: [StepInstructionsView.self]).normalTextColor = whiteColor.withAlphaComponent(0.8)
+        DistanceLabel.appearance(for: traitCollection, whenContainedInInstancesOf: [InstructionsBannerView.self]).unitTextColor = whiteColor.withAlphaComponent(0.8)
+        DistanceLabel.appearance(for: traitCollection, whenContainedInInstancesOf: [InstructionsBannerView.self]).valueTextColor = whiteColor
+        DistanceLabel.appearance(for: traitCollection, whenContainedInInstancesOf: [StepInstructionsView.self]).unitTextColor = whiteColor.withAlphaComponent(0.8)
+        DistanceLabel.appearance(for: traitCollection, whenContainedInInstancesOf: [StepInstructionsView.self]).valueTextColor = whiteColor
+        
+        // 道路名称 - 改为白色
+        WayNameLabel.appearance(for: traitCollection).normalTextColor = whiteColor
+        
+        // 转向图标 - 保持主题色
+        ManeuverView.appearance(for: traitCollection).backgroundColor = backgroundColor
+        ManeuverView.appearance(for: traitCollection, whenContainedInInstancesOf: [InstructionsBannerView.self]).primaryColor = primaryColor
+        ManeuverView.appearance(for: traitCollection, whenContainedInInstancesOf: [InstructionsBannerView.self]).secondaryColor = primaryColor.withAlphaComponent(0.8)
+        ManeuverView.appearance(for: traitCollection, whenContainedInInstancesOf: [NextBannerView.self]).primaryColor = primaryColor
+        ManeuverView.appearance(for: traitCollection, whenContainedInInstancesOf: [NextBannerView.self]).secondaryColor = primaryColor.withAlphaComponent(0.8)
+        ManeuverView.appearance(for: traitCollection, whenContainedInInstancesOf: [StepInstructionsView.self]).primaryColor = primaryColor
+        ManeuverView.appearance(for: traitCollection, whenContainedInInstancesOf: [StepInstructionsView.self]).secondaryColor = primaryColor.withAlphaComponent(0.8)
         
         print("🎨 CustomNightStyle: 已应用主题色 #01E47C")
         

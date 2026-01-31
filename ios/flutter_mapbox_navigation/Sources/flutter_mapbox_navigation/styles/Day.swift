@@ -80,8 +80,7 @@ class CustomDayStyle: StandardDayStyle {
         let primaryColor = UIColor(hex: "#01E47C")             // 亮绿色
         let secondaryColor = UIColor(hex: "#00B85F")           // 稍暗的绿色
         let lightGrayColor = UIColor(hex: "#808080")           // 浅灰色
-        let primaryLabelColor = UIColor(hex: "#01E47C")        // 亮绿色
-        let secondaryLabelColor = UIColor(hex: "#01E47C", alpha: 0.8) // 半透明亮绿色
+        let whiteColor = UIColor.white                         // 白色（统一声明）
         
         // Banner 背景色
         TopBannerView.appearance(for: traitCollection).backgroundColor = backgroundColor
@@ -90,28 +89,28 @@ class CustomDayStyle: StandardDayStyle {
         BottomBannerView.appearance(for: traitCollection).backgroundColor = backgroundColor
         BottomPaddingView.appearance(for: traitCollection).backgroundColor = backgroundColor
         
-        // 文字标签颜色
-        PrimaryLabel.appearance(for: traitCollection, whenContainedInInstancesOf: [InstructionsBannerView.self]).normalTextColor = primaryLabelColor
-        PrimaryLabel.appearance(for: traitCollection, whenContainedInInstancesOf: [StepInstructionsView.self]).normalTextColor = primaryLabelColor
-        SecondaryLabel.appearance(for: traitCollection, whenContainedInInstancesOf: [InstructionsBannerView.self]).normalTextColor = secondaryLabelColor
-        SecondaryLabel.appearance(for: traitCollection, whenContainedInInstancesOf: [StepInstructionsView.self]).normalTextColor = secondaryLabelColor
-        DistanceLabel.appearance(for: traitCollection, whenContainedInInstancesOf: [InstructionsBannerView.self]).unitTextColor = secondaryLabelColor
-        DistanceLabel.appearance(for: traitCollection, whenContainedInInstancesOf: [InstructionsBannerView.self]).valueTextColor = primaryLabelColor
-        DistanceLabel.appearance(for: traitCollection, whenContainedInInstancesOf: [StepInstructionsView.self]).unitTextColor = secondaryLabelColor
-        DistanceLabel.appearance(for: traitCollection, whenContainedInInstancesOf: [StepInstructionsView.self]).valueTextColor = primaryLabelColor
+        // 文字标签颜色 - 改为白色
+        PrimaryLabel.appearance(for: traitCollection, whenContainedInInstancesOf: [InstructionsBannerView.self]).normalTextColor = whiteColor
+        PrimaryLabel.appearance(for: traitCollection, whenContainedInInstancesOf: [StepInstructionsView.self]).normalTextColor = whiteColor
+        SecondaryLabel.appearance(for: traitCollection, whenContainedInInstancesOf: [InstructionsBannerView.self]).normalTextColor = whiteColor.withAlphaComponent(0.8)
+        SecondaryLabel.appearance(for: traitCollection, whenContainedInInstancesOf: [StepInstructionsView.self]).normalTextColor = whiteColor.withAlphaComponent(0.8)
+        DistanceLabel.appearance(for: traitCollection, whenContainedInInstancesOf: [InstructionsBannerView.self]).unitTextColor = whiteColor.withAlphaComponent(0.8)
+        DistanceLabel.appearance(for: traitCollection, whenContainedInInstancesOf: [InstructionsBannerView.self]).valueTextColor = whiteColor
+        DistanceLabel.appearance(for: traitCollection, whenContainedInInstancesOf: [StepInstructionsView.self]).unitTextColor = whiteColor.withAlphaComponent(0.8)
+        DistanceLabel.appearance(for: traitCollection, whenContainedInInstancesOf: [StepInstructionsView.self]).valueTextColor = whiteColor
         
-        // NextInstructionLabel - 设置多个属性确保生效
-        NextInstructionLabel.appearance(for: traitCollection).textColor = primaryLabelColor
-        NextInstructionLabel.appearance(for: traitCollection).normalTextColor = primaryLabelColor
-        NextInstructionLabel.appearance(for: traitCollection, whenContainedInInstancesOf: [NextBannerView.self]).textColor = primaryLabelColor
-        NextInstructionLabel.appearance(for: traitCollection, whenContainedInInstancesOf: [NextBannerView.self]).normalTextColor = primaryLabelColor
+        // NextInstructionLabel - 改为白色
+        NextInstructionLabel.appearance(for: traitCollection).textColor = whiteColor
+        NextInstructionLabel.appearance(for: traitCollection).normalTextColor = whiteColor
+        NextInstructionLabel.appearance(for: traitCollection, whenContainedInInstancesOf: [NextBannerView.self]).textColor = whiteColor
+        NextInstructionLabel.appearance(for: traitCollection, whenContainedInInstancesOf: [NextBannerView.self]).normalTextColor = whiteColor
         
         // Step Instructions View
         StepInstructionsView.appearance(for: traitCollection).backgroundColor = backgroundColor
         if let stepsViewControllerClass = NSClassFromString("MapboxNavigationUIKit.StepsViewController") as? UIViewController.Type {
             UITableView.appearance(for: traitCollection, whenContainedInInstancesOf: [stepsViewControllerClass]).backgroundColor = backgroundColor
             UITableViewCell.appearance(for: traitCollection, whenContainedInInstancesOf: [stepsViewControllerClass]).backgroundColor = backgroundColor
-            NextInstructionLabel.appearance(for: traitCollection, whenContainedInInstancesOf: [stepsViewControllerClass]).textColor = lightGrayColor
+            NextInstructionLabel.appearance(for: traitCollection, whenContainedInInstancesOf: [stepsViewControllerClass]).textColor = UIColor.white
         }
         if let stepsBackgroundViewClass = NSClassFromString("MapboxNavigationUIKit.StepsBackgroundView") as? UIView.Type {
             stepsBackgroundViewClass.appearance(for: traitCollection).backgroundColor = backgroundColor
@@ -142,15 +141,15 @@ class CustomDayStyle: StandardDayStyle {
         ResumeButton.appearance(for: traitCollection).backgroundColor = darkBackgroundColor
         ResumeButton.appearance(for: traitCollection).tintColor = primaryColor
         
-        // 时间和距离标签
-        ArrivalTimeLabel.appearance(for: traitCollection).textColor = primaryColor
-        DistanceRemainingLabel.appearance(for: traitCollection).textColor = primaryColor
-        TimeRemainingLabel.appearance(for: traitCollection).textColor = primaryColor
-        TimeRemainingLabel.appearance(for: traitCollection).trafficLowColor = secondaryColor
-        TimeRemainingLabel.appearance(for: traitCollection).trafficUnknownColor = lightGrayColor
+        // 时间和距离标签 - 改为白色
+        ArrivalTimeLabel.appearance(for: traitCollection).textColor = whiteColor
+        DistanceRemainingLabel.appearance(for: traitCollection).textColor = whiteColor
+        TimeRemainingLabel.appearance(for: traitCollection).textColor = whiteColor
+        TimeRemainingLabel.appearance(for: traitCollection).trafficLowColor = whiteColor
+        TimeRemainingLabel.appearance(for: traitCollection).trafficUnknownColor = whiteColor.withAlphaComponent(0.8)
         
-        // 道路名称
-        WayNameLabel.appearance(for: traitCollection).normalTextColor = primaryColor
+        // 道路名称 - 改为白色
+        WayNameLabel.appearance(for: traitCollection).normalTextColor = whiteColor
         WayNameView.appearance(for: traitCollection).backgroundColor = darkBackgroundColor
         
         print("🎨 CustomDayStyle: 已应用主题色 #01E47C")

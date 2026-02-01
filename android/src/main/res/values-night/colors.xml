@@ -56,8 +56,8 @@
     <color name="md_theme_error">#FF0000</color>
     <color name="md_theme_onError">#FFFFFF</color>
     
-    <!-- GPS Warning colors for light mode -->
-    <color name="gps_warning_background">#FFF3CD</color>
-    <color name="gps_warning_text">#664D03</color>
-    <color name="gps_warning_icon">#856404</color>
+    <!-- GPS Warning colors for dark mode -->
+    <color name="gps_warning_background">#664D03</color>
+    <color name="gps_warning_text">#FFECB5</color>
+    <color name="gps_warning_icon">#FFC107</color>
 </resources>

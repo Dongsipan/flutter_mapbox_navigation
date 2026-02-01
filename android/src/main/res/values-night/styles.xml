@@ -1,0 +1,132 @@
+<resources>
+    <!-- Base application theme - 深色主题匹配 Flutter Brightness.dark -->
+    <style name="AppTheme" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="windowNoTitle">true</item>
+        <item name="android:windowNoTitle">true</item>
+        <!-- 主题色配置 - 用于按钮、图标等交互元素 -->
+        <item name="colorPrimary">@color/colorPrimary</item>
+        <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
+        <item name="colorAccent">@color/colorAccent</item>
+        <!-- 背景色配置 -->
+        <item name="android:windowBackground">@color/colorBackground</item>
+        <item name="android:colorBackground">@color/colorBackground</item>
+        <item name="colorSurface">@color/colorSurface</item>
+        <!-- 文字颜色配置 -->
+        <item name="android:textColorPrimary">@color/textPrimary</item>
+        <item name="android:textColorSecondary">@color/textSecondary</item>
+        <!-- 状态栏和导航栏 - 使用背景色而非主题色 -->
+        <item name="android:statusBarColor">@color/colorBackground</item>
+        <item name="android:navigationBarColor">@color/colorBackground</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+
+    <!-- Mapbox Trip Progress View - 骑行导航样式 -->
+    <style name="MapboxCustomTripProgressStyle" parent="MapboxStyleTripProgressView">
+        <!-- 背景色 - 透明，使用父容器背景 -->
+        <item name="tripProgressViewBackgroundColor">@android:color/transparent</item>
+        <!-- 文字颜色 -->
+        <item name="tripProgressTextColor">@color/textPrimary</item>
+    </style>
+
+    <!-- Mapbox Maneuver Turn Icon Style - 确保深色模式下使用主题绿色 -->
+    <style name="MapboxCustomManeuverTurnIconStyle" parent="MapboxStyleTurnIconManeuver">
+        <item name="maneuverTurnIconColor">@color/colorPrimary</item>
+        <item name="maneuverTurnIconShadowColor">@color/colorPrimaryDark</item>
+    </style>
+
+    <!-- Mapbox Maneuver View Style - 深色模式配置 -->
+    <style name="MapboxCustomManeuverStyle" parent="MapboxStyleManeuverView">
+        <item name="maneuverViewBackgroundColor">@color/cardBackgroundDark</item>
+        <item name="subManeuverViewBackgroundColor">@color/cardBackgroundDark</item>
+        <item name="upcomingManeuverViewBackgroundColor">@color/cardBackgroundDark</item>
+        <item name="maneuverViewIconStyle">@style/MapboxCustomManeuverTurnIconStyle</item>
+        <item name="laneGuidanceManeuverIconStyle">@style/MapboxCustomManeuverTurnIconStyle</item>
+    </style>
+
+    <!-- 深色主题 - 无 ActionBar -->
+    <style name="KtMaterialTheme_NoActionBar" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="windowNoTitle">true</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="colorPrimary">@color/colorPrimary</item>
+        <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
+        <item name="colorAccent">@color/colorAccent</item>
+        <item name="android:windowBackground">@color/colorBackground</item>
+        <item name="android:colorBackground">@color/colorBackground</item>
+        <item name="android:textColorPrimary">@color/textPrimary</item>
+        <item name="android:statusBarColor">@color/colorBackground</item>
+        <item name="android:navigationBarColor">@color/colorBackground</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+
+    <!-- 深色主题 - 带 ActionBar（ActionBar 背景使用深色而非主题色）-->
+    <style name="KtMaterialTheme" parent="Theme.MaterialComponents.DayNight.DarkActionBar">
+        <!-- 主题色用于按钮、图标等交互元素 -->
+        <item name="colorPrimary">@color/colorPrimary</item>
+        <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
+        <item name="colorAccent">@color/colorAccent</item>
+        <!-- 背景色配置 -->
+        <item name="android:windowBackground">@color/colorBackground</item>
+        <item name="android:colorBackground">@color/colorBackground</item>
+        <!-- ActionBar 背景色 - 使用深色背景而非主题色 -->
+        <item name="colorPrimarySurface">@color/colorBackground</item>
+        <item name="colorOnPrimary">@color/textPrimary</item>
+        <!-- 文字颜色 -->
+        <item name="android:textColorPrimary">@color/textPrimary</item>
+        <item name="android:textColorSecondary">@color/textSecondary</item>
+        <!-- ActionBar 配置 -->
+        <item name="actionBarSize">56dp</item>
+        <item name="android:windowContentOverlay">@null</item>
+        <!-- 状态栏和导航栏 -->
+        <item name="android:statusBarColor">@color/colorBackground</item>
+        <item name="android:navigationBarColor">@color/colorBackground</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+
+    <!-- StylePicker Activity Theme - 深色主题，ActionBar 使用深色背景 -->
+    <style name="StylePickerTheme" parent="Theme.MaterialComponents.DayNight.DarkActionBar">
+        <!-- 主题色用于按钮、图标等交互元素 -->
+        <item name="colorPrimary">@color/colorPrimary</item>
+        <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
+        <item name="colorAccent">@color/colorAccent</item>
+        <!-- 背景色配置 -->
+        <item name="android:windowBackground">@color/colorBackground</item>
+        <item name="android:colorBackground">@color/colorBackground</item>
+        <!-- ActionBar 背景色 - 使用深色背景而非主题色 -->
+        <item name="colorPrimarySurface">@color/colorBackground</item>
+        <item name="colorOnPrimary">@color/textPrimary</item>
+        <!-- 文字颜色 -->
+        <item name="android:textColorPrimary">@color/textPrimary</item>
+        <item name="android:textColorSecondary">@color/textSecondary</item>
+        <!-- 其他配置 -->
+        <item name="materialCardViewStyle">@style/Widget.MaterialComponents.CardView</item>
+        <item name="android:statusBarColor">@color/colorBackground</item>
+        <item name="android:navigationBarColor">@color/colorBackground</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+
+    <!-- AlertDialog Theme - 退出导航确认对话框主题 -->
+    <style name="AlertDialogTheme" parent="Theme.MaterialComponents.DayNight.Dialog.Alert">
+        <!-- 主题色用于按钮等交互元素 -->
+        <item name="colorPrimary">@color/colorPrimary</item>
+        <item name="colorAccent">@color/colorPrimary</item>
+        <!-- 背景色配置 - 使用卡片背景色使对话框在深色背景上可见 -->
+        <item name="android:background">@color/colorCardBackground</item>
+        <item name="colorSurface">@color/colorCardBackground</item>
+        <!-- 文字颜色配置 -->
+        <item name="android:textColorPrimary">@color/textPrimary</item>
+        <item name="android:textColorSecondary">@color/textSecondary</item>
+        <!-- 按钮样式配置 -->
+        <item name="buttonBarPositiveButtonStyle">@style/PositiveButtonStyle</item>
+        <item name="buttonBarNegativeButtonStyle">@style/NegativeButtonStyle</item>
+    </style>
+
+    <!-- 确认按钮样式 - 使用主题色 -->
+    <style name="PositiveButtonStyle" parent="Widget.MaterialComponents.Button.TextButton.Dialog">
+        <item name="android:textColor">@color/colorPrimary</item>
+    </style>
+
+    <!-- 取消按钮样式 - 使用次要文字颜色 -->
+    <style name="NegativeButtonStyle" parent="Widget.MaterialComponents.Button.TextButton.Dialog">
+        <item name="android:textColor">@color/textSecondary</item>
+    </style>
+</resources>

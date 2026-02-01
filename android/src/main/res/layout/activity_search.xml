@@ -20,7 +20,7 @@
         android:id="@+id/search_results_view"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="@android:color/white" />
+        android:background="@color/colorBackground" />
 
     <!-- 底部抽屉 - 必须直接放在 CoordinatorLayout 内 -->
     <com.mapbox.search.ui.view.place.SearchPlaceBottomSheetView
